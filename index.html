@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Apoapsis</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="/style.css">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="author" content="GitHub@RedReaper420, GitHub@Vector-Graphics">
+	<script type="module" src="/js/main.js"></script>
+</head>
+
+<body>
+	<header>
+		<div class="tab">
+			<button class="tablinks btn" data-tab="btn" id="btn-generate">Generate system</button>
+			<button class="tablinks" data-tab="tab_generator">Generator settings</button>
+			<button class="tablinks btn" data-tab="btn" id="btn-download-system">Download SOLAR file</button>
+			<button class="tablinks btn" data-tab="btn" id="btn-upload-system">Upload SOLAR file</button>
+			<button class="tablinks" data-tab="tab_editor">JSON Editor</button>
+		</div>
+		<div class="tabcontent" id="tab_generator">
+			<p>
+				<label for="gen_seed">Seed:</label>
+				<input type="text" name="gen_seed" id="gen_seed" autocomplete="off">
+			</p>
+
+			<hr>
+			
+			<p>
+				<label for="gen_force_habitable">Force habitable:</label>
+				<input type="checkbox" name="gen_force_habitable" id="gen_force_habitable">
+			</p>
+			<p>
+				<label for="gen_life_chance">Chance of life on habitable planets:</label>
+				<input type="number" name="gen_life_chance" id="gen_life_chance" step="0.1">
+			</p>
+			<p>
+				<div>
+					<label for="gen_jupiter_behavior">Jupiter behavior:</label>
+				</div>
+				<p><label class="radio" for="gen_jupiter_behavior_opt_random">
+					<input type="radio" name="gen_jupiter_behavior" id="gen_jupiter_behavior_opt_random" value="random">
+					<span>Random</span>
+				</label></p>
+				<p><label class="radio" for="gen_jupiter_behavior_opt_no">
+					<input type="radio" name="gen_jupiter_behavior" id="gen_jupiter_behavior_opt_no" value="no">
+					<span>No Jupiter</span>
+				</label></p>
+				<p><label class="radio" for="gen_jupiter_behavior_opt_nohot">
+					<input type="radio" name="gen_jupiter_behavior" id="gen_jupiter_behavior_opt_nohot" value="nohot">
+					<span>No Hot Jupiter</span>
+				</label></p>
+				<p><label class="radio" for="gen_jupiter_behavior_opt_hot">
+					<input type="radio" name="gen_jupiter_behavior" id="gen_jupiter_behavior_opt_hot" value="hot">
+					<span>Hot Jupiter</span>
+				</label></p>
+				<p><label class="radio" for="gen_jupiter_behavior_opt_sol">
+					<input type="radio" name="gen_jupiter_behavior" id="gen_jupiter_behavior_opt_sol" value="sol">
+					<span>Sol-like</span>
+				</label></p>
+			</p>
+			<p>
+				<label for="gen_planet_density">Planet density:</label>
+				<input type="number" name="gen_planet_density" id="gen_planet_density" step="0.1">
+			</p>
+
+			<hr>
+
+			<p>
+				<label for="gen_star_mass_min">Minimum star mass:</label>
+				<input type="number" name="gen_star_mass_min" id="gen_star_mass_min" step="0.1">
+			</p>
+			<p>
+				<label for="gen_star_mass_max">Maximum star mass:</label>
+				<input type="number" name="gen_star_mass_max" id="gen_star_mass_max" step="0.1">
+			</p>
+			<p>
+				<label for="gen_star_mass_use_imf">Use IMF:</label>
+				<input type="checkbox" name="gen_star_mass_use_imf" id="gen_star_mass_use_imf">
+			</p>
+
+			<p>
+				<label for="gen_star_metallicity_min">Minimum star metallicity:</label>
+				<input type="number" name="gen_star_metallicity_min" id="gen_star_metallicity_min">
+			</p>
+			<p>
+				<label for="gen_star_metallicity_max">Maximum star metallicity:</label>
+				<input type="number" name="gen_star_metallicity_max" id="gen_star_metallicity_max">
+			</p>
+			<p>
+				<label for="gen_star_metallicity_gaussian">Use gaussian distribution:</label>
+				<input type="checkbox" name="gen_star_metallicity_use_gaussian" id="gen_star_metallicity_use_gaussian">
+			</p>
+			<p>
+				<label for="gen_star_metallicity_mean">Mean star metallicity:</label>
+				<input type="number" name="gen_star_metallicity_mean" id="gen_star_metallicity_mean">
+			</p>
+			<p>
+				<label for="gen_star_metallicity_std">Standard deviation for star metallicity:</label>
+				<input type="number" name="gen_star_metallicity_std" id="gen_star_metallicity_std">
+			</p>
+		</div>
+		<div class="tabcontent" id="tab_editor">
+			<p>
+				<textarea class="json-editor" cols="60" rows="30"></textarea>
+			</p>
+			<p>
+				<button>Update system</button>
+			</p>
+		</div>
+	</header>
+
+	<main>
+		<div class="system-display"></div>
+		<div class="system-info"></div>
+	</main>
+
+	<footer>
+		<span><b><a target="_blank" href="https://github.com/RedReaper420/apoapsis">Apoapsis</a></b> by RedReaper420 is a refactored fork of <b><a target="_blank" href="https://github.com/Vector-Graphics/periapsis">Periapsis</a></b> by Vector-Graphics.</span>
+	</footer>
+</body>
+</html>

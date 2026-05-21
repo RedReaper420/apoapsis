@@ -1,0 +1,305 @@
+
+:root {
+    --col-text-main: rgb(190, 234, 255);
+	--col-text-alt: rgb(255,255,255);
+    --col-background: #0808087f;
+
+	--col-tab-active: hsl(249, 80%, 40%);
+	--col-tab-hover: hsl(246, 80%, 25%);
+
+	--transition-speed-fast:   0.25s;
+	--transition-speed-medium: 0.33s;
+	--transition-speed-slow:   0.50s;
+
+	--corner-radius: 0.25em;
+	--corner-radius-big: 0.33em;
+}
+
+@font-face {
+	/* Comfortaa by Johan Aakerlund - https://fonts.google.com/specimen/Comfortaa
+	Converted to WOFF2 */
+	font-family: "Comfortaa";
+	src: url("/fonts/Comfortaa-VariableFont_wght.woff2") format('woff2');
+}
+
+@font-face {
+	/* Orbitron by Matt McInerney - https://fonts.google.com/specimen/Orbitron
+	Converted to WOFF2 */
+	font-family: "Orbitron";
+	src: url("/fonts/Orbitron-VariableFont_wght.woff2") format('woff2');
+}
+
+@font-face {
+	/* Metrophobic by Vernon Adams - https://fonts.google.com/specimen/Metrophobic
+	Converted to WOFF2 */
+	font-family: "Metrophobic";
+	src: url("/fonts/Metrophobic-Regular.woff2") format('woff2');
+}
+
+html {
+    --screen-size: calc(sqrt(100vh) * sqrt(100vw) / 1440px);
+	--font-size-const: 0.67;
+	--font-size: calc((25px + 5px * pow(round(to-zero, var(--screen-size) / 0.85px), 2)) * var(--font-size-const));
+
+    font-family: 'Metrophobic', Verdana, Geneva, Tahoma, sans-serif;
+    font-size: var(--font-size);
+	color: var(--col-text-main);
+
+    background-color: #090909;
+
+	scroll-behavior: smooth;
+	box-sizing: border-box;
+}
+@media (orientation: portrait) {
+	html {
+		--font-size: calc((4vmin + 2px) * var(--font-size-const));
+	}
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: inherit;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+}
+
+/* BACKGROUND */
+
+/* Pseudo-elements defaults */
+html::before,
+html::after,
+body::before {
+	content: "";
+	position: fixed;
+	inset: 0;
+}
+
+/* Base pattern layer */
+html::before {
+	z-index: -3;
+
+	background: url("/img/stars.webp") repeat;
+	background-size: 25vw;
+}
+
+/* Animated flickering layer */
+html::after {
+	z-index: -2;
+
+	background: url("/img/stars_mirrored.webp") repeat;
+	background-size: 25vw;
+
+	animation: Bkg 15s infinite linear;
+}
+@keyframes Bkg {
+	0%, 100% { opacity: 0.0; }
+	25%, 75% { opacity: 0.5; }
+	50%      { opacity: 1.0; }
+}
+
+/* Scaling in portrait */
+@media (orientation: portrait) {
+	html::before,
+	html::after {
+		background-size: 50vh;
+	}
+}
+
+/* Gradient at the top */
+body::before {
+	--col-grad-inner: #00000000;
+	--col-grad-outer: #00000064;
+
+	z-index: -1;
+	
+	background: radial-gradient(circle, var(--col-grad-inner), var(--col-grad-outer));
+}
+
+/* ---====== GENERAL ======--- */
+
+footer {
+    text-align: center;
+}
+
+a {
+	color: var(--col-text-main);
+
+	transition: var(--transition-speed-fast);
+
+	&::before {
+		font-size: 67%;
+		content: '🌐';
+		padding-right: 0.1em;
+		opacity: 75%;
+	}
+
+	&:hover {
+		color: var(--col-text-alt);
+	}
+}
+
+/* Style the tab */
+.tab {
+	overflow: hidden;
+	border: 1px solid #ccc;
+	background-color: var(--col-background);
+}
+
+
+/* Style the buttons inside the tab */
+.tab button {
+	font-size: large;
+	float: left;
+	padding: 0.75em 0.75em;
+
+	color: var(--col-text-alt);
+	background-color: inherit;
+	border: none;
+	outline: none;
+	cursor: pointer;
+
+	transition: var(--transition-speed-medium);
+
+	&::before {
+		padding-right: 0.25em;
+		content: '≡';
+	}
+
+	&.btn::before {
+		content: none;
+	}
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+	background-color: var(--col-tab-hover);
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+ 	background-color: var(--col-tab-active);
+}
+
+/* Style the tab content */
+.tabcontent {
+	display: none;
+	padding: 0.5em 1em;
+	text-align: center;
+
+	background-color: var(--col-background);
+	border: 1px solid #ccc;
+	border-top: none;
+
+	&.active {
+		display: block;
+	}
+}
+
+/* SWITCH/TOGGLE */
+
+.toggles-container {
+	font-size: 90%;
+
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+	align-content: center;
+}
+@media (orientation: portrait) {
+	.toggles-container {
+		font-size: 85%;
+		flex-direction: column;
+	}
+}
+
+.toggle {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	
+	margin: 0.33em 0.25em;
+}
+
+.toggle-label {
+	width: 1.5em;
+	margin: 0.25em;
+	user-select: none;
+}
+.toggle-label.left {
+	text-align: right;
+	margin-left: 0;
+}
+.toggle-label.right {
+	text-align: left;
+	margin-right: 0;
+}
+
+/* The switch - the box around the slider */
+.switch {
+	position: relative;
+	display: inline-block;
+	
+	width: 2.3em;
+	height: 1.1em;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+
+/* The slider */
+.slider {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+
+	background-color: #4A9DC9; /* Toggle OFF background color */
+
+	border-radius: 1em;
+
+	cursor: pointer;
+	
+	transition: var(--transition-speed-slow);
+}
+.slider::before {
+	content: "";
+	position: absolute;
+	height: 0.9em;
+	width: 0.9em;
+	left: 0.1em;
+	bottom: 0.1em;
+	
+	background-color: var(--col-main); /* Slider color */
+
+	border-radius: 50%;
+
+	transition: var(--transition-speed-medium);
+}
+.slider:hover::before {
+	background-color: var(--col-highlight);
+}
+input:checked + .slider {
+	background-color: #CC262E; /* Toggle ON background color */
+}
+input:checked + .slider::before {
+	transform: translateX(1.2em);
+}
+
+/* --- */
+
+.json-editor {
+	font-family: 'Courier New', Courier, monospace;
+	color: var(--col-text-alt);
+	background-color: var(--col-background);
+}
