@@ -8,7 +8,17 @@ class Consts {
 		this.PHY_STAR_METALLICITY_MAX = 2.0;
 
 		this.PHY_SUN_LIFESPAN = 10; // in Gyr
-		this.PHY_SUN_TEMPERATURE = 5772.0; 
+		this.PHY_SUN_TEMPERATURE = 5772.0; // in K
+
+		this.DEF_BINARY_SYSTEM_MASS_RATIO = 0.1 // 1:10 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon)
+
+		this.PHY_DENSITY_IRON = 8.0;
+		this.PHY_DENSITY_ROCK = 2.7;
+		this.PHY_DENSITY_ICE = 0.9;
+		this.PHY_DENSITY_GAS = 0.2;
+
+		this.PHY_TEMP_ABSOLUTE_ZERO = -273.15;
+		this.PHY_G = 6.6743015e-11;
 
 		// ---
 
