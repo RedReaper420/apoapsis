@@ -7,7 +7,7 @@ import consts from "../data/consts.js";
 
 class SystemGenerator {
 	constructor(
-		settings=new types.GenerationSettings()
+		settings = new types.GenerationSettings()
 	) {
 		this.settings = settings;
 
@@ -150,7 +150,7 @@ class SystemGenerator {
 		this.generateStarFormation(null);
 
 		// Generating the secondary single/binary star on a wide orbit
-		if (this.decideBinary)
+		if (this.decideBinary())
 			this.generateStarFormation(this.system.bodies[0]);
 
 		console.log(this.system);
