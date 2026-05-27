@@ -4,40 +4,40 @@ import consts from "../data/consts.js";
 import * as types from "../data/types.js";
 import * as namegen from "./namegen.js";
 
-
-function getLifespan(star_mass = new types.Value(1.0, 'mass_M_sun'), star_luminosity = 1.0) {
-	const mass = star_mass.getValueAs('mass_M_sun');
+function getLifespan(star_mass = new types.Value(1.0, types.units.Mass.M_Sun), star_luminosity = 1.0) {
+	const mass = star_mass.getValueAs(types.units.Mass.M_Sun);
 	/*
 	// Mass-only version
 	const pow = mass <= 50.0 ? -2.5 : -3.5;
 	const lifespan = consts.PHY_SUN_LIFESPAN * Math.pow(mass, pow);
 	*/
 	const lifespan = consts.PHY_SUN_LIFESPAN * (mass / star_luminosity);
-	return new types.Value(lifespan, 'time_Gyr');
+	return new types.Value(lifespan, types.units.Time.Gy);
 }
 
-function getLuminosity(star_mass = new types.Value(1.0, 'mass_M_sun')) {
-	const mass = star_mass.getValueAs('mass_M_sun');
+function getLuminosity(star_mass = new types.Value(1.0, types.units.Mass.M_Sun)) {
+	const mass = star_mass.getValueAs(types.units.Mass.M_Sun);
 	
-	// Modified values from there: https://en.wikipedia.org/wiki/Mass-luminosity_relation#Advanced_forms
+	// https://en.wikipedia.org/wiki/Mass-luminosity_relation#Advanced_forms
+	// Slightly modified to make the curve mostly seamless
 	if (mass < 0.43)
 		return 0.23 * Math.pow(mass, 2.3);
 	else if (mass < 2.0)
 		return Math.pow(mass, 4);
 	else if (mass < 53.0)
-		return 1.4 * Math.pow(mass, 3.5) + Math.pow(2.0, 3.5); // *
+		return 1.4 * Math.pow(mass, 3.5) + 0.160808; // no +0.16 originally
 	else
-		return 20450 * mass; // *
+		return 28629.7632 * mass; // 32000*mass originally
 }
 
-function getRadius(star_mass = new types.Value(1.0, 'mass_M_sun')) {
-	const mass = star_mass.getValueAs('mass_M_sun');
+function getRadius(star_mass = new types.Value(1.0, types.units.Mass.M_Sun)) {
+	const mass = star_mass.getValueAs(types.units.Mass.M_Sun);
 
 	// https://academic.oup.com/mnras/article/479/4/5491/5056185
 	if (mass <= 1.5)
-		return new types.Value(0.438*(mass**2) + 0.479*mass + 0.075, 'dist_R_sun');
+		return new types.Value(0.438*(mass**2) + 0.479*mass + 0.075, types.units.Dist.R_Sun);
 	else
-		return new types.Value(Math.pow(mass, 0.8), 'dist_R_sun');
+		return new types.Value(Math.pow(mass, 0.8), types.units.Dist.R_Sun);
 }
 
 const starTypeChart = new Map([
@@ -50,8 +50,8 @@ const starTypeChart = new Map([
 	['O', [50000, 33000]]
 ]);
 
-function getType(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, 'temp_k')) {
-	const temperature = star_temperature.getValueAs('temp_k');
+function getType(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, types.units.Temp.K)) {
+	const temperature = star_temperature.getValueAs(types.units.Temp.K);
 
 	for (const [type, [t_max, t_min]] of starTypeChart) {
 		if (temperature > t_max) {
@@ -70,10 +70,10 @@ function getType(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, 
 	return 'M9';
 }
 
-function getTemperature(star_luminosity = 1.0, star_radius = new types.Value(1.0, 'dist_R_sun')) {
-	const radius = star_radius.getValueAs('dist_R_sun');
+function getTemperature(star_luminosity = 1.0, star_radius = new types.Value(1.0, types.units.Dist.R_Sun)) {
+	const radius = star_radius.getValueAs(types.units.Dist.R_Sun);
 	const temperature = consts.PHY_SUN_TEMPERATURE * Math.pow(star_luminosity / (radius**2), 1/4);
-	return new types.Value(temperature, 'temp_k');
+	return new types.Value(temperature, types.units.Temp.K);
 }
 
 function getAbsMagnitude(star_luminosity = 1.0) {
@@ -81,8 +81,8 @@ function getAbsMagnitude(star_luminosity = 1.0) {
 }
 
 // Ballesteros 2012 approximation inverted (T -> B-V)
-function getBV(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, 'temp_k')) {
-	const temperature = star_temperature.getValueAs('temp_k');
+function getBV(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, types.units.Temp.K)) {
+	const temperature = star_temperature.getValueAs(types.units.Temp.K);
 
 	// Rough but good enough for visualization
 	if (temperature >= 10000) {
@@ -93,10 +93,10 @@ function getBV(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, 't
 	return 6.014 - 5.606 * x + 1.866 * x * x - 0.212 * Math.pow(x, 3);
 }
 
-function temperatureToColor(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, 'temp_k')) {
+function temperatureToColor(star_temperature = new types.Value(consts.PHY_SUN_TEMPERATURE, types.units.Temp.K)) {
 	// https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html
 
-	const temp = Math.max(1000, Math.min(40000, star_temperature.getValueAs('temp_k'))) / 100;
+	const temp = Math.max(1000, Math.min(40000, star_temperature.getValueAs(types.units.Temp.K))) / 100;
 	let r; let g; let b;
 
 	// Red
@@ -135,7 +135,9 @@ function temperatureToColor(star_temperature = new types.Value(consts.PHY_SUN_TE
 
 /**
  * Samples stellar mass from Kroupa (2001) IMF
+ * 
  * Broken power-law: a = 0.3 (0.01-0.08), 1.3 (0.08-0.5), 2.3 (>0.5)
+ * 
  * Uses inverse transform sampling with proper normalization.
  */
 function sampleKroupaIMF(minMass = consts.PHY_STAR_MASS_MIN, maxMass = consts.PHY_STAR_MASS_MAX) {
@@ -192,13 +194,13 @@ function sampleIMF(minMass = 0.08, maxMass = 150) {
 	do {
 		mass = sampleKroupaIMF();
 		attempts++;
-	} while((mass < minMass || mass > maxMass) && attempts < 50);
+	} while((mass < minMass || mass > maxMass) && attempts < 100);
 
-	return new types.Value(Math.max(minMass, Math.min(maxMass, mass)), 'mass_M_sun');
+	return new types.Value(Math.max(minMass, Math.min(maxMass, mass)), types.units.Mass.M_Sun);
 }
 
 /**
- * Sample metallicity [Fe/H] from a truncated normal distribution
+ * Sample metallicity [Fe/H] from a truncated normal distribution.
  * @param {number} mean      - Center of the distribution (usually 0 or -0.1)
  * @param {number} stdev     - Standard deviation (typical: 0.2 to 0.4)
  * @param {number} min       - Minimum allowed [Fe/H]
@@ -212,16 +214,16 @@ function sampleMetallicity(mean = 0.0, stdev = 0.35, min = -2.5, max = 0.5) {
 	do {
 		feh = gaussianRandom(mean, stdev);
 		attempts++;
-	} while ((feh < min || feh > max) && attempts < 50);
+	} while ((feh < min || feh > max) && attempts < 100);
 
 	// Fallback: clamp if we fail to sample inside bounds after many tries
 	return Math.max(min, Math.min(max, feh));
 }
 
 /**
- * Generates a random number following a normal (Gaussian) distribution
- * @param {number} mean - mean value (usually 0)
- * @param {number} stdev - standard deviation (width of scatter)
+ * Generates a random number following a normal (Gaussian) distribution.
+ * @param {number} mean - mean value (usually 0).
+ * @param {number} stdev - standard deviation (width of scatter).
  * @returns {number}
  */
 function gaussianRandom(mean = 0, stdev = 1) {
@@ -236,8 +238,8 @@ function gaussianRandom(mean = 0, stdev = 1) {
 
 /**
  * Generates a star object.
- * @param {types.GenerationSettings} settings - generator settings
- * @param {types.Star} constraint - (optional) star constraint, making the generated star lighter and with simillar metallicity.
+ * @param {types.GenerationSettings} settings - generation settings object.
+ * @param {types.Star} constraint             - (optional) other star constraint, will restrict the generated star's mass, and will assign a simillar metallicity value to it.
  * @returns {types.Star}
  */
 export function generateStar(settings = new types.GenerationSettings(), constraint = null) {
@@ -257,7 +259,7 @@ export function generateStar(settings = new types.GenerationSettings(), constrai
 	}
 	star.mass = settings.star_mass_use_imf
 		? sampleIMF(mass_min, mass_max)
-		: new types.Value(prng.range(mass_min, mass_max), 'mass_M_sun');
+		: new types.Value(prng.range(mass_min, mass_max), types.units.Mass.M_Sun);
 	
 	// Metallicity (positive = metal-rich)
 	let feh = 0;
@@ -294,6 +296,7 @@ export function generateStar(settings = new types.GenerationSettings(), constrai
 
 	star.luminosity = L;
 	star.radius = R;
+	star.density = star.mass.getValueAs(types.units.Mass.kg) / ((4/3)*Math.PI*(R.getValueAs(types.units.Dist.m)**3)) / 1000;
 	star.temperature = getTemperature(star.luminosity, star.radius);
 	star.type = getType(star.temperature);
 	star.abs_mag = getAbsMagnitude(star.luminosity);
@@ -303,7 +306,7 @@ export function generateStar(settings = new types.GenerationSettings(), constrai
 	
 	star.lifespan = getLifespan(star.mass, star.luminosity);
 	if (constraint === null)
-		star.age = new types.Value(star.lifespan.getValueAs('time_Gyr') * prng.range(0.1, 0.9), 'time_Gyr');
+		star.age = new types.Value(star.lifespan.getValueAs(types.units.Time.Gy) * prng.range(0.1, 0.9), types.units.Time.Gy);
 	else
 		star.age = constraint.age;
 

@@ -1,6 +1,151 @@
 
 import consts from "./consts.js";
 
+// =================================================
+// Units
+// =================================================
+
+/**
+ * Enum for available units.
+ * @readonly
+ * @enum {String}
+ */
+export const units = Object.freeze({
+	Dist: Object.freeze({
+		m: 'dist_m',
+		km: 'dist_km',
+		AU: 'dist_au',
+		ly: 'dist_ly',
+		R_Sun: 'dist_R_sun',
+		R_Jupiter: 'dist_R_jupiter',
+		R_Earth: 'dist_R_earth',
+		R_Moon: 'dist_R_moon'
+	}),
+	Mass: Object.freeze({
+		kg: 'mass_kg',
+		M_Sun: 'mass_M_sun',
+		M_Jupiter: 'mass_M_jupiter',
+		M_Earth: 'mass_M_earth',
+		M_Moon: 'mass_M_moon'
+	}),
+	Time: Object.freeze({
+		s: 'time_s',
+		h: 'time_h',
+		d: 'time_d',
+		mo: 'time_mo',
+		y: 'time_y',
+		My: 'time_My',
+		Gy: 'time_Gy'
+	}),
+	Spd: Object.freeze({
+		m_s: 'spd_m_s',
+		km_s: 'spd_km_s',
+		km_h: 'spd_km_h',
+		c: 'spd_c'
+	}),
+	Temp: Object.freeze({
+		K: 'temp_k',
+		C: 'temp_c'
+	}),
+	GROUPS: Object.freeze({
+		Dist: 'dist',
+		Mass: 'mass',
+		Time: 'time',
+		Spd: 'spd',
+		Temp: 'temp'
+	})
+});
+
+const unit_types = [units.GROUPS.Dist, units.GROUPS.Mass, units.GROUPS.Time, units.GROUPS.Spd, units.GROUPS.Temp];
+const unit_val = new Map([
+	// Distance
+	[units.Dist.m,         1],
+	[units.Dist.km,        1000],
+	[units.Dist.AU,        149597870700],
+	[units.Dist.ly,        9460730472580800],
+	[units.Dist.R_Sun,     695700e3],
+	[units.Dist.R_Jupiter, 69886e3],
+	[units.Dist.R_Earth,   6371e3],
+	[units.Dist.R_Moon,    1737.4e3],
+
+	// Mass
+	[units.Mass.kg,        1],
+	[units.Mass.M_Sun,     1.988475e30],
+	[units.Mass.M_Jupiter, 1.898125e27],
+	[units.Mass.M_Earth,   5.97217e24],
+	[units.Mass.M_Moon,    7.346e22],
+
+	// Time,
+	[units.Time.s,  1],
+	[units.Time.h,  1*60*60],
+	[units.Time.d,  1*60*60*24],
+	[units.Time.mo, 1*60*60*24*30],
+	[units.Time.y,  1*60*60*24*365],
+	[units.Time.My, 1*60*60*24*365*1e6],
+	[units.Time.Gy, 1*60*60*24*365*1e9],
+
+	// Speed
+	[units.Spd.m_s,  1],
+	[units.Spd.km_s, 1000],
+	[units.Spd.km_h, 1/3.6],
+	[units.Spd.c,    299792458],
+]);
+
+export class Value {
+	constructor (
+		value = 1.0,
+		unit = units.Mass.kg
+	) {
+		this.value = value;
+		this.unit = unit;
+	}
+
+	getValueAs(targetUnit = '') {
+		if (targetUnit === this.unit) return this.value;
+		if (targetUnit === '') return this.value;
+
+		// Determining unit types and checking if they're the same
+		let unit_type = '';
+		let tar_unit_type = '';
+		for (let type in unit_types) {
+			if (this.unit.startsWith(type)) unit_type = type;
+			if (targetUnit.startsWith(type)) tar_unit_type = type;
+		}
+		if (unit_type !== tar_unit_type) throw new Error(`Incompatable unit types. (Initial: '${unit_type}', Target: '${tar_unit_type}'`);
+
+		// Conversion
+		if (unit_type !== units.GROUPS.Temp) {
+			const si_unit = new Map([
+				[units.GROUPS.Dist, units.Dist.m],
+				[units.GROUPS.Mass, units.Mass.kg],
+				[units.GROUPS.Time, units.Time.s],
+				[units.GROUPS.Spd, units.Spd.m_s]
+			]);
+
+			let converted_value = this.value;
+			if (this.unit !== si_unit.get(unit_type))
+				converted_value *= unit_val.get(this.unit); // From original unit to SI unit
+			converted_value /= unit_val.get(targetUnit); // From SI unit to target unit
+			return converted_value;
+		}
+		else {
+			if (targetUnit == units.Temp.K)
+				return this.value + (consts.PHY_TEMP_ABSOLUTE_ZERO * -1);
+			else
+				return this.value - (consts.PHY_TEMP_ABSOLUTE_ZERO * -1);
+		}
+	}
+
+	convertUnitTo(targetUnit = '') {
+		this.value = this.getValueAs(targetUnit);
+		this.unit = targetUnit;
+	}
+}
+
+// -------------------------------------------------
+
+
+
 export class GenerationSettings {
     constructor(
 		seed_user = '',
@@ -56,91 +201,6 @@ export class System {
 	}
 }
 
-const unit_types = ['dist', 'mass', 'time', 'spd', 'temp'];
-const unit_val = new Map([
-	// Distance
-	['dist_m',         1],
-	['dist_km',        1000],
-	['dist_au',        149597870700],
-	['dist_ly',        9460730472580800],
-	['dist_R_sun',     695700e3],
-	['dist_R_jupiter', 69886e3],
-	['dist_R_earth',   6371e3],
-	['dist_R_moon',    1737.4e3],
-
-	// Mass
-	['mass_kg',        1],
-	['mass_M_sun',     1.988475e30],
-	['mass_M_jupiter', 1.898125e27],
-	['mass_M_earth',   5.97217e24],
-	['mass_M_moon',    7.346e22],
-
-	// Time,
-	['time_s',  1],
-	['time_h',  1*60*60],
-	['time_d',  1*60*60*24],
-	['time_mo', 1*60*60*24*30],
-	['time_y',  1*60*60*24*365],
-	['time_My', 1*60*60*24*365*1e6],
-	['time_Gy', 1*60*60*24*365*1e9],
-
-	// Speed
-	['spd_ms',  1],
-	['spd_kms', 1000],
-	['spd_c',   299792458],
-]);
-
-export class Value {
-	constructor (
-		value = 1.0,
-		unit = 'mass_kg'
-	) {
-		this.value = value;
-		this.unit = unit;
-	}
-
-	getValueAs(targetUnit = '') {
-		if (targetUnit === this.unit) return this.value;
-		if (targetUnit === '') return this.value;
-
-		// Determining unit types and checking if they're the same
-		let unit_type = '';
-		let tar_unit_type = '';
-		for (let type in unit_types) {
-			if (this.unit.startsWith(type)) unit_type = type;
-			if (targetUnit.startsWith(type)) tar_unit_type = type;
-		}
-		if (unit_type !== tar_unit_type) throw new Error(`Incompatable unit types. (Initial: '${unit_type}', Target: '${tar_unit_type}'`);
-
-		// Conversion
-		if (unit_type !== 'temp') {
-			const si_unit = new Map([
-				['dist', 'dist_m'],
-				['mass', 'mass_kg'],
-				['time', 'time_s'],
-				['spd', 'spd_ms']
-			]);
-
-			let converted_value = this.value;
-			if (this.unit !== si_unit.get(unit_type))
-				converted_value *= unit_val.get(this.unit); // From original unit to SI unit]
-			converted_value /= unit_val.get(targetUnit); // From SI unit to target unit]
-			return converted_value;
-		}
-		else {
-			if (targetUnit == 'temp_k')
-				return this.value + (consts.PHY_TEMP_ABSOLUTE_ZERO * -1);
-			else
-				return this.value - (consts.PHY_TEMP_ABSOLUTE_ZERO * -1);
-		}
-	}
-
-	convertUnitTo(targetUnit = '') {
-		this.value = this.getValueAs(targetUnit);
-		this.unit = targetUnit;
-	}
-}
-
 export class CompositionElement {
 	constructor (amount, density) {
 		this.amount = amount;
@@ -165,11 +225,12 @@ export class Composition {
 	}
 
 	getDensity() {
-		return 
+		return (
 			this.iron.getDensityAdjusted() +
 			this.rock.getDensityAdjusted() +
 			this.ice.getDensityAdjusted() +
-			this.gas.getDensityAdjusted();
+			this.gas.getDensityAdjusted()
+		);
 	}
 }
 
@@ -190,19 +251,20 @@ export class Star extends Body {
 		parentBody = null,
 		name = 'Sol',
 
-		mass = new Value(1.0, 'mass_M_sun'),
+		mass = new Value(1.0, units.Mass.M_Sun),
 		metallicity = 0.0, // Fe/H
-		radius = new Value(1.0, 'dist_R_sun'),
+		radius = new Value(1.0, units.Dist.R_Sun),
+		density = 1.409,
 		luminosity = 1.0, // in solar luminocities
-		temperature = new Value(consts.PHY_SUN_TEMPERATURE, 'temp_k'),
+		temperature = new Value(consts.PHY_SUN_TEMPERATURE, units.Temp.K),
 		type = 'G2',
 
 		abs_mag = 4.83,
 		bv = 0.046,
 		color = '#FFF5DC',
 
-		lifespan = new Value(consts.PHY_SUN_LIFESPAN, 'time_Gyr'),
-		age = new Value(consts.PHY_SUN_LIFESPAN * 0.46, 'time_Gyr'),
+		lifespan = new Value(consts.PHY_SUN_LIFESPAN, units.Time.Gy),
+		age = new Value(consts.PHY_SUN_LIFESPAN * 0.46, units.Time.Gy),
 	) {
 		super(parentBody, name);
 
@@ -210,6 +272,7 @@ export class Star extends Body {
 		this.metallicity = metallicity;
 		this.luminosity = luminosity;
 		this.radius = radius;
+		this.density = density;
 		this.temperature = temperature;
 		this.type = type;
 
@@ -226,7 +289,7 @@ export class Planet extends Body {
 	constructor (
 		parentBody = null,
 
-		mass = new Value(1.0, 'mass_M_earth'),
+		mass = new Value(1.0, units.Mass.M_Earth),
 
 		name = 'Terra',
 	) {
@@ -240,7 +303,7 @@ export class Binary extends Body {
 	constructor (
 		primary = null,
 		secondary = null,
-		sma = new Value(1, 'dist_au'),
+		sma = new Value(1, units.Dist.AU),
 	) {
 		super(null, `${primary.name}-${secondary.name}`);
 
@@ -258,7 +321,7 @@ export class BinaryStar extends Binary {
 	constructor (
 		primary = new Star(),
 		secondary = new Star(),
-		sma = new Value(15, 'dist_au'),
+		sma = new Value(15, units.Dist.AU),
 	) {
 		super(primary, secondary, sma);
 
@@ -267,11 +330,15 @@ export class BinaryStar extends Binary {
 	
 	combineProperties() {
 		this.mass = new Value(
-			this.primary.mass.getValueAs('mass_M_sun') + this.secondary.mass.getValueAs('mass_M_sun'), 
-			'mass_M_sun'); // Combined value
+			this.primary.mass.getValueAs(units.Mass.M_Sun) + this.secondary.mass.getValueAs(units.Mass.M_Sun), 
+			units.Mass.M_Sun); // Combined value
 		this.luminosity = this.primary.luminosity + this.secondary.luminosity; // Combined value
 		this.metallicity = (this.primary.metallicity + this.secondary.metallicity) / 2; // Mean value
 		this.age = this.primary.age; // Equal values, first taken
+		this.temperature = new Value(Math.max(
+			this.primary.temperature.getValueAs(units.Temp.K),
+			this.secondary.temperature.getValueAs(units.Temp.K)
+		), units.Temp.K);
 	}
 }
 
@@ -279,7 +346,7 @@ export class BinaryPlanet extends Binary {
 	constructor (
 		primary = new Planet(),
 		secondary = new Planet(),
-		sma = new Value(500000, 'dist_km'),
+		sma = new Value(500000, units.Dist.km),
 	) {
 		super(primary, secondary, sma);
 	}

@@ -55,5 +55,6 @@ class Consts {
 	}
 }
 
-const consts = new Consts();
+const consts = Object.freeze(new Consts());
+
 export default consts;
