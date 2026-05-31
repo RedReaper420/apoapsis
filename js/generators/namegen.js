@@ -1,5 +1,5 @@
 import prng from "../utils/prng.js";
 
 export function generate() {
-	return "PlaceholderName " + prng.int32();
+	return "PH_" + prng.int32();
 }

@@ -1,5 +1,5 @@
 
-// eventBus.js
+// Originally by Mohsen Fallahnejad (GitHub@mohsenfallahnjd)
 class EventBus {
 	constructor() { this.map = Object.create(null); }
 
@@ -28,5 +28,33 @@ class EventBus {
 	}
 }
 
-const eventBus = new EventBus();
-export default eventBus;
+export const eventBus = new EventBus();
+
+export const events = Object.freeze({
+	Generator: Object.freeze({
+		Generate: 'generator:generate',
+		Settings: Object.freeze({
+			Seed: 'generator:settings_seed',
+
+			ForceHabitable: 'settings_force_habitable',
+			LifeChance: 'settings_life_chance',
+
+			JupiterBehavior: 'settings_life_jupiter_behavior',
+			PlanetDensity: 'settings_planet_density',
+
+			Star: Object.freeze({
+				BinaryChance: 'settings_star_binary_chance',
+
+				MassMin: 'settings_star_mass_min',
+				MassMax: 'settings_star_mass_max',
+				MassUseIMF: 'settings_star_mass_use_imf',
+
+				MetallicityMin: 'settings_star_metallicity_min',
+				MetallicityMax: 'settings_star_metallicity_max',
+				MetallicityGaussian: 'settings_star_metallicity_gaussian',
+				MetallicityMean: 'settings_star_metallicity_mean',
+				MetallicityStD: 'settings_star_metallicity_std',
+			}),
+		}),
+	}),
+});

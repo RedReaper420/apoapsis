@@ -8,7 +8,8 @@ import consts from "./consts.js";
 /**
  * Enum for available units.
  * @readonly
- * @enum {String}
+ * @enum {string}
+ * @see {@link Value}
  */
 export const units = Object.freeze({
 	Dist: Object.freeze({
@@ -56,8 +57,8 @@ export const units = Object.freeze({
 	})
 });
 
-const unit_types = [units.GROUPS.Dist, units.GROUPS.Mass, units.GROUPS.Time, units.GROUPS.Spd, units.GROUPS.Temp];
-const unit_val = new Map([
+const unitTypes = [units.GROUPS.Dist, units.GROUPS.Mass, units.GROUPS.Time, units.GROUPS.Spd, units.GROUPS.Temp];
+const unitValues = new Map([
 	// Distance
 	[units.Dist.m,         1],
 	[units.Dist.km,        1000],
@@ -92,51 +93,63 @@ const unit_val = new Map([
 ]);
 
 export class Value {
-	constructor (
-		value = 1.0,
-		unit = units.Mass.kg
-	) {
+	/**
+	 * A value with the assigned unit (convertable)
+	 * @param {number} value 
+	 * @param {string} unit - <types.units.GROUP.UNIT>
+	 */
+	constructor (value, unit) {
 		this.value = value;
 		this.unit = unit;
 	}
 
-	getValueAs(targetUnit = '') {
+	/**
+	 * Get the raw number value converted to the specified unit.
+	 * @param {string} targetUnit - <types.units.GROUP.UNIT>
+	 * @returns {number}
+	 */
+	getValueAs(targetUnit) {
+		if (targetUnit === undefined) return this.value;
 		if (targetUnit === this.unit) return this.value;
-		if (targetUnit === '') return this.value;
 
 		// Determining unit types and checking if they're the same
-		let unit_type = '';
-		let tar_unit_type = '';
-		for (let type in unit_types) {
-			if (this.unit.startsWith(type)) unit_type = type;
-			if (targetUnit.startsWith(type)) tar_unit_type = type;
+		let unitType = '';
+		let tarUnitType = '';
+		for (let type in unitTypes) {
+			if (this.unit.startsWith(type)) unitType = type;
+			if (targetUnit.startsWith(type)) tarUnitType = type;
 		}
-		if (unit_type !== tar_unit_type) throw new Error(`Incompatable unit types. (Initial: '${unit_type}', Target: '${tar_unit_type}'`);
+		if (unitType !== tarUnitType)
+			throw new Error(`Incompatable unit types. (Initial: '${unitType}', Target: '${tarUnitType}')`);
 
 		// Conversion
-		if (unit_type !== units.GROUPS.Temp) {
-			const si_unit = new Map([
+		if (unitType === units.GROUPS.Temp) {
+			// Temperature conversion
+			if (targetUnit == units.Temp.K)
+				return this.value + (consts.PHY_TEMP_ABSOLUTE_ZERO * -1); // C -> K
+			else
+				return this.value - (consts.PHY_TEMP_ABSOLUTE_ZERO * -1); // K -> C
+		}
+		else {
+			// Other types conversion
+			const siUnit = new Map([
 				[units.GROUPS.Dist, units.Dist.m],
 				[units.GROUPS.Mass, units.Mass.kg],
 				[units.GROUPS.Time, units.Time.s],
 				[units.GROUPS.Spd, units.Spd.m_s]
 			]);
 
-			let converted_value = this.value;
-			if (this.unit !== si_unit.get(unit_type))
-				converted_value *= unit_val.get(this.unit); // From original unit to SI unit
-			converted_value /= unit_val.get(targetUnit); // From SI unit to target unit
-			return converted_value;
-		}
-		else {
-			if (targetUnit == units.Temp.K)
-				return this.value + (consts.PHY_TEMP_ABSOLUTE_ZERO * -1);
-			else
-				return this.value - (consts.PHY_TEMP_ABSOLUTE_ZERO * -1);
+			let convertedValue = this.value;
+			if (this.unit !== siUnit.get(unitType))
+				convertedValue *= unitValues.get(this.unit); // From original unit to SI unit
+			convertedValue /= unitValues.get(targetUnit); // From SI unit to target unit
+			return convertedValue;
 		}
 	}
 
-	convertUnitTo(targetUnit = '') {
+	convertUnitTo(targetUnit) {
+		if (targetUnit === this.unit) return;
+
 		this.value = this.getValueAs(targetUnit);
 		this.unit = targetUnit;
 	}
@@ -155,6 +168,8 @@ export class GenerationSettings {
 		life_chance = consts.UI_LIFE_CHANCE_VAL_DEF,
 		jupiter_behavior = consts.UI_JUPITER_BEHAVIOR_VAL_DEF,
 		planet_density = consts.UI_PLANET_DENSITY_VAL_DEF,
+
+		star_binary_chance = consts.UI_STAR_BINARY_CHANCE_VAL_DEF,
 
 		star_mass_min = consts.UI_STAR_MASS_MIN_VAL_DEF,
 		star_mass_max = consts.UI_STAR_MASS_MAX_VAL_DEF,
@@ -175,6 +190,8 @@ export class GenerationSettings {
 		this.life_chance = life_chance;
 
 		this.jupiter_behavior = jupiter_behavior;
+
+		this.star_binary_chance = star_binary_chance;
 
 		this.star_mass_min = star_mass_min;
 		this.star_mass_max = star_mass_max;
@@ -206,6 +223,7 @@ export class CompositionElement {
 		this.amount = amount;
 		this.density = density;
 	}
+	
 	getDensityAdjusted() {
 		return this.density * this.amount;
 	}
@@ -259,7 +277,7 @@ export class Star extends Body {
 		temperature = new Value(consts.PHY_SUN_TEMPERATURE, units.Temp.K),
 		type = 'G2',
 
-		abs_mag = 4.83,
+		absMag = 4.83,
 		bv = 0.046,
 		color = '#FFF5DC',
 
@@ -276,7 +294,7 @@ export class Star extends Body {
 		this.temperature = temperature;
 		this.type = type;
 
-		this.abs_mag = abs_mag;
+		this.absMag = absMag;
 		this.bv = bv;
 		this.color = color;
 
@@ -293,7 +311,7 @@ export class Planet extends Body {
 
 		name = 'Terra',
 	) {
-		super();
+		super(parentBody, name);
 
 		// WIP
 	}
@@ -338,7 +356,7 @@ export class BinaryStar extends Binary {
 		this.temperature = new Value(Math.max(
 			this.primary.temperature.getValueAs(units.Temp.K),
 			this.secondary.temperature.getValueAs(units.Temp.K)
-		), units.Temp.K);
+		), units.Temp.K); // Max value
 	}
 }
 
