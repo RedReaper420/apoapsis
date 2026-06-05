@@ -113,12 +113,11 @@ export class Value {
 		if (targetUnit === this.unit) return this.value;
 
 		// Determining unit types and checking if they're the same
-		let unitType = '';
-		let tarUnitType = '';
-		for (let type in unitTypes) {
+		let unitType = ''; let tarUnitType = '';
+		unitTypes.forEach(type => {
 			if (this.unit.startsWith(type)) unitType = type;
 			if (targetUnit.startsWith(type)) tarUnitType = type;
-		}
+		});
 		if (unitType !== tarUnitType)
 			throw new Error(`Incompatable unit types. (Initial: '${unitType}', Target: '${tarUnitType}')`);
 
@@ -274,7 +273,7 @@ export class Star extends Body {
 		radius = new Value(1.0, units.Dist.R_Sun),
 		density = 1.409,
 		luminosity = 1.0, // in solar luminocities
-		temperature = new Value(consts.PHY_SUN_TEMPERATURE, units.Temp.K),
+		temperature = new Value(consts.PHY_TEMP_SUN, units.Temp.K),
 		type = 'G2',
 
 		absMag = 4.83,

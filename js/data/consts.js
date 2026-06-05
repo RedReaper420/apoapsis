@@ -1,25 +1,26 @@
 
 const consts = Object.freeze({
-	PHY_STAR_MASS_MIN: 0.08, // in solar masses
-	PHY_STAR_MASS_MAX: 150.0,
-	
-	PHY_STAR_METALLICITY_MIN: -3.0, // in Fe/H
-	PHY_STAR_METALLICITY_MAX: 2.0,
-
-	PHY_SUN_LIFESPAN: 10, // in Gyr
-	PHY_SUN_TEMPERATURE: 5772.0, // in K
-
-	DEF_BINARY_PLANET_MASS_RATIO: 0.1, // 1:10 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon)
-
-	PHY_DENSITY_IRON: 8.0,
-	PHY_DENSITY_ROCK: 2.7,
-	PHY_DENSITY_ICE: 0.9,
-	PHY_DENSITY_GAS: 0.2,
-
-	PHY_TEMP_ABSOLUTE_ZERO: -273.15, // in C
 	PHY_G: 6.6743015e-11,
 
-	PHY_SNOW_LINE: 2.7, // in AU☉
+	PHY_STAR_MASS_MIN: 0.08, // M☉
+	PHY_STAR_MASS_MAX: 150.0,
+	PHY_STAR_METALLICITY_MIN: -3.0, // Fe/H
+	PHY_STAR_METALLICITY_MAX: 2.0,
+	PHY_SUN_LIFESPAN: 10, // Gyr
+
+	PHY_TEMP_SIGMA: 5.670374419e-8, // Stefan-Boltzmann constant
+	PHY_TEMP_ABSOLUTE_ZERO: -273.15, // C
+	PHY_TEMP_SUN: 5772.0, // K
+	PHY_TEMP_EARTH_EQ: 278.5, // K
+
+	PHY_SNOW_LINE: 2.7, // AU☉
+
+	PHY_DENSITY_IRON: 7.87, // g/cm^3
+	PHY_DENSITY_ROCK: 3.25,
+	PHY_DENSITY_ICE: 0.92,
+	PHY_DENSITY_EARTH: 5.51, // g/cm^3
+
+	DEF_BINARY_PLANET_MASS_RATIO: 0.1, // 1:10 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon)
 
 	// ---
 
@@ -42,7 +43,7 @@ const consts = Object.freeze({
 	UI_STAR_MASS_LIM_MIN: 0.08, // see PHY_STAR_MASS_MIN
 	UI_STAR_MASS_LIM_MAX: 150.0, // see PHY_STAR_MASS_MAX
 	UI_STAR_MASS_MIN_VAL_DEF: 0.08, // see UI_STAR_MASS_LIM_MIN
-	UI_STAR_MASS_MAX_VAL_DEF: 150.0, // see UI_STAR_MASS_LIM_MAX
+	UI_STAR_MASS_MAX_VAL_DEF: 10.0,
 
 	UI_STAR_MASS_USE_IMF_VAL_DEF: true,
 

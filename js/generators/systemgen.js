@@ -85,7 +85,7 @@ class SystemGenerator {
 	 * @returns {number} in AU
 	 */
 	getNextOrbit(smaCurrent) {
-		const newPeriod = prng.range(1.4, 2.8);
+		const newPeriod = prng.range(1.4, 2.6);
 		return smaCurrent * ((newPeriod**2)**(1/3)); // Simplified Kepler's 3rd law
 	}
 
@@ -109,8 +109,8 @@ class SystemGenerator {
 		let skipCount = 0;
 
 		while (skipCount < 6) {
-			const skipProb = Math.pow(0.5, skipCount + 1); // 50%, 25%, 12.5%...
-			if (prng() >= skipProb) break;
+			const skipProb = 1 - Math.pow(0.5, skipCount + 1); // 50%, 25%, 12.5%...
+			if (prng() < skipProb) break;
 			
 			current = this.getNextOrbit(current);
 			skipCount++;
@@ -136,7 +136,7 @@ class SystemGenerator {
 	 * Generates planets for the specified (binary) star instance.
 	 * @param {types.Star} star - a (binary) star instance getting the planets generated
 	 * @param {Array} planetsArray
-	 * @param {number} distanceLimit - distance (in AU) limit beyond which planets will not be generated
+	 * @param {number} distanceLimit - distance limit (in AU) beyond which planets will not be generated
 	 * @param {number} distanceStart - [default 0.1] distance (in AU) from which planets will start generating
 	 * @param {number} planetsNumber - [optional] specified planets number to generate instead of a random one
 	 * @returns {number} number of not generated planets, as they've got beyond the allowed distance
@@ -146,7 +146,7 @@ class SystemGenerator {
 		if (planetsToGenerate === 0)
 			return 0;
 
-		const startDistance = distanceStart + prng.range(0.0, 0.15) * Math.sqrt(star.luminosity); // AU
+		const startDistance = (distanceStart + prng.range(0.0, 0.15)) * Math.sqrt(star.luminosity); // AU
 		let sma = startDistance;
 		let discardedPlanets = 0;
 		for (let planetIndex = 0; planetIndex < planetsToGenerate; planetIndex++) {
@@ -227,7 +227,7 @@ class SystemGenerator {
 		}
 		else { // This binary is alone
 			// Simulating a pass-by of a stray red dwarf at 1 ly distance
-			const evilAndIntimidatingRedDwarf = new types.Value(0.25, types.units.Mass.M_Sun);
+			const evilAndIntimidatingRedDwarf = new types.Value(0.3, types.units.Mass.M_Sun);
 			const lightYear = new types.Value(1, types.units.Dist.ly);
 			const passByResult = this.getMaximalSTypeOrbit(binary.mass, evilAndIntimidatingRedDwarf, lightYear);
 			limit_safe = passByResult.getValueAs(types.units.Dist.AU) * S_TYPE_SAFETY_FACTOR;
@@ -261,7 +261,7 @@ class SystemGenerator {
 		}
 		else { // This single star is alone
 			// Simulating a pass-by of a stray red dwarf at 1 ly distance
-			const evilAndIntimidatingRedDwarf = new types.Value(0.25, types.units.Mass.M_Sun);
+			const evilAndIntimidatingRedDwarf = new types.Value(0.3, types.units.Mass.M_Sun);
 			const lightYear = new types.Value(1, types.units.Dist.ly);
 			const passByResult = this.getMaximalSTypeOrbit(star.mass, evilAndIntimidatingRedDwarf, lightYear);
 			a_crit_safe = passByResult.getValueAs(types.units.Dist.AU) * S_TYPE_SAFETY_FACTOR;
@@ -365,25 +365,21 @@ class SystemGenerator {
 		}
 		else {
 			// Binary star decided
-			const constraint = structuredClone(origin);
 			let allow_binary = true;
 			if (origin !== null) {
-				constraint.mass.value /= 2;
-
-				if (constraint.mass.value < consts.PHY_STAR_MASS_MIN) {
+				if ((origin.mass.value / 2) < consts.PHY_STAR_MASS_MIN) {
 					/*
 					Can't generate stars with mass below minimal threshold (that would be brown dwarfs).
 					If attempted to generate, the masses will be clamped to 0.08 M☉, resulting with combined binary mass of 0.16 M☉.
 					The combined mass can get greater than the constraint's mass. So, to avoid that, making a single star instead.
 					*/
 					allow_binary = false;
-					constraint.mass.value *= 2;
 				}
 			}
 
 			if (allow_binary) {
 				// Binary star generated
-				const primary = stargen.generateStar(this.settings, constraint);
+				const primary = stargen.generateStar(this.settings, origin);
 				const secondary = stargen.generateStar(this.settings, primary);
 				const sma = this.generateStarSeparation(primary.mass, secondary.mass, true);
 
@@ -392,7 +388,7 @@ class SystemGenerator {
 			}
 			else {
 				// Single star generated (since binary is incompatible)
-				const star = stargen.generateStar(this.settings, constraint);
+				const star = stargen.generateStar(this.settings, origin, 0.5);
 				this.appendStarFormation(star, origin, starsArray);
 			}
 		}
@@ -403,7 +399,7 @@ class SystemGenerator {
 
 
 	generate() {
-		//this.settings.seed_user = '1779905235851';
+		//this.settings.seed_user = '1780617986811';
 
 		this.settings.seed = !this.settings.seed_user ? +new Date() : this.settings.seed_user;
 		prng.seed(this.settings.seed);

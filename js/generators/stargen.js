@@ -49,6 +49,7 @@ function getLuminosity(starMass) {
  * @param {types.Value} starMass - <types.units.Mass.X>
  * @returns {types.Value} <types.units.Dist.X>
  * @see {@link https://academic.oup.com/mnras/article/479/4/5491/5056185}
+ * @see {@link http://astro.vaporia.com/start/massradius.html}
  */
 function getRadius(starMass) {
 	const mass = starMass.getValueAs(types.units.Mass.M_Sun);
@@ -56,7 +57,8 @@ function getRadius(starMass) {
 	if (mass <= 1.5)
 		return new types.Value(0.438 * (mass**2) + 0.479 * mass + 0.075, types.units.Dist.R_Sun);
 	else
-		return new types.Value(Math.pow(mass, 0.8), types.units.Dist.R_Sun);
+		return new types.Value(Math.pow(10, 0.003 + 0.724 * Math.log10(mass)), types.units.Dist.R_Sun);
+		//return new types.Value(Math.pow(mass, 0.8), types.units.Dist.R_Sun);
 }
 
 const starTypeChart = [
@@ -103,7 +105,7 @@ function getType(starTemperature) {
  */
 function getTemperature(starLuminosity, starRadius) {
 	const radius = starRadius.getValueAs(types.units.Dist.R_Sun);
-	const temperature = consts.PHY_SUN_TEMPERATURE * Math.pow(starLuminosity / (radius**2), 1/4);
+	const temperature = consts.PHY_TEMP_SUN * Math.pow(starLuminosity / (radius**2), 1/4);
 	return new types.Value(temperature, types.units.Temp.K);
 }
 
@@ -277,9 +279,10 @@ function sampleMetallicity(mean, stdev, min, max) {
  * Generate a star instance.
  * @param {types.GenerationSettings} settings
  * @param {types.Star} constraint - [optional] other star constraint, will restrict the generated star's mass, and will assign a simillar metallicity an age values to it.
+ * @param {number} constraintMassMult - [default 1] used to prevent the generation of stars below min mass threshold when a constraint is used.
  * @returns {types.Star}
  */
-export function generateStar(settings, constraint = null) {
+export function generateStar(settings, constraint = null, constraintMassMult = 1) {
 	const star = new types.Star();
 
 	// A constraint is influencing on: mass, metallicity, age
@@ -288,8 +291,8 @@ export function generateStar(settings, constraint = null) {
 	let mass_min = settings.star_mass_min;
 	let mass_max = settings.star_mass_max;
 	if (constraint !== null) {
-		mass_min = Math.max(consts.PHY_STAR_MASS_MIN, constraint.mass.value * 0.1);
-		mass_max = Math.max(consts.PHY_STAR_MASS_MIN, constraint.mass.value * 0.9);
+		mass_min = Math.max(consts.PHY_STAR_MASS_MIN, constraint.mass.value * 0.1 * constraintMassMult);
+		mass_max = Math.max(consts.PHY_STAR_MASS_MIN, constraint.mass.value * 0.9 * constraintMassMult);
 	}
 	star.mass = settings.star_mass_use_imf
 		? sampleIMF(mass_min, mass_max)
