@@ -3,6 +3,7 @@ import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
 import consts from "../data/consts.js";
 import * as types from "../data/types.js";
+
 import * as namegen from "./namegen.js";
 
 /**
@@ -105,7 +106,7 @@ function getType(starTemperature) {
  */
 function getTemperature(starLuminosity, starRadius) {
 	const radius = starRadius.getValueAs(types.units.Dist.R_Sun);
-	const temperature = consts.PHY_TEMP_SUN * Math.pow(starLuminosity / (radius**2), 1/4);
+	const temperature = consts.PHY_SUN_TEMP * Math.pow(starLuminosity / (radius**2), 1/4);
 	return new types.Value(temperature, types.units.Temp.K);
 }
 
@@ -278,7 +279,7 @@ function sampleMetallicity(mean, stdev, min, max) {
 /**
  * Generate a star instance.
  * @param {types.GenerationSettings} settings
- * @param {types.Star} constraint - [optional] other star constraint, will restrict the generated star's mass, and will assign a simillar metallicity an age values to it.
+ * @param {types.Star} constraint - [optional] other star constraint, will restrict the generated star's mass, and will assign a simillar metallicity and age values to it.
  * @param {number} constraintMassMult - [default 1] used to prevent the generation of stars below min mass threshold when a constraint is used.
  * @returns {types.Star}
  */

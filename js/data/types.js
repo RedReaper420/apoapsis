@@ -27,7 +27,8 @@ export const units = Object.freeze({
 		M_Sun: 'mass_M_sun',
 		M_Jupiter: 'mass_M_jupiter',
 		M_Earth: 'mass_M_earth',
-		M_Moon: 'mass_M_moon'
+		M_Moon: 'mass_M_moon',
+		M_Earth_atm: 'mass_M_Earth_atm',
 	}),
 	Time: Object.freeze({
 		s: 'time_s',
@@ -70,11 +71,12 @@ const unitValues = new Map([
 	[units.Dist.R_Moon,    1737.4e3],
 
 	// Mass
-	[units.Mass.kg,        1],
-	[units.Mass.M_Sun,     1.988475e30],
-	[units.Mass.M_Jupiter, 1.898125e27],
-	[units.Mass.M_Earth,   5.97217e24],
-	[units.Mass.M_Moon,    7.346e22],
+	[units.Mass.kg,          1],
+	[units.Mass.M_Sun,       1.988475e30],
+	[units.Mass.M_Jupiter,   1.898125e27],
+	[units.Mass.M_Earth,     5.97217e24],
+	[units.Mass.M_Moon,      7.346e22],
+	[units.Mass.M_Earth_atm, 5.15e18],
 
 	// Time,
 	[units.Time.s,  1],
@@ -147,10 +149,11 @@ export class Value {
 	}
 
 	convertUnitTo(targetUnit) {
-		if (targetUnit === this.unit) return;
-
-		this.value = this.getValueAs(targetUnit);
-		this.unit = targetUnit;
+		if (targetUnit !== this.unit) {
+			this.value = this.getValueAs(targetUnit);
+			this.unit = targetUnit;
+		}
+		return this;
 	}
 }
 
@@ -158,21 +161,22 @@ export class Value {
 
 
 
+// =================================================
+// Generation Settings
+// =================================================
+
 export class GenerationSettings {
     constructor(
 		seed_user = '',
 		seed = '',
 
-		force_habitable = consts.UI_FORCE_HABITABLE_VAL_DEF,
-		life_chance = consts.UI_LIFE_CHANCE_VAL_DEF,
-		jupiter_behavior = consts.UI_JUPITER_BEHAVIOR_VAL_DEF,
-		planet_density = consts.UI_PLANET_DENSITY_VAL_DEF,
+		// Stars settings
 
 		star_binary_chance = consts.UI_STAR_BINARY_CHANCE_VAL_DEF,
 
+		star_mass_use_imf = consts.UI_STAR_MASS_USE_IMF_VAL_DEF,
 		star_mass_min = consts.UI_STAR_MASS_MIN_VAL_DEF,
 		star_mass_max = consts.UI_STAR_MASS_MAX_VAL_DEF,
-		star_mass_use_imf = consts.UI_STAR_MASS_USE_IMF_VAL_DEF,
 
 		star_metallicity_min = consts.UI_STAR_METALLICITY_MIN_VAL_DEF,
 		star_metallicity_max = consts.UI_STAR_METALLICITY_MAX_VAL_DEF,
@@ -180,21 +184,36 @@ export class GenerationSettings {
 		star_metallicity_mean = consts.UI_STAR_METALLICITY_MEAN_VAL_DEF,
 		star_metallicity_std = consts.UI_STAR_METALLICITY_STD_VAL_DEF,
 
+		// Planets settings
+
+		planet_amount_multiplier = consts.UI_PLANET_AMOUNT_MULT_VAL_DEF,
+
+		planet_s_type_safety_factor = consts.UI_PLANET_S_TYPE_SAFETY_FACTOR_VAL_DEF,
+		planet_p_type_enabled = consts.UI_PLANET_P_TYPE_ENABLED_VAL_DEF,
+		planet_p_type_safety_factor = consts.UI_PLANET_P_TYPE_SAFETY_FACTOR_VAL_DEF,
+
+		planet_migration_type_1_enabled = consts.UI_PLANET_MIGRATION_TYPE_1_ENABLED_VAL_DEF,
+		planet_migration_type_1_coeff = consts.UI_PLANET_MIGRATION_TYPE_1_COEFF_VAL_DEF,
+		planet_migration_type_2_enabled = consts.UI_PLANET_MIGRATION_TYPE_2_ENABLED_VAL_DEF,
+		planet_migration_type_2_coeff = consts.UI_PLANET_MIGRATION_TYPE_2_COEFF_VAL_DEF,
+		planet_migration_interpolated = consts.UI_PLANET_MIGRATION_INTERPOLATED_VAL_DEF,
+		planet_migration_grand_tack_enabled = consts.UI_PLANET_MIGRATION_GRAND_TACK_ENABLED_VAL_DEF,
+		planet_migration_hill_safety_factor = consts.UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF,
+
+		// ---
+
     	manual = false,
 	) {
 		this.seed_user = seed_user;
 		this.seed = seed;
 
-		this.force_habitable = force_habitable;
-		this.life_chance = life_chance;
-
-		this.jupiter_behavior = jupiter_behavior;
+		// Stars settings
 
 		this.star_binary_chance = star_binary_chance;
 
+		this.star_mass_use_imf = star_mass_use_imf;
 		this.star_mass_min = star_mass_min;
 		this.star_mass_max = star_mass_max;
-		this.star_mass_use_imf = star_mass_use_imf;
 
 		this.star_metallicity_min = star_metallicity_min;
 		this.star_metallicity_max = star_metallicity_max;
@@ -202,7 +221,23 @@ export class GenerationSettings {
 		this.star_metallicity_mean = star_metallicity_mean;
 		this.star_metallicity_std = star_metallicity_std;
 
-		this.planet_density = planet_density;
+		// Planets settings
+
+		this.planet_amount_multiplier = planet_amount_multiplier;
+
+		this.planet_s_type_safety_factor = planet_s_type_safety_factor;
+		this.planet_p_type_enabled = planet_p_type_enabled;
+		this.planet_p_type_safety_factor = planet_p_type_safety_factor;
+
+		this.planet_migration_type_1_enabled = planet_migration_type_1_enabled;
+		this.planet_migration_type_1_coeff = planet_migration_type_1_coeff;
+		this.planet_migration_type_2_enabled = planet_migration_type_2_enabled;
+		this.planet_migration_type_2_coeff = planet_migration_type_2_coeff;
+		this.planet_migration_interpolated = planet_migration_interpolated;
+		this.planet_migration_grand_tack_enabled = planet_migration_grand_tack_enabled;
+		this.planet_migration_hill_safety_factor = planet_migration_hill_safety_factor;
+
+		// ---
 
         this.manual = manual;
 	}
@@ -216,6 +251,10 @@ export class System {
 		this.bodies = [];
 	}
 }
+
+// -------------------------------------------------
+
+
 
 export class CompositionElement {
 	constructor (amount, density) {
@@ -273,7 +312,7 @@ export class Star extends Body {
 		radius = new Value(1.0, units.Dist.R_Sun),
 		density = 1.409,
 		luminosity = 1.0, // in solar luminocities
-		temperature = new Value(consts.PHY_TEMP_SUN, units.Temp.K),
+		temperature = new Value(consts.PHY_SUN_TEMP, units.Temp.K),
 		type = 'G2',
 
 		absMag = 4.83,
