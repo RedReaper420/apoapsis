@@ -12,49 +12,56 @@ const evilAndIntimidatingRedDwarf = new types.Value(0.3, types.units.Mass.M_Sun)
 const lightYear = new types.Value(1, types.units.Dist.ly);
 
 /**
- * Get SMA for the next orbit with ~{@link consts.PHI} times longer period.
+ * Get SMA for the next orbit with 1.4-2.1 times longer period.
+ * 
  * @param {number} smaCurrent - in AU
+ * 
  * @returns {number} in AU
  */
-function getNextOrbit(smaCurrent) {
-	const newPeriod = consts.PHI * prng.range(0.5, 1.5);
+export function getNextOrbit(smaCurrent) {
+	const newPeriod = prng.range(1.4, 2.1);
 	return smaCurrent * ((newPeriod**2)**(1/3)); // Simplified Kepler's 3rd law
 }
 
 /**
  * Skip the current orbit in favor of a further one. Probability of each skip decreases cumulatively.
- * @see {@link getNextOrbit}
  * 
  * Probability of skips:
  * - 1: 50%
- * - 2: 25% x 50% = 12.5%
- * - 3: 12.5% x 12.5% = 1.56%
- * - 4: 6.25% x 1.56% = 0.098%
- * - 5: 3.13% x 0.098% = 0.003%
+ * - 2: 12.5% (25% x 50%)
+ * - 3: 1.56% (12.5% x 12.5%)
+ * - 4: 0.098% (6.25% x 1.56%)
+ * - 5: 0.003% (3.13% x 0.098%)
  * - 6 and more: 0% (explicitly forbidden; very unlikely in the first place)
  * 
  * @param {number} sma - in AU
+ * 
  * @returns {number} in AU
+ * 
+ * @see {@link getNextOrbit}
  */
-function tryToSkipOrbit(sma) {
-	let current = sma;
-	let skipCount = 0;
+export function tryToSkipOrbit(sma) {
+	const baseSkipProbability = 0.5;
 
+	let sma_new = sma;
+	let skipCount = 0;
 	while (skipCount < 6) {
-		const skipProb = 1 - Math.pow(0.5, skipCount + 1); // 50%, 25%, 12.5%...
+		const skipProb = 1 - Math.pow(baseSkipProbability, skipCount + 1); // 50%, 25%, 12.5%...
 		if (prng() < skipProb) break;
 		
-		current = getNextOrbit(current);
+		sma_new = getNextOrbit(sma_new);
 		skipCount++;
 	}
 
-	return current;
+	return sma_new;
 }
 
 /**
  * Get an average number of planets around the star from its temperature and metallicity.
- * @param {types.Star} star 
- * @param {number} amountMult 
+ * 
+ * @param {types.Star} star   - a star instance. For binaries, amount of P-type orbiting planets is instead calculated from discarded S-type orbiting planets (@see {@link generatePlanetsForBinary}).
+ * @param {number} amountMult - planets amount multiplier setting
+ * 
  * @returns {number}
  */
 function getPlanetsNumberToGenerate(star, amountMult) {
@@ -67,12 +74,14 @@ function getPlanetsNumberToGenerate(star, amountMult) {
 
 /**
  * Generates planets for the specified (binary) star instance.
- * @param {types.GenerationSettings} settings 
- * @param {types.Star} star - a (binary) star instance getting the planets generated
+ * 
+ * @param {types.GenerationSettings} settings - generating system, containing generation settings
+ * @param {types.Star} star		 - a (binary) star instance getting the planets generated
  * @param {number} distanceLimit - distance limit (in AU) beyond which planets will not be generated
- * @param {number} distanceStart - [min {@link PLANET_SPAWN_START_DIST}] distance (in AU) from which planets will start generating
- * @param {number} planetsNumber - [optional] specified planets number to generate instead of a random one
- * @returns {number} number of not generated planets, as they've got beyond the allowed distance
+ * @param {number} distanceStart - [min, default: {@link PLANET_SPAWN_START_DIST}] distance (in AU) from which planets will start generating
+ * @param {number} planetsNumber - [optional] specified planets number to generate instead of a random one (@see {@link generatePlanetsForBinary})
+ * 
+ * @returns {number} number of not generated planets, as they've got beyond the allowed distance limit.
  */
 function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0.0, planetsNumber = undefined) {
 	const planetsToGenerate = planetsNumber === undefined
@@ -91,7 +100,17 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
 			break;
 		}
 		
-		const planet = planetgen.generatePlanet(settings, star, new types.Value(sma, types.units.Dist.AU), { sma_min: distanceStart, sma_max: distanceLimit });
+		const planet = planetgen.generatePlanet(
+			settings, 
+			star, 
+			new types.Value(sma, types.units.Dist.AU), 
+			{ 
+				isMoon: false,
+				sma_init: sma,
+				sma_min: distanceStart, 
+				sma_max: distanceLimit,
+			}
+		);
 		star.bodies.push(planet);
 
 		sma = getNextOrbit(sma);
@@ -102,10 +121,13 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
 
 /**
  * Get minimal stable P-type orbit (around the binary's barycenter) from Holman & Wiegert 1999 (simplified for circular binaries).
+ * 
  * @see {@link getMaximalSTypeOrbit}
+ * 
  * @param {types.Value} mass_greater - <types.units.Mass.X>
- * @param {types.Value} mass_lesser - <types.units.Mass.X>
- * @param {types.Value} binary_sma - <types.units.Dist.X>
+ * @param {types.Value} mass_lesser  - <types.units.Mass.X>
+ * @param {types.Value} binary_sma	 - <types.units.Dist.X>
+ * 
  * @returns {types.Value} <types.units.Dist.X>
  */
 function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
@@ -116,9 +138,11 @@ function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
 
 /**
  * Get maximal stable S-type orbit (around the star) from Holman & Wiegert 1999 (simplified for circular binaries).
- * @param {types.Value} host_mass - <types.units.Mass.X>
+ * 
+ * @param {types.Value} host_mass	   - <types.units.Mass.X>
  * @param {types.Value} companion_mass - <types.units.Mass.X>
- * @param {types.Value} binary_sma - <types.units.Dist.X>
+ * @param {types.Value} binary_sma	   - <types.units.Dist.X>
+ * 
  * @returns {types.Value} <types.units.Dist.X>
  */
 function getMaximalSTypeOrbit(host_mass, companion_mass, binary_sma) {
@@ -133,7 +157,9 @@ function getMaximalSTypeOrbit(host_mass, companion_mass, binary_sma) {
 
 /**
  * Gets distance limits and performs planets generation for a binary star system (both S-type orbits and P-type orbits).
+ * 
  * @see {@link generatePlanetsForStar}
+ * 
  * @param {types.BinaryStar} binary 
  * @param {types.GenerationSettings} settings 
  */
@@ -167,14 +193,16 @@ function generatePlanetsForBinary(binary, settings) {
 		const start_safe = start.getValueAs(types.units.Dist.AU) * settings.planet_p_type_safety_factor;
 		
 		// Avg. of discarded planets x 0.75
-		const pOrbitPlanetsToGenerate = Math.round(((discardedPlanetsPrimary + discardedPlanetsSecondary) / 2) * 0.75);
+		const pOrbitPlanetsToGenerate = Math.round( ((discardedPlanetsPrimary + discardedPlanetsSecondary) / 2) * 0.75 );
 		generatePlanetsForStar(settings, binary, limit_safe, start_safe, pOrbitPlanetsToGenerate);
 	}
 }
 
 /**
  * Gets distance limits and performs planets generation for a single star.
+ * 
  * @see {@link generatePlanetsForStar}
+ * 
  * @param {types.Star} star 
  * @param {types.GenerationSettings} settings 
  */
@@ -199,8 +227,10 @@ function generatePlanetsForSingleStar(star, settings) {
 
 /**
  * Wrapper for generating planets for the specified star formation.
+ * 
  * @param {types.Star} star 
  * @param {types.GenerationSettings} settings 
+ * 
  * @see {@link generatePlanetsForBinary}
  * @see {@link generatePlanetsForSingleStar}
  */
@@ -212,6 +242,7 @@ export function generatePlanets(star, settings) {
 }
 
 /**
+ * 
  * @param {types.GenerationSettings} settings 
  * @param {types.Planet} planet 
  * @param {number} diskDensity 
@@ -262,7 +293,7 @@ function applyMigration(settings, planet, diskDensity, d_t, grandTack) {
 	// Stopping inward migration near the star (and outward too, but normally that shouldn't happen anyway)
 	planet.sma.value = utils.clamp(
 		planet.sma.value, 
-		planet.genData.sma_min - PLANET_SPAWN_START_DIST + ( innerEdge * Math.sqrt(planet.parentBody.luminosity) ),
+		planet.genData.sma_min + ( innerEdge * Math.sqrt(planet.parentBody.luminosity) ),
 		planet.genData.sma_max
 	);
 }
@@ -272,6 +303,7 @@ function applyMigration(settings, planet, diskDensity, d_t, grandTack) {
  * @param {types.Planet} planet_1 
  * @param {types.Planet} planet_2 
  * @param {types.Star} star 
+ * 
  * @returns {types.Value} <types.units.Dist.X>
  */
 function getMutualHillSphere(planet_1, planet_2, star) {
@@ -301,7 +333,7 @@ function mergePlanets(planet, nextPlanet) {
 	// Incrementing impact counter
 	planet.genData.impacts += nextPlanet.genData.impacts + 1;
 
-	// ! Core merge
+	// ---=== Core merge ===---
 	// Core composition fraction to mass conversion
 	planet.core.composition.iron *= planet.core.mass;
 	planet.core.composition.rock *= planet.core.mass;
@@ -318,7 +350,7 @@ function mergePlanets(planet, nextPlanet) {
 	planet.core.composition.rock /= planet.core.mass;
 	planet.core.composition.ice /= planet.core.mass;
 
-	// ! Envelope merge
+	// ---=== Envelope merge ===---
 	// Envelope composition fraction to mass conversion
 	planet.envelope.composition.gas *= planet.envelope.mass;
 	planet.envelope.composition.ice *= planet.envelope.mass;
@@ -332,7 +364,7 @@ function mergePlanets(planet, nextPlanet) {
 	planet.envelope.composition.gas /= planet.envelope.mass > 0 ? planet.envelope.mass : 1;
 	planet.envelope.composition.ice /= planet.envelope.mass > 0 ? planet.envelope.mass : 1;
 
-	// ! Planet type reevaluation
+	// ---=== Planet type reevaluation ===---
 	if (planet.envelope.mass === 0) {
 		planet.type = 'Terrestrial';
 	}
@@ -345,42 +377,52 @@ function mergePlanets(planet, nextPlanet) {
 		}
 	}
 
-	// Donor discarding
+	// ---=== Donor discarding ===---
 	nextPlanet.genData.status = 'Merged';
 	nextPlanet.sma = new types.Value(Infinity, types.units.Dist.AU);
 }
 
 /**
+ * 
  * @param {types.GenerationSettings} settings 
  * @param {types.Planet} planet_1 
  * @param {types.Planet} planet_2 
- * @param {types.Star} star 
+ * @param {types.Star|types.BinaryStar} star 
  */
 function resolveCloseEncounter(settings, planet, nextPlanet, star, finalStep) {
-	// Stability check
+	// 1. Stability check
 	const mutualHillSphere = getMutualHillSphere(planet, nextPlanet, star);
 	const distance = Math.abs(planet.sma.getValueAs(types.units.Dist.AU) - nextPlanet.sma.getValueAs(types.units.Dist.AU));
 	const threshold = mutualHillSphere.getValueAs(types.units.Dist.AU) * settings.planet_migration_hill_safety_factor;
-	if (distance < threshold) { // Planets are too close
+	
+	// 2. Event trigger if planets got too close
+	if (distance < threshold) {
 		const massRatio = planet.mass.getValueAs(types.units.Mass.M_Earth) / nextPlanet.mass.getValueAs(types.units.Mass.M_Earth);
 
 		const outcome_roll = prng();
 		let outcome = 0;
-		
+
 		if (finalStep === false) {
-			if (outcome_roll < 0.3) outcome = 0; // 30% - bodies merge case
-			else if (outcome_roll < 0.5) outcome = 1; // 20% - lesser body eject case
-			else outcome = 2; // 50% - chaotic mutual shift case
+			if (outcome_roll < 0.3)
+				outcome = 0; // 30% - "bodies merged" case
+			else if (outcome_roll < 0.5)
+				outcome = 1; // 20% - "lesser body ejected" case
+			else
+				outcome = 2; // 50% - "chaotic mutual shift" case
 		}
 		else { // Forced violent event at the final simulation step
-			outcome = Math.round(outcome_roll);
+			outcome = Math.round(outcome_roll); // 0 or 1, 2 is excluded
 		}
 
 		switch (outcome) {
 			case 0:
+				// "Bodies merged" case
+
 				mergePlanets(planet, nextPlanet);
 				break;
 			case 1:
+				// "Lesser body ejected" case
+
 				if (massRatio < 1) {
 					// "planet" < "nextPlanet" | "planet" ejects, "nextPlanet" shifts
 					planet.genData.status = 'Ejected';
@@ -399,6 +441,8 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, finalStep) {
 				}
 				break;
 			case 2:
+				// "Chaotic mutual shift" case
+
 				if (massRatio < 1) {
 					// 0.75|1.25^(1 - 0.99..0.01)
 					planet.sma.value *= prng.range(0.7**(1 - massRatio), 1.3**(1 - massRatio));
@@ -413,57 +457,49 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, finalStep) {
 					// 0.75|1.25^(1 - 1/1.01..1/99.9)
 					nextPlanet.sma.value *= prng.range(0.7**(1 - 1/massRatio), 1.3**(1 - 1/massRatio));
 				}
-				break
+				break;
 		}
 	}
 }
 
 /**
+ * Simulates planets migration during the system's early days. In result, destroys some planets, and shifts positions of others.
  * 
- * @param {types.Body} a 
- * @param {types.Body} b 
- * @returns 
- */
-function distSort(a, b) {
-	const dist_a = a.sma.getValueAs(types.units.Dist.m);
-	const dist_b = b.sma.getValueAs(types.units.Dist.m);
-
-	if (dist_a > dist_b) return 1;
-	if (dist_a < dist_b) return -1;
-	return 0;
-}
-
-/**
- * 
- * @param {types.GenerationSettings} settings 
- * @param {Array<types.Star>} starsArray 
+ * @param {types.GenerationSettings} settings - Generation settings
+ * @param {Array<types.Star|types.BinaryStar>} starsArray - List of single and binary stars
  */
 export function simulateMigration(settings, starsArray) {
-	// Converting units of all planets for convenience and reassurance
+	// 1. Units conversion for further convenience
+	// Dist -> AU
 	starsArray.forEach(star => { star.bodies.forEach( body => { 
 		if ((body instanceof types.Planet) === false)
 			return;
 		body.sma.convertUnitTo(types.units.Dist.AU)
 	}); });
+	// Mass -> M⊕
 	starsArray.forEach(star => { star.bodies.forEach( body => { 
 		if ((body instanceof types.Planet) === false)
 			return;
 		body.mass.convertUnitTo(types.units.Mass.M_Earth)
 	}); });
 
+	// 2. Protoplanetary disk setup
 	const d_t = 10000; // 1 step duration in years
-	const diskLifetime = Math.round(new types.Value(5, types.units.Time.My).getValueAs(types.units.Time.y) / d_t); // 5 Myr disk lifetime, converted to steps
+	const diskLifetimeY = new types.Value(5, types.units.Time.My).getValueAs(types.units.Time.y); // 5 Myr disk lifetime
+	const diskLifetime = Math.round(diskLifetimeY / d_t); // Disk lifetime converted to discrete steps
 	
+	// 3. Migration simulation
 	starsArray.forEach(star => {
 		const initialDiskDensity = 1 * (10**(star.metallicity * 0.2)) * (10**utils.randomRangeGaussian(-0.5, 0.5));
-		const starMass = star.mass.getValueAs(types.units.Mass.M_Earth);
 		
 		let activeGiants = 0;
 		let grandTack = false;
 
+		// Simulation cycle
 		for (let step = 0; step < diskLifetime; step++) {
 			const diskDensity = initialDiskDensity * Math.exp(-step / diskLifetime);
 
+			// 3.1. Bodies processing
 			activeGiants = 0; // Giants counter reset
 			for (let i = 0; i < star.bodies.length; i++) {
 				const planet = star.bodies[i];
@@ -471,39 +507,42 @@ export function simulateMigration(settings, starsArray) {
 				// Discarding stars
 				if ((planet instanceof types.Planet) === false)
 					continue;
-				
 				// Discarding discarded planets
 				if ((planet.genData.status === 'Ejected') || (planet.genData.status === 'Merged'))
-					continue; 
+					continue;
 
+				// 3.1.1. Migration
 				applyMigration(settings, planet, diskDensity, d_t, grandTack)
 
-				// --------------------
-				
-				// Array out of bounds protection, since we're processing it in pairs
-				if (i !== (star.bodies.length - 1)) {
-					const nextPlanet = star.bodies[i+1];
+				// 3.1.2. Close encounters
+				if (i !== (star.bodies.length-1))  {// Array out of bounds protection, since we're processing it in pairs
+					let nextPlanet = null;
+					let n = i+1;
+					for (n; n < star.bodies.length-1; n++) {
+						let nextPlanetTemp = star.bodies[i+1];
 
-					// Discarding a star neighbour (it should be at the edge of the list anyway)
-					if ((nextPlanet instanceof types.Planet) === false)
-						continue;
+						// Discarding a star neighbour (it should be at the edge of the list anyway)
+						if ((nextPlanetTemp instanceof types.Planet) === false)
+							continue;
+						// Discarding a discarded planet neighbour
+						if ((nextPlanetTemp.genData.status === 'Ejected') || (nextPlanetTemp.genData.status === 'Merged'))
+							continue;
 
-					// Discarding a discarded planet neighbour
-					if ((nextPlanet.genData.status === 'Ejected') || (nextPlanet.genData.status === 'Merged'))
-						continue;
+						nextPlanet = nextPlanetTemp;
+						break;
+					}
 
-					resolveCloseEncounter(settings, planet, nextPlanet, star, step === (diskLifetime - 1))
+					if (nextPlanet !== null)
+						resolveCloseEncounter(settings, planet, nextPlanet, star, step === (diskLifetime - 1))
 				}
 				
-				// --------------------
-
-				// Gas giants counter increment
+				// 3.1.3. Gas giants counter increment
 				if (planet.genData.status === '')
 					if (planet.type !== 'Terrestrial')
 						activeGiants++;
 			}
 
-			// Grand Tack activation
+			// 3.2. Grand Tack activation
 			if (settings.planet_migration_grand_tack_enabled === true) {
 				if (grandTack === false) {
 					if (activeGiants >= 2)
@@ -512,21 +551,38 @@ export function simulateMigration(settings, starsArray) {
 				}
 			}
 
-			// Resorting array by distance at the end of the step, after processing all planets
+			// 3.3. Resorting array by distance at the end of the step, after processing all planets
+			function distSort(a, b) {
+				const dist_a = a.sma.getValueAs(types.units.Dist.m);
+				const dist_b = b.sma.getValueAs(types.units.Dist.m);
+
+				if (dist_a > dist_b) return 1;
+				if (dist_a < dist_b) return -1;
+				return 0;
+			}
 			star.bodies.sort((a, b) => distSort(a, b)); 
 		}
 	});
 
-	// Discarded planets purge
+	// 4. Post-migration data management
 	starsArray.forEach(star => {
+		// 4.1. Discarded planets purge
 		for (let i = star.bodies.length-1; i >= 0; i--) {
 			if ((star.bodies[i] instanceof types.Planet) === false)
 				continue;
 
 			if (star.bodies[i].genData.status !== '') {
-				console.log(`Removed ${star.bodies[i].type} (${star.bodies[i].genData.status})`);
 				star.bodies.splice(i, 1);
 			}
+		}
+
+		// 4.2. Neighbors assigning
+		for (let i = star.bodies.length-1; i >= 0; i--) {
+			if ((star.bodies[i] instanceof types.Planet) === false)
+				continue;
+
+			star.bodies[i].genData.neighborPrev = i > 0 ? star.bodies[i-1] : null;
+			star.bodies[i].genData.neighborNext = i < (star.bodies.length-1) ? star.bodies[i+1] : null;
 		}
 	});
 }

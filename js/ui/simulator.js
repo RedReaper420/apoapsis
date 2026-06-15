@@ -34,24 +34,24 @@ const warpSlider = document.getElementById('warpSlider');
 const warpDisplay = document.getElementById('warpDisplay');
 
 function updateWarpSpeed() {
-    const val = parseFloat(warpSlider.value);
-    timeMultiplier = Math.pow(10, val);
-    
-    if (timeMultiplier < 3600) {
-        warpDisplay.innerText = `${Math.round(timeMultiplier)} sec/sec`;
-    } else if (timeMultiplier < 86400) {
-        warpDisplay.innerText = `${(timeMultiplier / 3600).toFixed(1)} hours/sec`;
-    } else if (timeMultiplier < 31536000) {
-        warpDisplay.innerText = `${(timeMultiplier / 86400).toFixed(1)} days/sec`;
-    } else {
-        warpDisplay.innerText = `${(timeMultiplier / 31536000).toFixed(1)} years/sec`;
-    }
+	const val = parseFloat(warpSlider.value);
+	timeMultiplier = Math.pow(10, val);
+	
+	if (timeMultiplier < 3600) {
+		warpDisplay.innerText = `${Math.round(timeMultiplier)} sec/sec`;
+	} else if (timeMultiplier < 86400) {
+		warpDisplay.innerText = `${(timeMultiplier / 3600).toFixed(1)} hours/sec`;
+	} else if (timeMultiplier < 31536000) {
+		warpDisplay.innerText = `${(timeMultiplier / 86400).toFixed(1)} days/sec`;
+	} else {
+		warpDisplay.innerText = `${(timeMultiplier / 31536000).toFixed(1)} years/sec`;
+	}
 }
 warpSlider.addEventListener('input', updateWarpSpeed);
 
 function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -61,21 +61,27 @@ resizeCanvas();
  * @param {Array} bodies 
  */
 function addBody(body, bodies) {
-    body.x = 0;
-    body.y = 0;
-    body.vx = 0;
-    body.vy = 0;
-    body.trail = [];
+	body.x = 0;
+	body.y = 0;
+	body.vx = 0;
+	body.vy = 0;
+	body.trail = [];
+	
+	body.mass.convertUnitTo(types.units.Mass.kg);
+	
+	let orbitDirection = 1;
+	if (body instanceof types.Planet) {
+		orbitDirection = body.genData.retrograde ? -1 : 1;
+	}
 
-    body.mass.convertUnitTo(types.units.Mass.kg);
-    if (body instanceof types.BinaryStar) {
-        body.genData = { angle: Math.random() * Math.PI * 2 };
-    }
-
-    if (body.parentBody !== null) {
-        let angle = Math.random() * Math.PI * 2;
-        let r = body.sma.getValueAs(types.units.Dist.m);
-        
+	if (body instanceof types.BinaryStar) {
+		body.genData = { angle: Math.random() * Math.PI * 2 };
+	}
+	
+	if (body.parentBody !== null) {
+		let angle = Math.random() * Math.PI * 2;
+		let r = body.sma.getValueAs(types.units.Dist.m);
+		
 		if (body.parentBody instanceof types.BinaryStar) {
 			if (body instanceof types.Star) {
 				const binary = body.parentBody;
@@ -108,8 +114,8 @@ function addBody(body, bodies) {
 				body.y = binary.y + Math.sin(angle) * r;
 
 				// Notice the matching angle variable naturally separates their direction vectors now
-				body.vx = binary.vx + -Math.sin(angle) * orbitalSpeed;
-				body.vy = binary.vy + Math.cos(angle) * orbitalSpeed;
+				body.vx = binary.vx + Math.sin(angle) * orbitalSpeed * orbitDirection;
+				body.vy = binary.vy + -Math.cos(angle) * orbitalSpeed * orbitDirection;
 			}
 			else {
 				const binary = body.parentBody;
@@ -133,8 +139,8 @@ function addBody(body, bodies) {
 				body.x = body.parentBody.x + Math.cos(angle) * r;
 				body.y = body.parentBody.y + Math.sin(angle) * r;
 				
-				body.vx = binary.vx + -Math.sin(angle) * orbitalSpeed;
-				body.vy = binary.vy + Math.cos(angle) * orbitalSpeed;
+				body.vx = binary.vx + Math.sin(angle) * orbitalSpeed * orbitDirection;
+				body.vy = binary.vy + -Math.cos(angle) * orbitalSpeed * orbitDirection;
 			}
 		}
 		else {
@@ -143,24 +149,24 @@ function addBody(body, bodies) {
 			body.y = body.parentBody.y + Math.sin(angle) * r;
 
 			const orbitalSpeed = Math.sqrt((consts.PHY_G * body.parentBody.mass.value) / r);
-			body.vx = body.parentBody.vx + -Math.sin(angle) * orbitalSpeed;
-			body.vy = body.parentBody.vy + Math.cos(angle) * orbitalSpeed;
+			body.vx = body.parentBody.vx + Math.sin(angle) * orbitalSpeed * orbitDirection;
+			body.vy = body.parentBody.vy + -Math.cos(angle) * orbitalSpeed * orbitDirection;
 		}
-    }
-    
-    if (body instanceof types.Planet) {
-        body.color = body.type === 'Terrestrial' ? '#7fa1b5' : '#e29a4a';
-    }
+	}
+	
+	if (body instanceof types.Planet) {
+		body.color = body.type === 'Terrestrial' ? '#7fa1b5' : '#e29a4a';
+	}
 
-    bodies.push(body);
+	bodies.push(body);
 
-    if (body instanceof types.BinaryStar) {
+	if (body instanceof types.BinaryStar) {
 		body.primary.mass.convertUnitTo(types.units.Mass.kg);
 		body.secondary.mass.convertUnitTo(types.units.Mass.kg);
-        addBody(body.primary, bodies);
-        addBody(body.secondary, bodies);
-    }
-    body.bodies.forEach(childBody => { addBody(childBody, bodies); });
+		addBody(body.primary, bodies);
+		addBody(body.secondary, bodies);
+	}
+	body.bodies.forEach(childBody => { addBody(childBody, bodies); });
 }
 
 function updatePosition(dt) {
@@ -191,6 +197,47 @@ function drawTrail() {
 	ctx.stroke();
 }
 
+/**
+ * 
+ * @param {types.RingSystem} ring 
+ */
+function drawRing(ctx, x, y, scale, ring) {
+    ctx.save();
+
+	const innerRadius = ring.innerRadius.getValueAs(types.units.Dist.m) / scale;
+	const outerRadius = ring.outerRadius.getValueAs(types.units.Dist.m) / scale;
+	const albedo = 0.55 * ring.albedo + 0.15;
+	const baseColor = `rgb(${Math.round(200 * albedo)}, ${Math.round(220 * albedo)}, ${Math.round(240 * albedo)})`;
+
+    // 1. Создаем радиальный градиент от центра планеты
+    // Градиент начинается в точке (x,y) с радиусом innerRadius и идет до outerRadius
+    const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, outerRadius);
+
+    // 2. Настраиваем слои кольца (цветовые переходы)
+    // baseColor должен быть в формате без скобок, например '170, 150, 130' для удобства,
+    // но для универсальности сделаем красивую структуру щелей (как деление Кассини):
+    
+    gradient.addColorStop(0, `${baseColor.replace(')', ', 0)')}`);       // Прозрачный стык у планеты
+    gradient.addColorStop(0.05, `${baseColor.replace(')', ', 0.6)')}`);   // Внутреннее яркое кольцо
+    gradient.addColorStop(0.4, `${baseColor.replace(')', ', 0.8)')}`);    // Плотная средняя зона
+    gradient.addColorStop(0.5, `${baseColor.replace(')', ', 0.1)')}`);    // "Щель" (деление) в кольце
+    gradient.addColorStop(0.6, `${baseColor.replace(')', ', 0.7)')}`);    // Внешнее кольцо
+    gradient.addColorStop(0.95, `${baseColor.replace(')', ', 0.4)')}`);   // Плавное затухание к краю
+    gradient.addColorStop(1, `${baseColor.replace(')', ', 0)')}`);       // Прозрачный внешний край
+
+    // 3. Рисуем геометрию кольца через Path
+    ctx.beginPath();
+    // Рисуем внешнюю окружность по часовой стрелке
+    ctx.arc(x, y, outerRadius, 0, Math.PI * 2, false);
+    // Рисуем внутреннюю окружность ПРОТИВ часовой стрелки (это вырезает отверстие)
+    ctx.arc(x, y, innerRadius, 0, Math.PI * 2, true);
+    ctx.closePath();
+
+    // 4. Заливаем полученное «пончиковое» пространство градиентом
+    ctx.fillStyle = gradient;
+    ctx.fill();
+}
+
 function drawBody() {
 	const coords = this.getScreenCoords();
 	ctx.beginPath();
@@ -199,6 +246,10 @@ function drawBody() {
 	ctx.arc(coords.x, coords.y, visualRadius, 0, Math.PI * 2);
 	ctx.fillStyle = this.color;
 	ctx.fill();
+
+	for (const ring in this.rings) {
+		drawRing(ctx, coords.x, coords.y, metersPerPixel, this.rings[ring]);
+	}
 
 	// Highlight if tracked
 	if (trackedBody === this) {
@@ -245,8 +296,8 @@ function drawHint() {
 
 // --- System Generation ---
 function generateSystem(system) {
-    bodies = [];
-    trackedBody = null;
+	bodies = [];
+	trackedBody = null;
 	
 	system.bodies.forEach(body => {
 		addBody(body, bodies);
@@ -273,167 +324,167 @@ function generateSystem(system) {
 			systemMaxRadius = dist;
 	}
 
-    document.getElementById('totalCountDisplay').innerText = bodies.length;
-    document.getElementById('maxRadiusDisplay').innerText = new types.Value(systemMaxRadius, types.units.Dist.m).getValueAs(types.units.Dist.AU).toFixed(1);
+	document.getElementById('totalCountDisplay').innerText = bodies.length;
+	document.getElementById('maxRadiusDisplay').innerText = new types.Value(systemMaxRadius, types.units.Dist.m).getValueAs(types.units.Dist.AU).toFixed(1);
 
-    const minScreenDimension = Math.min(canvas.width, canvas.height);
-    systemBroadViewScale = (systemMaxRadius * 2.3) / minScreenDimension; 
-    targetMetersPerPixel = systemBroadViewScale;
-    metersPerPixel = systemBroadViewScale;
+	const minScreenDimension = Math.min(canvas.width, canvas.height);
+	systemBroadViewScale = (systemMaxRadius * 2.3) / minScreenDimension; 
+	targetMetersPerPixel = systemBroadViewScale;
+	metersPerPixel = systemBroadViewScale;
 }
 
 // --- Physics Engine (O(N²)) ---
 function updatePhysics(frameTimeSeconds) {
 	if (frameTimeSeconds <= 0) return;
 
-    const n = bodies.length;
+	const n = bodies.length;
 	
 	// If the slider makes a frame step forward by 100,000 seconds, the engine dynamically 
-    // runs 100 precise physics substeps inside this frame instead of breaking.
-    const maxSubstepDt = 1000; 
-    const dynamicSubsteps = Math.max(12, Math.ceil(frameTimeSeconds / maxSubstepDt));
-    const dt = frameTimeSeconds / dynamicSubsteps;
+	// runs 100 precise physics substeps inside this frame instead of breaking.
+	const maxSubstepDt = 1000; 
+	const dynamicSubsteps = Math.max(12, Math.ceil(frameTimeSeconds / maxSubstepDt));
+	const dt = frameTimeSeconds / dynamicSubsteps;
 
-    for (let step = 0; step < dynamicSubsteps; step++) {
-        let fxs = new Array(n).fill(0);
-        let fys = new Array(n).fill(0);
+	for (let step = 0; step < dynamicSubsteps; step++) {
+		let fxs = new Array(n).fill(0);
+		let fys = new Array(n).fill(0);
 
-        for (let i = 0; i < n; i++) {
-            const bI = bodies[i];
-            for (let j = i + 1; j < n; j++) {
-                const bJ = bodies[j];
+		for (let i = 0; i < n; i++) {
+			const bI = bodies[i];
+			for (let j = i + 1; j < n; j++) {
+				const bJ = bodies[j];
 
-                const dx = bJ.x - bI.x;
-                const dy = bJ.y - bI.y;
-                const distSq = dx * dx + dy * dy;
-                const dist = Math.sqrt(distSq);
+				const dx = bJ.x - bI.x;
+				const dy = bJ.y - bI.y;
+				const distSq = dx * dx + dy * dy;
+				const dist = Math.sqrt(distSq);
 
-                if (dist === 0) continue;
+				if (dist === 0) continue;
 
-                const forceMag = (consts.PHY_G * bI.mass.value * bJ.mass.value) / distSq;
-                const fx = forceMag * (dx / dist);
-                const fy = forceMag * (dy / dist);
+				const forceMag = (consts.PHY_G * bI.mass.value * bJ.mass.value) / distSq;
+				const fx = forceMag * (dx / dist);
+				const fy = forceMag * (dy / dist);
 
-                fxs[i] += fx;
-                fys[i] += fy;
-                fxs[j] -= fx;
-                fys[j] -= fy;
-            }
-        }
+				fxs[i] += fx;
+				fys[i] += fy;
+				fxs[j] -= fx;
+				fys[j] -= fy;
+			}
+		}
 
-        for (let i = 0; i < n; i++) {
-            const b = bodies[i];
+		for (let i = 0; i < n; i++) {
+			const b = bodies[i];
 			if (b instanceof types.BinaryStar) continue
 
-            b.vx += (fxs[i] / b.mass.value) * dt;
-            b.vy += (fys[i] / b.mass.value) * dt;
-            b.updatePosition(dt);
-        }
-    }
+			b.vx += (fxs[i] / b.mass.value) * dt;
+			b.vy += (fys[i] / b.mass.value) * dt;
+			b.updatePosition(dt);
+		}
+	}
 
-    // Capture trails periodically
-    for (let i = 0; i < n; i++) {
+	// Capture trails periodically
+	for (let i = 0; i < n; i++) {
 		bodies[i].trail.push({x: bodies[i].x, y: bodies[i].y});
 		if (bodies[i].trail.length > 300) bodies[i].trail.shift();
-    }
+	}
 }
 
 // --- Interaction / Click Event ---
 canvas.addEventListener('click', (e) => {
-    // Check if clicked element was inside UI panel bounding rect
-    const uiPanel = document.getElementById('ui-panel');
-    const rect = uiPanel.getBoundingClientRect();
-    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        return; 
-    }
+	// Check if clicked element was inside UI panel bounding rect
+	const uiPanel = document.getElementById('ui-panel');
+	const rect = uiPanel.getBoundingClientRect();
+	if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+		return; 
+	}
 
-    let clickedBody = null;
-    let closestDist = 20; // Click selection radius in pixels
+	let clickedBody = null;
+	let closestDist = 20; // Click selection radius in pixels
 
-    for (let body of bodies) {
-        const coords = body.getScreenCoords();
-        const dist = Math.hypot(e.clientX - coords.x, e.clientY - coords.y);
-        if (dist < closestDist) {
-            closestDist = dist;
-            clickedBody = body;
-        }
-    }
+	for (let body of bodies) {
+		const coords = body.getScreenCoords();
+		const dist = Math.hypot(e.clientX - coords.x, e.clientY - coords.y);
+		if (dist < closestDist) {
+			closestDist = dist;
+			clickedBody = body;
+		}
+	}
 
-    if (clickedBody) {
-        trackedBody = clickedBody;
-        // Dynamically adjust zoom targets depending on body classification
-        if (trackedBody.type === 'Star') targetMetersPerPixel = systemBroadViewScale * 0.1;
-        else if (trackedBody.type === 'Moon') targetMetersPerPixel = AU * 0.00003; 
-        else targetMetersPerPixel = AU * 0.00008; // Planet view zoom scale
-    } else {
-        // Space clicked: restore system view
-        trackedBody = null;
-        targetMetersPerPixel = systemBroadViewScale;
-    }
+	if (clickedBody) {
+		trackedBody = clickedBody;
+		// Dynamically adjust zoom targets depending on body classification
+		if (trackedBody.type === 'Star') targetMetersPerPixel = systemBroadViewScale * 0.1;
+		else if (trackedBody.type === 'Moon') targetMetersPerPixel = AU * 0.00003; 
+		else targetMetersPerPixel = AU * 0.00008; // Planet view zoom scale
+	} else {
+		// Space clicked: restore system view
+		trackedBody = null;
+		targetMetersPerPixel = systemBroadViewScale;
+	}
 });
 
 // --- Mouse Scroll Zoom Feature ---
 canvas.addEventListener('wheel', (e) => {
-    e.preventDefault(); // Prevent standard browser page scrolling
+	e.preventDefault(); // Prevent standard browser page scrolling
 
-    // Determine zoom factor multiplier (scrolling up zooms in, down zooms out)
-    const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15;
-    
-    // Scale the target metric
-    let nextZoom = targetMetersPerPixel * zoomFactor;
+	// Determine zoom factor multiplier (scrolling up zooms in, down zooms out)
+	const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15;
+	
+	// Scale the target metric
+	let nextZoom = targetMetersPerPixel * zoomFactor;
 
-    // Boundary constraints: Prevents scrolling infinitely outwards or breaking floating math limit boundaries
-    const maxZoomOut = systemBroadViewScale * 4;
-    const maxZoomIn = AU * 0.000005; 
+	// Boundary constraints: Prevents scrolling infinitely outwards or breaking floating math limit boundaries
+	const maxZoomOut = systemBroadViewScale * 4;
+	const maxZoomIn = AU * 0.000005; 
 
-    if (nextZoom > maxZoomIn && nextZoom < maxZoomOut) {
-        targetMetersPerPixel = nextZoom;
-    }
+	if (nextZoom > maxZoomIn && nextZoom < maxZoomOut) {
+		targetMetersPerPixel = nextZoom;
+	}
 }, { passive: false });
 
 // --- Main Animation Frame Engine ---
 let lastRealTime = 0;
 
 function loop(timestamp) {
-    if (!lastRealTime) lastRealTime = timestamp;
-    let realDt = (timestamp - lastRealTime) / 1000;
-    lastRealTime = timestamp;
+	if (!lastRealTime) lastRealTime = timestamp;
+	let realDt = (timestamp - lastRealTime) / 1000;
+	lastRealTime = timestamp;
 
-    if (realDt > 0.1) realDt = 0.1; 
-    const simDt = realDt * timeMultiplier;
+	if (realDt > 0.1) realDt = 0.1; 
+	const simDt = realDt * timeMultiplier;
 
-    updatePhysics(simDt);
+	updatePhysics(simDt);
 
-    // Camera Interpolation & Smoothing
+	// Camera Interpolation & Smoothing
 	const trackingTightness = Math.min(1.0, 0.1 + (timeMultiplier / 5000000));
-    if (trackedBody) {
-        // Linear interpolation to smoothly follow tracked targets
-        cameraX += (trackedBody.x - cameraX) * trackingTightness;
-        cameraY += (trackedBody.y - cameraY) * trackingTightness;
-    } else {
-        // Return camera smoothly back to system geometric origin
-        cameraX += (0 - cameraX) * 0.1;
-        cameraY += (0 - cameraY) * 0.1;
-    }
-    // Zoom easing factor
-    metersPerPixel += (targetMetersPerPixel - metersPerPixel) * 0.08;
+	if (trackedBody) {
+		// Linear interpolation to smoothly follow tracked targets
+		cameraX += (trackedBody.x - cameraX) * trackingTightness;
+		cameraY += (trackedBody.y - cameraY) * trackingTightness;
+	} else {
+		// Return camera smoothly back to system geometric origin
+		cameraX += (0 - cameraX) * 0.1;
+		cameraY += (0 - cameraY) * 0.1;
+	}
+	// Zoom easing factor
+	metersPerPixel += (targetMetersPerPixel - metersPerPixel) * 0.08;
 
-    // Render pass updates
+	// Render pass updates
 	ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.fillStyle = '#03030565';
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+	ctx.fillStyle = '#03030565';
+	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    // Draw lines first so they render under bodies
-    for (let body of bodies) body.drawTrail();
-    for (let body of bodies) body.drawBody();
-    if (trackedBody) trackedBody.drawHint();
+	// Draw lines first so they render under bodies
+	for (let body of bodies) body.drawTrail();
+	for (let body of bodies) body.drawBody();
+	if (trackedBody) trackedBody.drawHint();
 
-    requestAnimationFrame(loop);
+	requestAnimationFrame(loop);
 }
 
 // Start sequence
 updateWarpSpeed();
-eventBus.on(events.Generator.Finished, (cb) => {
+eventBus.on(events.Generator.Generation.Completed, (cb) => {
 	generateSystem(cb.data);
 });
 requestAnimationFrame(loop);

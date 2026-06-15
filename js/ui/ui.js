@@ -62,7 +62,7 @@ function setupSetting(elementId, event, defaultValue, limitMin=undefined, limitM
 // Generate button
 const btn_generate = document.getElementById('btn-generate');
 btn_generate.addEventListener('click', (e) => {
-	eventBus.emit(events.Generator.Generate);
+	eventBus.emit(events.Generator.Generation.Start);
 });
 
 // Seed field

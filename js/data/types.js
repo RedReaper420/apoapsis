@@ -256,104 +256,71 @@ export class System {
 
 
 
-export class CompositionElement {
-	constructor (amount, density) {
-		this.amount = amount;
-		this.density = density;
-	}
-	
-	getDensityAdjusted() {
-		return this.density * this.amount;
-	}
-}
-
-export class Composition {
-	constructor (
-		iron_amount = 0.2,
-		rock_amount = 0.8,
-		ice_amount = 0.0,
-		gas_amount = 0.0,
-	) {
-		this.iron = new CompositionElement(iron_amount, consts.PHY_DENSITY_IRON);
-		this.rock = new CompositionElement(rock_amount, consts.PHY_DENSITY_ROCK);
-		this.ice = new CompositionElement(ice_amount, consts.PHY_DENSITY_ICE);
-		this.gas = new CompositionElement(gas_amount, consts.PHY_DENSITY_GAS);
-	}
-
-	getDensity() {
-		return (
-			this.iron.getDensityAdjusted() +
-			this.rock.getDensityAdjusted() +
-			this.ice.getDensityAdjusted() +
-			this.gas.getDensityAdjusted()
-		);
-	}
-}
+// =================================================
+// Celestial bodies
+// =================================================
 
 export class Body {
-	constructor (
-		parentBody = null,
-		name = 'Spaceball',
-		bodies = [],
-	) {
+	constructor (parentBody = null, name = 'Spaceball') {
 		this.parentBody = parentBody;
 		this.name = name;
-		this.bodies = bodies;
+
+		this.bodies = [];
+		this.sma = new Value(1.26, units.Dist.AU);
+
+		this.mass = new Value(1.0, units.Mass.kg);
+		this.radius = new Value(1.0, units.Dist.m);
+		this.density = 1.0;
+		this.temperature = new Value(2.73, units.Temp.K);
 	}
 }
 
 export class Star extends Body {
-	constructor (
-		parentBody = null,
-		name = 'Sol',
-
-		mass = new Value(1.0, units.Mass.M_Sun),
-		metallicity = 0.0, // Fe/H
-		radius = new Value(1.0, units.Dist.R_Sun),
-		density = 1.409,
-		luminosity = 1.0, // in solar luminocities
-		temperature = new Value(consts.PHY_SUN_TEMP, units.Temp.K),
-		type = 'G2',
-
-		absMag = 4.83,
-		bv = 0.046,
-		color = '#FFF5DC',
-
-		lifespan = new Value(consts.PHY_SUN_LIFESPAN, units.Time.Gy),
-		age = new Value(consts.PHY_SUN_LIFESPAN * 0.46, units.Time.Gy),
-	) {
+	constructor (parentBody = null, name = 'Sol') {
 		super(parentBody, name);
 
-		this.mass = mass;
-		this.metallicity = metallicity;
-		this.luminosity = luminosity;
-		this.radius = radius;
-		this.density = density;
-		this.temperature = temperature;
-		this.type = type;
+		this.mass = new Value(1.0, units.Mass.M_Sun);
+		this.radius = new Value(1.0, units.Dist.R_Sun);
+		this.density = 1.409;
+		this.temperature = new Value(consts.PHY_SUN_TEMP, units.Temp.K);
 
-		this.absMag = absMag;
-		this.bv = bv;
-		this.color = color;
-
-		this.lifespan = lifespan;
-		this.age = age;
+		this.lifespan = new Value(consts.PHY_SUN_LIFESPAN, units.Time.Gy);
+		this.age = new Value(consts.PHY_SUN_LIFESPAN * 0.46, units.Time.Gy);
+		this.metallicity = 0.0;
+		this.luminosity = 1.0;
+		this.type = 'G2';
+		this.absMag = 4.83;
+		this.bv = 0.046;
+		this.color = '#FFF5DC';
 	}
 }
 
 export class Planet extends Body {
-	constructor (
-		parentBody = null,
-
-		mass = new Value(1.0, units.Mass.M_Earth),
-
-		name = 'Terra',
-	) {
+	constructor (parentBody = null, name = 'Terra') {
 		super(parentBody, name);
 
-		// WIP
+		this.mass = new Value(1.0, units.Mass.M_Earth);
+		this.radius = new Value(1.0, units.Dist.R_Earth);
+		this.density = consts.PHY_EARTH_DENSITY;
+		this.temperature = new Value(14, units.Temp.C);
+
+		this.core = new Core();
+		this.envelope = new Envelope();
+
+		this.type = 'Terrestrial';
+		this.rings = [];
+		this.genData = {};
 	}
 }
+
+// -------------------------------------------------
+
+
+
+// =================================================
+// Binary containers
+// =================================================
+
 
 export class Binary extends Body {
 	constructor (
@@ -364,10 +331,10 @@ export class Binary extends Body {
 		super(null, `${primary.name}-${secondary.name}`);
 
 		this.primary = primary;
-		this.secondary = secondary;
-
 		this.primary.parentBody = this;
 		this.primary.sma = sma;
+		
+		this.secondary = secondary;
 		this.secondary.parentBody = this;
 		this.secondary.sma = sma;
 	}
@@ -388,13 +355,13 @@ export class BinaryStar extends Binary {
 		this.mass = new Value(
 			this.primary.mass.getValueAs(units.Mass.M_Sun) + this.secondary.mass.getValueAs(units.Mass.M_Sun), 
 			units.Mass.M_Sun); // Combined value
-		this.luminosity = this.primary.luminosity + this.secondary.luminosity; // Combined value
-		this.metallicity = (this.primary.metallicity + this.secondary.metallicity) / 2; // Mean value
-		this.age = this.primary.age; // Equal values, first taken
 		this.temperature = new Value(Math.max(
 			this.primary.temperature.getValueAs(units.Temp.K),
 			this.secondary.temperature.getValueAs(units.Temp.K)
 		), units.Temp.K); // Max value
+		this.age = this.primary.age; // Equal values, first taken
+		this.metallicity = (this.primary.metallicity + this.secondary.metallicity) / 2; // Mean value
+		this.luminosity = this.primary.luminosity + this.secondary.luminosity; // Combined value
 	}
 }
 
@@ -402,12 +369,104 @@ export class BinaryPlanet extends Binary {
 	constructor (
 		primary = new Planet(),
 		secondary = new Planet(),
-		sma = new Value(500000, units.Dist.km),
+		sma = new Value(420000, units.Dist.km),
 	) {
 		super(primary, secondary, sma);
+
+		this.combineProperties();
 	}
 
 	combineProperties() {
 		
 	}
 }
+
+// -------------------------------------------------
+
+
+
+// =================================================
+// Planets components
+// =================================================
+
+export class MassComponent {
+	/**
+	 * 
+	 * @param {number} mass 
+	 */
+	constructor (mass=0.0) {
+		this.mass = mass; // M⊕
+		this.composition = { };
+	}
+}
+
+export class Core extends MassComponent {
+	/**
+	 * 
+	 * @param {number} mass 
+	 * @param {number} f_iron 
+	 * @param {number} f_rock 
+	 * @param {number} f_ice 
+	 */
+	constructor (mass=1.0, f_iron=0.20, f_rock=0.79, f_ice=0.01) {
+		super(mass);
+		
+		this.composition = new CoreComposition(f_iron, f_rock, f_ice);
+	}
+}
+
+export class CoreComposition {
+	/**
+	 * 
+	 * @param {number} f_iron 
+	 * @param {number} f_rock 
+	 * @param {number} f_ice 
+	 */
+	constructor (f_iron, f_rock, f_ice) {
+		this.iron = f_iron;
+		this.rock = f_rock;
+		this.ice = f_ice;
+	}
+}
+
+export class Envelope extends MassComponent {
+	/**
+	 * 
+	 * @param {number} mass 
+	 * @param {number} f_gas 
+	 * @param {number} f_ice 
+	 */
+	constructor (mass=0.0, f_gas=0.9, f_ice=0.1) {
+		super(mass);
+
+		this.composition = new EnvelopeComposition(f_gas, f_ice);
+	}
+}
+
+export class EnvelopeComposition {
+	/**
+	 * 
+	 * @param {number} f_gas 
+	 * @param {number} f_ice 
+	 */
+	constructor (f_gas, f_ice) {
+		this.gas = f_gas;
+		this.ice = f_ice;
+	}
+}
+
+export class RingSystem {
+	constructor (
+		innerRadius = new Value(1.5, units.Dist.R_Jupiter), 
+		outerRadius = new Value(120000, units.Dist.km), 
+		originMass = 1.2, 
+		albedo = 0.5
+	) {
+		this.innerRadius = innerRadius;
+		this.outerRadius = outerRadius;
+		this.originMass = originMass;
+		this.albedo = albedo;
+	}
+}
+
+// -------------------------------------------------

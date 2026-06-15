@@ -32,7 +32,11 @@ export const eventBus = new EventBus();
 
 export const events = Object.freeze({
 	Generator: Object.freeze({
-		Generate:						'generator:generate',
+		Generation: Object.freeze({
+			Start:			'generator:generation_start',
+			FinishPlanets:	'generator:generation_finish_planets',
+			Completed:		'generator:generation_completed',
+		}),
 		
 		Settings: Object.freeze({
 			Seed:						'generator:settings_seed',
@@ -53,9 +57,11 @@ export const events = Object.freeze({
 
 			Planet: Object.freeze({
 				amountMultiplier:		'settings_planet_amount_multiplier',
+
 				sTypeSafetyFactor:		'settings_planet_s_type_safety_factor',
 				pTypeSafetyFactor:		'settings_planet_p_type_safety_factor',
 				pTypeEnabled:			'settings_planet_p_type_enabled',
+				
 				type1MigrationEnabled:	'settings_planet_migration_type_1_enabled',
 				type1MigrationCoeff:	'settings_planet_migration_type_1_coeff',
 				type2MigrationEnabled:	'settings_planet_migration_type_2_enabled',
@@ -65,7 +71,5 @@ export const events = Object.freeze({
 				hillSafetyFactor:		'settings_planet_migration_hill_safety_factor',
 			}),
 		}),
-		
-		Finished:						'generator:finished',
 	}),
 });
