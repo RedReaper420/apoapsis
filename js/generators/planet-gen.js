@@ -19,7 +19,7 @@ import * as moonsystemgen from "./moon-system-gen.js";
 function samplePlanetCoreMass(sma_norm, star) {
 	// Defining the curve
 	const startMinMass = 2.0;
-	const peakMaxMass = 25.0;
+	const peakMaxMass = 30.0;
 
 	const m = peakMaxMass - startMinMass;
 	const x = sma_norm - consts.PHY_DIST_SNOW_LINE;
@@ -334,18 +334,34 @@ function assumeAlbedo(planet, T_blackbody) {
 			return 0.10;
 		}
 
-		default: { // Каменистые и ледяные миры (Твоя исходная логика по расстояниям)
-			// Примечание: Для унификации здесь sma_norm пересчитан в контекст твоих HZ констант.
-			// Если нужно, сюда тоже можно передавать sma_norm, сделав temp опциональным.
-			
-			if (planet.core.composition.ice < 0.005) {
-				return 0.15; // Airless
+		default: { // Terrestrial worlds
+			const mass = planet.mass.getValueAs(types.units.Mass.M_Earth);
+			const canHaveAtmosphere = (mass > 0.05) && (temp < 1000) && (planet.core.composition.ice > 0.001);
+
+			if (canHaveAtmosphere) {
+				if (temp > 350) {
+					return 0.65; // Venus-like reflective atmosphere
+				}
+				else if (temp < 240) {
+					return 0.75; // Snowball
+				}
+
+				if (planet.core.composition.ice < 0.005) {
+					return 0.25; // Dry desert with rare clouds
+				}
+
+				// Ocean world with patches of land. Dark ocean (0.06), land (0.2), and clouds (0.6) give average albedo around 0.3.
+				return planet.core.composition.ice > 0.01 ? 0.25 : 0.3;
 			}
-			
-			// Приблизительная оценка зон через температуру (для примера, если захочешь переписать на T)
-			// Но пока оставляем завязку на зоны, если тебе так удобнее:
-			// (В финальном коде ниже я покажу, как передать и T, и sma_norm)
-			return 0.35; 
+			else {
+				if (planet.core.composition.ice > 0.50) {
+					return 0.60; // Icy airless world (Europa, Enceladus)
+				}
+				if (planet.core.composition.ice > 0.10) {
+					return 0.35; // Mixed dirty-icy world (Gannymed, Callysto)
+				}
+				return 0.12; // Regolith (Mercury, Moon) — очень темные
+			}
 		}
 	}
 }
