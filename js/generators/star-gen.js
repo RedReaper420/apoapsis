@@ -1,8 +1,8 @@
 
 import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
-import consts from "../data/consts.js";
 import * as types from "../data/types.js";
+import consts from "../data/consts.js";
 
 import * as namegen from "./name-gen.js";
 

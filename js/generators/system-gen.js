@@ -7,6 +7,7 @@ import consts from "../data/consts.js";
 
 import * as starsystemgen from "./star-system-gen.js";
 import * as planetsystemgen from "./planet-system-gen.js";
+import * as migrationsim from "./migration-sim.js";
 
 class SystemGenerator {
 	constructor(
@@ -132,7 +133,7 @@ class SystemGenerator {
 		});
 
 		// Migration simulation
-		planetsystemgen.simulateMigration(this.settings, stars);
+		migrationsim.simulateMigration(this.settings, stars);
 		
 		// Finishing planets generation and generating moons
 		eventBus.emit(events.Generator.Generation.FinishPlanets);
