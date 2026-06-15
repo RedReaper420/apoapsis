@@ -4,8 +4,8 @@ import * as utils from "../utils/utils.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as planetsystemgen from "./planetsystemgen.js";
-import * as planetgen from "./planetgen.js";
+import * as planetsystemgen from "./planet-system-gen.js";
+import * as planetgen from "./planet-gen.js";
 
 /**
  * 

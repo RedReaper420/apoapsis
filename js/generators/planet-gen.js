@@ -6,8 +6,8 @@ import * as utils from "../utils/utils.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as namegen from "./namegen.js";
-import * as moonsystemgen from "./moonsystemgen.js";
+import * as namegen from "./name-gen.js";
+import * as moonsystemgen from "./moon-system-gen.js";
 
 /**
  * 

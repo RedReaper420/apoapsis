@@ -4,7 +4,7 @@ import * as utils from "../utils/utils.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as planetgen from "./planetgen.js";
+import * as planetgen from "./planet-gen.js";
 
 const PLANET_SPAWN_START_DIST = 0.1;
 

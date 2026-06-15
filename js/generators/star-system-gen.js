@@ -3,7 +3,7 @@ import prng from "../utils/prng.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as stargen from "./stargen.js";
+import * as stargen from "./star-gen.js";
 
 /**
  * Adds the generated star formation to the system (and to the stars array).

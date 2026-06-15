@@ -5,8 +5,8 @@ import prng from "../utils/prng.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as starsystemgen from "./starsystemgen.js";
-import * as planetsystemgen from "./planetsystemgen.js";
+import * as starsystemgen from "./star-system-gen.js";
+import * as planetsystemgen from "./planet-system-gen.js";
 
 class SystemGenerator {
 	constructor(
