@@ -6,6 +6,72 @@ import consts from "../data/consts.js";
 import * as starGen from "./star-gen.js";
 
 /**
+ * Generates a complete stellar subsystem (single or binary star) and injects it into the system environment.
+ * 
+ * @param {types.System} system	- The core system instance (containing configuration rules).
+ * @param {types.Star|types.BinaryStar|null} parentFormation - Parent hierarchical component, or null if generating system baseline.
+ * @param {Array<types.Star|types.BinaryStar>} starsArray - Target array reference accumulating system components.
+ */
+export function generateStarFormation(system, parentFormation = null, starsArray) {
+	if (decideStarBinary(system.settings.star_binary_chance) === false) {
+		// Single star decided and generated
+		const star = starGen.generateStar(system.settings, parentFormation);
+		appendStarFormation(system, star, parentFormation, starsArray);
+	}
+	else {
+		// Binary star decided
+		let isBinaryAllowed = true;
+		if (parentFormation !== null) {
+			if ((parentFormation.mass.value / 2) < consts.PHY_STAR_MASS_MIN) {
+				/*
+				Structural Guardrails: Prevent splitting mass below the stellar thermonuclear threshold (0.08 M☉).
+				If split, clamping would artificially create mass out of nowhere, exceeding parent constraint budget.
+				Fallback: Generate a single star with adjusted mass scaling parameters to honor the constraint budget.
+				*/
+				isBinaryAllowed = false;
+			}
+		}
+
+		if (isBinaryAllowed) {
+			// Binary star generated
+			const primary = starGen.generateStar(system.settings, parentFormation);
+			const secondary = starGen.generateStar(system.settings, primary);
+			const sma = generateStarSeparation(primary.mass, secondary.mass, true);
+
+			const binary = new types.BinaryStar(primary, secondary, sma);
+			appendStarFormation(system, binary, parentFormation, starsArray);
+		}
+		else {
+			// Single star generated (fallback)
+			const SINGLE_FALLBACK_MASS_MULTIPLIER = 0.5;
+			const star = starGen.generateStar(system.settings, parentFormation, SINGLE_FALLBACK_MASS_MULTIPLIER);
+			appendStarFormation(system, star, parentFormation, starsArray);
+		}
+	}
+}
+
+/**
+ * Determines whether a star system should form as a binary configuration.
+ * 
+ * Under default 33.3% chance settings ({@link consts.UI_STAR_BINARY_CHANCE_VAL_DEF}), recursive nesting calculations approximate the following structural outcomes:
+ * - 44.44% Single Star				  [ ✹ ]
+ * - 22.22% Close Binary			  [ ✹✷ ]
+ * - 14.81% Wide Binary				  [ ✹ ··· ✷ ]
+ * -  7.41% Wide Triple System (1)	  [ ✹ ··· ✷✴ ]
+ * -  7.41% Wide Triple System (2)	  [ ✹✷ ··· ✷ ]
+ * -  3.70% Complex Quadruple System  [ ✹✷ ··· ✷✴ ]
+ * 
+ * Note: there's actually a bit greater amount of single stars on a wide orbit (@see {@link generateStarFormation}).
+ * 
+ * @param {number} binaryChance - Probability factor between 0.0 and 1.0
+ * 
+ * @returns {boolean} True if binary architecture is selected
+ */
+export function decideStarBinary(binaryChance) {
+	return prng() < binaryChance;
+}
+
+/**
  * Adds the generated star formation to the system (and to the stars array).
  * 
  * @param {types.System} system - The core system instance containing global settings.
@@ -52,70 +118,4 @@ function generateStarSeparation(primaryMass, secondaryMass, isCloseOrbit = true)
 	const smaMeters = Math.pow( (consts.PHY_G * totalMassKg * periodSeconds**2) / (4 * Math.PI**2), 1/3 );
 	
 	return new types.Value(smaMeters, types.units.Dist.m);
-}
-
-/**
- * Determines whether a star system should form as a binary configuration.
- * 
- * Under default 33.3% chance settings ({@link consts.UI_STAR_BINARY_CHANCE_VAL_DEF}), recursive nesting calculations approximate the following structural outcomes:
- * - 44.44% Single Star				  [ ✹ ]
- * - 22.22% Close Binary			  [ ✹✷ ]
- * - 14.81% Wide Binary				  [ ✹ ··· ✷ ]
- * -  7.41% Wide Triple System (1)	  [ ✹ ··· ✷✴ ]
- * -  7.41% Wide Triple System (2)	  [ ✹✷ ··· ✷ ]
- * -  3.70% Complex Quadruple System  [ ✹✷ ··· ✷✴ ]
- * 
- * Note: there's actually a bit greater amount of single stars on a wide orbit (@see {@link generateStarFormation}).
- * 
- * @param {number} binaryChance - Probability factor between 0.0 and 1.0
- * 
- * @returns {boolean} True if binary architecture is selected
- */
-export function decideStarBinary(binaryChance) {
-	return prng() < binaryChance;
-}
-
-/**
- * Generates a complete stellar subsystem (single or binary star) and injects it into the system environment.
- * 
- * @param {types.System} system	- The core system instance (containing configuration rules).
- * @param {types.Star|types.BinaryStar|null} parentFormation - Parent hierarchical component, or null if generating system baseline.
- * @param {Array<types.Star|types.BinaryStar>} starsArray - Target array reference accumulating system components.
- */
-export function generateStarFormation(system, parentFormation = null, starsArray) {
-	if (decideStarBinary(system.settings.star_binary_chance) === false) {
-		// Single star decided and generated
-		const star = starGen.generateStar(system.settings, parentFormation);
-		appendStarFormation(system, star, parentFormation, starsArray);
-	}
-	else {
-		// Binary star decided
-		let isBinaryAllowed = true;
-		if (parentFormation !== null) {
-			if ((parentFormation.mass.value / 2) < consts.PHY_STAR_MASS_MIN) {
-				/*
-				Structural Guardrails: Prevent splitting mass below the stellar thermonuclear threshold (0.08 M☉).
-				If split, clamping would artificially create mass out of nowhere, exceeding parent constraint budget.
-				Fallback: Generate a single star with adjusted mass scaling parameters to honor the constraint budget.
-				*/
-				isBinaryAllowed = false;
-			}
-		}
-
-		if (isBinaryAllowed) {
-			// Binary star generated
-			const primary = starGen.generateStar(system.settings, parentFormation);
-			const secondary = starGen.generateStar(system.settings, primary);
-			const sma = generateStarSeparation(primary.mass, secondary.mass, true);
-
-			const binary = new types.BinaryStar(primary, secondary, sma);
-			appendStarFormation(system, binary, parentFormation, starsArray);
-		}
-		else {
-			// Single star generated (fallback)
-			const SINGLE_FALLBACK_MASS_MULTIPLIER = 0.5;
-			const star = starGen.generateStar(system.settings, parentFormation, SINGLE_FALLBACK_MASS_MULTIPLIER);
-			appendStarFormation(system, star, parentFormation, starsArray);
-		}
-	}
 }

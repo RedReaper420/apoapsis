@@ -9,6 +9,167 @@ import consts from "../data/consts.js";
 import * as nameGen from "./name-gen.js";
 
 /**
+ * Generates the base of the planet: core mass + possible envelope (ice/gas giants).
+ * 
+ * Further generation is applied after simulating migration. (@see {@link finishGeneration})
+ * 
+ * @param {types.GenerationSettings} settings 
+ * @param {types.Body} parentBody 
+ * @param {types.Value} sma 
+ * @param {Object} genData
+ * 
+ * @returns {types.Planet}
+ */
+export function generatePlanet(settings, parentBody, sma, genData) {
+	const planet = new types.Planet(parentBody, nameGen.generate());
+	planet.sma = sma;
+
+	if (genData.isMoon === false) {
+		// Planet generation
+
+		planet.genData = {
+			isMoon: genData.isMoon,
+			sma_init: genData.sma_init, // Initial spawn distance, used later during moons generation
+			sma_min: genData.sma_min, // Minimum allowed spawn distance, used later during migration
+			sma_max: genData.sma_max, // Maximum allowed spawn distance, used later during migration
+			status: '', // Planet status that is used (assigned) later during migration
+			impacts: 0, // Planet impacts counter, incremented later during migration, then used during moons generation
+			retrograde: false,
+			sma_norm: sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentBody.luminosity), // Converting to AU☉ units
+			sma_init_norm: genData.sma_init / Math.sqrt(parentBody.luminosity),
+			parentStar: planet.parentBody,
+		}
+
+		planet.core = generatePlanetCore(planet);
+		planet.envelope = makeGasGiant(planet);
+		
+		planet.mass = new types.Value(
+			planet.core.mass.getValueAs(types.units.Mass.M_Earth) + 
+			planet.envelope.mass.getValueAs(types.units.Mass.M_Earth), 
+			types.units.Mass.M_Earth
+		);
+	}
+	else {
+		// Moon generation
+
+		// Moon.Planet.Binary / Moon.Planet.Star === Binary
+		let sma_norm = 0;
+		let sma_init_norm = 0;
+		let parentStar = null;
+		if (planet.parentBody.parentBody instanceof types.BinaryPlanet) {
+			parentStar = planet.parentBody.parentBody.parentBody; // Moon.Planet.Binary.Star
+			//			Moon.Planet.Binary.property
+			sma_norm = planet.parentBody.parentBody.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentStar.luminosity);
+			sma_init_norm = planet.parentBody.parentBody.genData.sma_init_norm;
+		}
+		else {
+			parentStar = planet.parentBody.parentBody; // Moon.Planet.Star
+			//			Moon.Planet.property
+			sma_norm = planet.parentBody.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentStar.luminosity);
+			sma_init_norm = planet.parentBody.genData.sma_init_norm;
+		}
+
+		planet.genData = {
+			isMoon: true,
+			mass: genData.mass,
+			retrograde: genData.retrograde,
+			type: genData.type,
+			sma_norm: sma_norm,
+			sma_init_norm: sma_init_norm,
+			parentStar: parentStar,
+		}
+		
+		planet.core = generatePlanetCore(planet);
+		planet.envelope = planet.genData.type === 'binary'
+			? makeGasGiant(planet)
+			: new types.Envelope();
+		
+		planet.mass = new types.Value(
+			planet.core.mass.getValueAs(types.units.Mass.M_Earth) + 
+			planet.envelope.mass.getValueAs(types.units.Mass.M_Earth), 
+			types.units.Mass.M_Earth
+		);
+
+		finishGeneration(settings, planet);
+	}
+
+	return planet;
+}
+
+/**
+ * @param {types.GenerationSettings} settings 
+ * @param {types.Planet} planet 
+ */
+export function finishGeneration(settings, planet) {
+	if (planet.genData.isMoon === false)
+		planet.genData.sma_norm = planet.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(planet.parentBody.luminosity);
+
+	setPlanetRadius(planet);
+
+	planet.temperature_eq = getEffectiveTemperature(planet);
+	planet.temperature = planet.temperature_eq;
+
+	if (planet.type === 'Terrestrial') {
+		generateAtmosphere(planet);
+		planet.color = '#867470';
+	}
+	else {
+		planet.color = setGasGiantColor(planet);
+	}
+}
+
+/**
+ * 
+ * @param {types.Planet} planet
+ */
+function generatePlanetCore(planet) {
+	const coreIronFraction = sampleCoreIronFraction(planet.genData);
+	const coreIceFraction = (1.0 - coreIronFraction) * sampleCoreIceFraction(planet.genData);
+	const coreRockFraction = 1.0 - coreIronFraction - coreIceFraction;
+
+	if (planet.genData.isMoon === false) {
+		// Generating a planet
+		const planetCoreMass = samplePlanetCoreMass(planet.genData);
+		return new types.Core(
+			planetCoreMass, 
+			coreIronFraction, 
+			coreRockFraction, 
+			coreIceFraction
+		);
+	}
+	else {
+		// Generating a moon
+		const parentBody = planet.parentBody;
+		console.log(planet.genData);
+		switch (planet.genData.type) {
+			case 'impact':
+				const f_iron = parentBody.core.composition.iron**2;
+				const f_rock = parentBody.core.composition.rock;
+				const f_ice = parentBody.core.composition.ice**2;
+				const f_total = f_iron + f_rock + f_ice;
+				
+				return new types.Core(
+					planet.genData.mass,
+					f_iron / f_total,
+					f_rock / f_total,
+					f_ice / f_total
+				);
+			default:
+				const likeness = planet.genData.type === 'binary'
+					? utils.randomRangeGaussian(0.9, 1.0)
+					: utils.clamp(utils.randomRangeGaussian(0.0, 0.7*2), 0.3, 0.9);
+				
+				return new types.Core(
+					planet.genData.mass,
+					parentBody.core.composition.iron * likeness + coreIronFraction * (1 - likeness),
+					parentBody.core.composition.rock * likeness + coreRockFraction * (1 - likeness),
+					parentBody.core.composition.ice * likeness + coreIceFraction * (1 - likeness)
+				);
+		}
+	}
+}
+
+/**
  * 
  * @param {object} genData 
  * 
@@ -81,57 +242,6 @@ function sampleCoreIceFraction(genData) {
 	const maxIce = maxIceBase * metallicityFactor;
 
 	return (utils.randomRangeGaussian(0, maxIce) + prng.range(0, maxIce)) / 2; // Avg. of gaussian random and uniform random
-}
-
-/**
- * 
- * @param {types.Planet} planet
- */
-function generatePlanetCore(planet) {
-	const coreIronFraction = sampleCoreIronFraction(planet.genData);
-	const coreIceFraction = (1.0 - coreIronFraction) * sampleCoreIceFraction(planet.genData);
-	const coreRockFraction = 1.0 - coreIronFraction - coreIceFraction;
-
-	if (planet.genData.isMoon === false) {
-		// Generating a planet
-		const planetCoreMass = samplePlanetCoreMass(planet.genData);
-		return new types.Core(
-			planetCoreMass, 
-			coreIronFraction, 
-			coreRockFraction, 
-			coreIceFraction
-		);
-	}
-	else {
-		// Generating a moon
-		const parentBody = planet.parentBody;
-		console.log(planet.genData);
-		switch (planet.genData.type) {
-			case 'impact':
-				const f_iron = parentBody.core.composition.iron**2;
-				const f_rock = parentBody.core.composition.rock;
-				const f_ice = parentBody.core.composition.ice**2;
-				const f_total = f_iron + f_rock + f_ice;
-				
-				return new types.Core(
-					planet.genData.mass,
-					f_iron / f_total,
-					f_rock / f_total,
-					f_ice / f_total
-				);
-			default:
-				const likeness = planet.genData.type === 'binary'
-					? utils.randomRangeGaussian(0.9, 1.0)
-					: utils.clamp(utils.randomRangeGaussian(0.0, 0.7*2), 0.3, 0.9);
-				
-				return new types.Core(
-					planet.genData.mass,
-					parentBody.core.composition.iron * likeness + coreIronFraction * (1 - likeness),
-					parentBody.core.composition.rock * likeness + coreRockFraction * (1 - likeness),
-					parentBody.core.composition.ice * likeness + coreIceFraction * (1 - likeness)
-				);
-		}
-	}
 }
 
 /**
@@ -229,27 +339,6 @@ function makeGasGiant(planet) {
 	);
 }
 
-// Constants derived from Seager et al. and Lopez & Fortney
-const EOS = {
-	iron: { r0: 0.70, alpha: 0.266, beta: -0.015, gamma: 0.50 },
-	rock: { r0: 1.00, alpha: 0.274, beta: -0.021, gamma: 0.51 },
-	ice:  { r0: 1.25, alpha: 0.282, beta: -0.033, gamma: 0.53 }
-};
-
-/**
- * 
- * @param {number} mass 
- * @param {string} material 
- * 
- * @returns {number}
- */
-function getMaterialRadius(mass, material) {
-	if (mass <= 0) return 0;
-	const config = EOS[material];
-	// R = r0 * M^alpha + beta * M^gamma
-	return config.r0 * Math.pow(mass, config.alpha) + config.beta * Math.pow(mass, config.gamma);
-}
-
 /**
  * 
  * @param {types.Planet} planet
@@ -328,6 +417,51 @@ function setPlanetRadius(planet) {
 	planet.density = bulkDensity;
 }
 
+// Constants derived from Seager et al. and Lopez & Fortney
+const EOS = {
+	iron: { r0: 0.70, alpha: 0.266, beta: -0.015, gamma: 0.50 },
+	rock: { r0: 1.00, alpha: 0.274, beta: -0.021, gamma: 0.51 },
+	ice:  { r0: 1.25, alpha: 0.282, beta: -0.033, gamma: 0.53 }
+};
+
+/**
+ * 
+ * @param {number} mass 
+ * @param {string} material 
+ * 
+ * @returns {number}
+ */
+function getMaterialRadius(mass, material) {
+	if (mass <= 0) return 0;
+	const config = EOS[material];
+	// R = r0 * M^alpha + beta * M^gamma
+	return config.r0 * Math.pow(mass, config.alpha) + config.beta * Math.pow(mass, config.gamma);
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ * 
+ * @returns {types.Value} (unit: types.units.Temp)
+ */
+function getEffectiveTemperature(planet) {
+	const sma_norm = planet.genData.sma_norm;
+
+	// 1. Calculating black-body temperature (albedo = 0)
+	// T_bb = T_earth_eq / sqrt(sma_norm) * (1 - 0)^1/4
+	// Using Earth's effective temperature w/o its albedo (0.3)
+	const T_earth_blackbody = consts.PHY_EARTH_EQ_TEMP / Math.pow(1 - 0.30, 1/4);
+	const T_blackbody = new types.Value(T_earth_blackbody / Math.sqrt(sma_norm), types.units.Temp.K);
+
+	// 2. Getting a realistic albedo based on black-body temperature
+	const albedo = assumeAlbedo(planet, T_blackbody);
+
+	// 3. Calculating final effective temperature based on assumed albedo
+	const T_eq = (consts.PHY_EARTH_EQ_TEMP * Math.pow(1 - albedo, 1/4)) / Math.sqrt(sma_norm);
+
+	return new types.Value(T_eq, types.units.Temp.K);
+}
+
 /**
  * Assumes the planet's albedo based on the planet's type and its black-body temperature.
  * @param {types.Planet} planet 
@@ -399,30 +533,6 @@ function assumeAlbedo(planet, T_blackbody) {
 			}
 		}
 	}
-}
-
-/**
- * 
- * @param {types.Planet} planet 
- * 
- * @returns {types.Value} (unit: types.units.Temp)
- */
-function getEffectiveTemperature(planet) {
-	const sma_norm = planet.genData.sma_norm;
-
-	// 1. Calculating black-body temperature (albedo = 0)
-	// T_bb = T_earth_eq / sqrt(sma_norm) * (1 - 0)^1/4
-	// Using Earth's effective temperature w/o its albedo (0.3)
-	const T_earth_blackbody = consts.PHY_EARTH_EQ_TEMP / Math.pow(1 - 0.30, 1/4);
-	const T_blackbody = new types.Value(T_earth_blackbody / Math.sqrt(sma_norm), types.units.Temp.K);
-
-	// 2. Getting a realistic albedo based on black-body temperature
-	const albedo = assumeAlbedo(planet, T_blackbody);
-
-	// 3. Calculating final effective temperature based on assumed albedo
-	const T_eq = (consts.PHY_EARTH_EQ_TEMP * Math.pow(1 - albedo, 1/4)) / Math.sqrt(sma_norm);
-
-	return new types.Value(T_eq, types.units.Temp.K);
 }
 
 import {temperatureToColor} from "./star-gen.js";
@@ -605,114 +715,4 @@ function generateAtmosphere(planet) {
 		composition: { },
 	};
 	for (const gas in atmosphere) planet.atmosphere.composition[gas] = atmosphere[gas].f;
-}
-
-/**
- * Generates the base of the planet: core mass + possible envelope (ice/gas giants).
- * 
- * Further generation is applied after simulating migration. (@see {@link finishGeneration})
- * 
- * @param {types.GenerationSettings} settings 
- * @param {types.Body} parentBody 
- * @param {types.Value} sma 
- * @param {Object} genData
- * 
- * @returns {types.Planet}
- */
-export function generatePlanet(settings, parentBody, sma, genData) {
-	const planet = new types.Planet(parentBody, nameGen.generate());
-	planet.sma = sma;
-
-	if (genData.isMoon === false) {
-		// Planet generation
-
-		planet.genData = {
-			isMoon: genData.isMoon,
-			sma_init: genData.sma_init, // Initial spawn distance, used later during moons generation
-			sma_min: genData.sma_min, // Minimum allowed spawn distance, used later during migration
-			sma_max: genData.sma_max, // Maximum allowed spawn distance, used later during migration
-			status: '', // Planet status that is used (assigned) later during migration
-			impacts: 0, // Planet impacts counter, incremented later during migration, then used during moons generation
-			retrograde: false,
-			sma_norm: sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentBody.luminosity), // Converting to AU☉ units
-			sma_init_norm: genData.sma_init / Math.sqrt(parentBody.luminosity),
-			parentStar: planet.parentBody,
-		}
-
-		planet.core = generatePlanetCore(planet);
-		planet.envelope = makeGasGiant(planet);
-		
-		planet.mass = new types.Value(
-			planet.core.mass.getValueAs(types.units.Mass.M_Earth) + 
-			planet.envelope.mass.getValueAs(types.units.Mass.M_Earth), 
-			types.units.Mass.M_Earth
-		);
-	}
-	else {
-		// Moon generation
-
-		// Moon.Planet.Binary / Moon.Planet.Star === Binary
-		let sma_norm = 0;
-		let sma_init_norm = 0;
-		let parentStar = null;
-		if (planet.parentBody.parentBody instanceof types.BinaryPlanet) {
-			parentStar = planet.parentBody.parentBody.parentBody; // Moon.Planet.Binary.Star
-			//			Moon.Planet.Binary.property
-			sma_norm = planet.parentBody.parentBody.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentStar.luminosity);
-			sma_init_norm = planet.parentBody.parentBody.genData.sma_init_norm;
-		}
-		else {
-			parentStar = planet.parentBody.parentBody; // Moon.Planet.Star
-			//			Moon.Planet.property
-			sma_norm = planet.parentBody.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentStar.luminosity);
-			sma_init_norm = planet.parentBody.genData.sma_init_norm;
-		}
-
-		planet.genData = {
-			isMoon: true,
-			mass: genData.mass,
-			retrograde: genData.retrograde,
-			type: genData.type,
-			sma_norm: sma_norm,
-			sma_init_norm: sma_init_norm,
-			parentStar: parentStar,
-		}
-		
-		planet.core = generatePlanetCore(planet);
-		planet.envelope = planet.genData.type === 'binary'
-			? makeGasGiant(planet)
-			: new types.Envelope();
-		
-		planet.mass = new types.Value(
-			planet.core.mass.getValueAs(types.units.Mass.M_Earth) + 
-			planet.envelope.mass.getValueAs(types.units.Mass.M_Earth), 
-			types.units.Mass.M_Earth
-		);
-
-		finishGeneration(settings, planet);
-	}
-
-	return planet;
-}
-
-/**
- * @param {types.GenerationSettings} settings 
- * @param {types.Planet} planet 
- */
-export function finishGeneration(settings, planet) {
-	if (planet.genData.isMoon === false)
-		planet.genData.sma_norm = planet.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(planet.parentBody.luminosity);
-
-	setPlanetRadius(planet);
-
-	planet.temperature_eq = getEffectiveTemperature(planet);
-	planet.temperature = planet.temperature_eq;
-
-	if (planet.type === 'Terrestrial') {
-		generateAtmosphere(planet);
-		planet.color = '#867470';
-	}
-	else {
-		planet.color = setGasGiantColor(planet);
-	}
 }

@@ -11,6 +11,83 @@ import {events, eventBus} from "../utils/eventbus.js";
 
 /**
  * 
+ * @param {types.GenerationSettings} settings 
+ * @param {types.Planet} planet 
+ */
+export function generateMoons(settings, planet) {
+	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
+	const planetRadius_REarth = planet.radius.getValueAs(types.units.Dist.R_Earth);
+
+	const hillSphere = getHillSphere(planet, planet.parentBody);
+	const hillSphere_REarth = hillSphere.getValueAs(types.units.Dist.R_Earth);
+	const moonSmaMax_REarth = hillSphere_REarth * 0.3;
+
+	// Minimal SMA values are rough approximations of Roche limits
+	const binarySmaMin_REarth = 2.5 * (1 + 1) * planetRadius_REarth;
+	const moonSmaMin_REarth = 2.5 * (1 + 1/3) * planetRadius_REarth;
+
+	// Preventing generation beforehand if there's no room for stable orbits
+	if (moonSmaMax_REarth < moonSmaMin_REarth)
+		return;
+	
+	const binaryChance = 0.1 * Math.exp(-Math.log10(planetMass_MEarth + 1));
+
+	const maxSafeMass = calculateMaxSafeMass(planet, planet.parentBody, settings.planet_migration_hill_safety_factor);
+	const maxSafeMass_MEarth = maxSafeMass.getValueAs(types.units.Mass.M_Earth);
+	const maxCompanionMass_MEarth = Math.min(maxSafeMass_MEarth, planetMass_MEarth);
+
+	const availableMassRatio = Math.min(0.99, maxCompanionMass_MEarth / planetMass_MEarth);
+	
+	// Chance to add an impact to the planet's stats, even if there were no impact during migration simulation.
+	const bonusImpactChance = 0.1 * Math.exp(-0.5 * planetMass_MEarth); 
+	if (prng() < bonusImpactChance) planet.genData.impacts += 1;
+	
+	let regularMoonsOverrideChance = 0;
+	let isBinary = false;
+
+	if (planet.genData.impacts > 0) {
+		// Deciding about making an impact moon or regular moons
+		const impactMoonsOnlyMass = 5; // M⊕
+		const regularMoonsOnlyMass = 20; // M⊕
+		
+		regularMoonsOverrideChance = planetMass_MEarth >= impactMoonsOnlyMass 
+			? (planetMass_MEarth <= regularMoonsOnlyMass 
+				? Math.exp(-0.75 * (planetMass_MEarth - impactMoonsOnlyMass)) 
+				: 0.0) 
+			: 1.0;
+		
+		// Deciding about making a binary planet instead moons
+		if (moonSmaMax_REarth > binarySmaMin_REarth) {
+			if (availableMassRatio >= consts.DEF_BINARY_PLANET_MASS_RATIO) {
+				for (let i = 0; i < planet.genData.impacts; i++) {
+					if (prng() < binaryChance) {
+						isBinary = true;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	if (isBinary === true) {
+		// Binary planet decided
+		generateBinary(settings, planet, binarySmaMin_REarth, moonSmaMax_REarth, availableMassRatio);
+	}
+	else {
+		// Moon(s) decided
+		if (prng() < regularMoonsOverrideChance) {
+			// Impact moon generation
+			generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REarth);
+		}
+		else {
+			// Regular moons generation
+			generateRegularMoons(settings, planet, moonSmaMax_REarth);
+		}
+	}
+}
+
+/**
+ * 
  * @param {types.Planet} planet 
  * @param {types.Star} star 
  * 
@@ -26,21 +103,6 @@ function getHillSphere(planet, star) {
 }
 
 /**
- * 
- * @param {types.Planet} planet 
- * @param {types.Planet} moon 
- * @returns {types.Value} (unit: types.units.Dist)
- */
-function getRocheLimit(planet, moon) {
-	const r_p = planet.radius.getValueAs(types.units.Dist.m);
-	const rho_p = planet.density;
-	const rho_m = moon.density;
-	
-	const R = 2.44 * r_p * Math.pow(rho_p / rho_m, 1/3);
-	return new types.Value(R, types.units.Dist.m);
-}
-
-/**
  * Calculates maximal allowed mass that won't destabilize neighbors' orbits.
  * 
  * @param {types.Planet} planet 
@@ -50,40 +112,55 @@ function getRocheLimit(planet, moon) {
  * @returns {types.Value} Maximal allowed mass (unit: types.unuts.Mass)
  */
 function calculateMaxSafeMass(planet, star, safetyFactor = 4.0) {
-    const M_star = star.mass.getValueAs(types.units.Mass.kg);
-    const a_current = planet.sma.getValueAs(types.units.Dist.m);
+	const M_star = star.mass.getValueAs(types.units.Mass.kg);
+	const a_current = planet.sma.getValueAs(types.units.Dist.m);
 	const M_planet = planet.mass.getValueAs(types.units.Mass.kg);
-    
-    let maxMassPrev = Infinity;
-    let maxMassNext = Infinity;
 
-    // Calculation function for a mass limit alongside a neighbor 
-    const getLimitByNeighbor = (neighbor) => {
-        const a_neigh = neighbor.sma.getValueAs(types.units.Dist.m);
-        const M_neigh = neighbor.mass.getValueAs(types.units.Mass.kg);
-        
-        const deltaA = Math.abs(a_current - a_neigh);
-        const meanA = (a_current + a_neigh) / 2;
-        
-        // Hill criteria
-        const massLimit = 3 * M_star * Math.pow(deltaA / (safetyFactor * meanA), 3) - M_neigh;
-        return massLimit - M_planet;
-    };
+	let maxMassPrev = Infinity;
+	let maxMassNext = Infinity;
 
-    // Calculating limit for the inner neighbor (if there is one)
-    if (planet.genData.neighborPrev) {
-        maxMassPrev = getLimitByNeighbor(planet.genData.neighborPrev);
-    }
+	// Calculation function for a mass limit alongside a neighbor 
+	const getLimitByNeighbor = (neighbor) => {
+		const a_neigh = neighbor.sma.getValueAs(types.units.Dist.m);
+		const M_neigh = neighbor.mass.getValueAs(types.units.Mass.kg);
 
-    // Calculating limit for the outer neighbor (if there is one)
-    if (planet.genData.neighborNext) {
-        maxMassNext = getLimitByNeighbor(planet.genData.neighborNext);
-    }
+		const deltaA = Math.abs(a_current - a_neigh);
+		const meanA = (a_current + a_neigh) / 2;
 
-    // Taking the strictest mass limit as the result
-    const maxSafeMass = Math.min(maxMassPrev, maxMassNext);
+		// Hill criteria
+		const massLimit = 3 * M_star * Math.pow(deltaA / (safetyFactor * meanA), 3) - M_neigh;
+		return massLimit - M_planet;
+	};
 
-    return new types.Value(maxSafeMass, types.units.Mass.kg);
+	// Calculating limit for the inner neighbor (if there is one)
+	if (planet.genData.neighborPrev) {
+		maxMassPrev = getLimitByNeighbor(planet.genData.neighborPrev);
+	}
+
+	// Calculating limit for the outer neighbor (if there is one)
+	if (planet.genData.neighborNext) {
+		maxMassNext = getLimitByNeighbor(planet.genData.neighborNext);
+	}
+
+	// Taking the strictest mass limit as the result
+	const maxSafeMass = Math.min(maxMassPrev, maxMassNext);
+
+	return new types.Value(maxSafeMass, types.units.Mass.kg);
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ * @param {types.Planet} moon 
+ * @returns {types.Value} (unit: types.units.Dist)
+ */
+function getRocheLimit(planet, moon) {
+	const r_p = planet.radius.getValueAs(types.units.Dist.m);
+	const rho_p = planet.density;
+	const rho_m = moon.density;
+
+	const R = 2.44 * r_p * Math.pow(rho_p / rho_m, 1/3);
+	return new types.Value(R, types.units.Dist.m);
 }
 
 /**
@@ -286,83 +363,6 @@ function generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REar
 		}
 		else {
 			planet.bodies.push(moon);
-		}
-	}
-}
-
-/**
- * 
- * @param {types.GenerationSettings} settings 
- * @param {types.Planet} planet 
- */
-export function generateMoons(settings, planet) {
-	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
-	const planetRadius_REarth = planet.radius.getValueAs(types.units.Dist.R_Earth);
-
-	const hillSphere = getHillSphere(planet, planet.parentBody);
-	const hillSphere_REarth = hillSphere.getValueAs(types.units.Dist.R_Earth);
-	const moonSmaMax_REarth = hillSphere_REarth * 0.3;
-
-	// Minimal SMA values are rough approximations of Roche limits
-	const binarySmaMin_REarth = 2.5 * (1 + 1) * planetRadius_REarth;
-	const moonSmaMin_REarth = 2.5 * (1 + 1/3) * planetRadius_REarth;
-
-	// Preventing generation beforehand if there's no room for stable orbits
-	if (moonSmaMax_REarth < moonSmaMin_REarth)
-		return;
-	
-	const binaryChance = 0.1 * Math.exp(-Math.log10(planetMass_MEarth + 1));
-
-	const maxSafeMass = calculateMaxSafeMass(planet, planet.parentBody, settings.planet_migration_hill_safety_factor);
-	const maxSafeMass_MEarth = maxSafeMass.getValueAs(types.units.Mass.M_Earth);
-	const maxCompanionMass_MEarth = Math.min(maxSafeMass_MEarth, planetMass_MEarth);
-
-	const availableMassRatio = Math.min(0.99, maxCompanionMass_MEarth / planetMass_MEarth);
-	
-	// Chance to add an impact to the planet's stats, even if there were no impact during migration simulation.
-	const bonusImpactChance = 0.1 * Math.exp(-0.5 * planetMass_MEarth); 
-	if (prng() < bonusImpactChance) planet.genData.impacts += 1;
-	
-	let regularMoonsOverrideChance = 0;
-	let isBinary = false;
-
-	if (planet.genData.impacts > 0) {
-		// Deciding about making an impact moon or regular moons
-		const impactMoonsOnlyMass = 5; // M⊕
-		const regularMoonsOnlyMass = 20; // M⊕
-		
-		regularMoonsOverrideChance = planetMass_MEarth >= impactMoonsOnlyMass 
-			? (planetMass_MEarth <= regularMoonsOnlyMass 
-				? Math.exp(-0.75 * (planetMass_MEarth - impactMoonsOnlyMass)) 
-				: 0.0) 
-			: 1.0;
-		
-		// Deciding about making a binary planet instead moons
-		if (moonSmaMax_REarth > binarySmaMin_REarth) {
-			if (availableMassRatio >= consts.DEF_BINARY_PLANET_MASS_RATIO) {
-				for (let i = 0; i < planet.genData.impacts; i++) {
-					if (prng() < binaryChance) {
-						isBinary = true;
-						break;
-					}
-				}
-			}
-		}
-	}
-
-	if (isBinary === true) {
-		// Binary planet decided
-		generateBinary(settings, planet, binarySmaMin_REarth, moonSmaMax_REarth, availableMassRatio);
-	}
-	else {
-		// Moon(s) decided
-		if (prng() < regularMoonsOverrideChance) {
-			// Impact moon generation
-			generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REarth);
-		}
-		else {
-			// Regular moons generation
-			generateRegularMoons(settings, planet, moonSmaMax_REarth);
 		}
 	}
 }

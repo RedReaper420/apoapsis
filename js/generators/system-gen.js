@@ -21,6 +21,55 @@ class SystemGenerator {
 		//this.settings.seed_user = '77636919-528a-4881-92e3-02cc47a2c504';
 	}
 
+	generate() {
+		this.settings.seed = !this.settings.seed_user ? window.crypto.randomUUID() : this.settings.seed_user;
+		prng.seed(this.settings.seed);
+		this.system = new types.System(this.settings);
+
+		console.log(this.settings.seed);
+
+		const stars = []; // single stars and binary stars list
+
+		// Generating the primary single/binary star
+		starSystemGen.generateStarFormation(this.system, null, stars);
+
+		// Generating the secondary single/binary star on a wide orbit
+		if (starSystemGen.decideStarBinary(this.settings.star_binary_chance))
+			starSystemGen.generateStarFormation(this.system, this.system.bodies[0], stars);
+
+		// Planets generation around the star(s)
+		stars.forEach(star => {
+			planetSystemGen.generatePlanets(star, this.settings);
+		});
+
+		// Making the star list correctly include binary components after generating planets
+		stars.forEach(star => {
+			if (star instanceof types.BinaryStar) {
+				stars.push(star.primary);
+				stars.push(star.secondary);
+			}
+		});
+
+		// Migration simulation
+		migrationSim.simulateMigration(this.settings, stars);
+
+		// Finishing planets generation and generating moons
+		stars.forEach(star => { star.bodies.forEach(body => {
+			if ((body instanceof types.Star) || (body instanceof types.Binary))
+				return;
+
+			planetGen.finishGeneration(this.settings, body);
+			moonSystemGen.generateMoons(this.settings, body);
+		}); });
+		
+		console.log(this.system);
+		console.log('-------')
+
+		eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
+	}
+
+	// -------------------------------------------------
+
 	#subscribe() {
 		eventBus.on(events.Generator.Generation.Start, () => { 
 			///*
@@ -112,55 +161,6 @@ class SystemGenerator {
 		eventBus.on(events.Generator.Settings.Planet.hillSafetyFactor, (cb) => {
 			this.settings.planet_migration_hill_safety_factor = cb.data;
 		});
-	}
-
-	// -------------------------------------------------
-
-	generate() {
-		this.settings.seed = !this.settings.seed_user ? window.crypto.randomUUID() : this.settings.seed_user;
-		prng.seed(this.settings.seed);
-		this.system = new types.System(this.settings);
-
-		console.log(this.settings.seed);
-
-		const stars = []; // single stars and binary stars list
-
-		// Generating the primary single/binary star
-		starSystemGen.generateStarFormation(this.system, null, stars);
-
-		// Generating the secondary single/binary star on a wide orbit
-		if (starSystemGen.decideStarBinary(this.settings.star_binary_chance))
-			starSystemGen.generateStarFormation(this.system, this.system.bodies[0], stars);
-
-		// Planets generation around the star(s)
-		stars.forEach(star => {
-			planetSystemGen.generatePlanets(star, this.settings);
-		});
-
-		// Making the star list correctly include binary components after generating planets
-		stars.forEach(star => {
-			if (star instanceof types.BinaryStar) {
-				stars.push(star.primary);
-				stars.push(star.secondary);
-			}
-		});
-
-		// Migration simulation
-		migrationSim.simulateMigration(this.settings, stars);
-
-		// Finishing planets generation and generating moons
-		stars.forEach(star => { star.bodies.forEach(body => {
-			if ((body instanceof types.Star) || (body instanceof types.Binary))
-				return;
-
-			planetGen.finishGeneration(this.settings, body);
-			moonSystemGen.generateMoons(this.settings, body);
-		}); });
-		
-		console.log(this.system);
-		console.log('-------')
-
-		eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
 	}
 }
 
