@@ -3,7 +3,7 @@ import prng from "../utils/prng.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as stargen from "./star-gen.js";
+import * as starGen from "./star-gen.js";
 
 /**
  * Adds the generated star formation to the system (and to the stars array).
@@ -85,7 +85,7 @@ export function decideStarBinary(binaryChance) {
 export function generateStarFormation(system, parentFormation = null, starsArray) {
 	if (decideStarBinary(system.settings.star_binary_chance) === false) {
 		// Single star decided and generated
-		const star = stargen.generateStar(system.settings, parentFormation);
+		const star = starGen.generateStar(system.settings, parentFormation);
 		appendStarFormation(system, star, parentFormation, starsArray);
 	}
 	else {
@@ -104,8 +104,8 @@ export function generateStarFormation(system, parentFormation = null, starsArray
 
 		if (isBinaryAllowed) {
 			// Binary star generated
-			const primary = stargen.generateStar(system.settings, parentFormation);
-			const secondary = stargen.generateStar(system.settings, primary);
+			const primary = starGen.generateStar(system.settings, parentFormation);
+			const secondary = starGen.generateStar(system.settings, primary);
 			const sma = generateStarSeparation(primary.mass, secondary.mass, true);
 
 			const binary = new types.BinaryStar(primary, secondary, sma);
@@ -114,7 +114,7 @@ export function generateStarFormation(system, parentFormation = null, starsArray
 		else {
 			// Single star generated (fallback)
 			const SINGLE_FALLBACK_MASS_MULTIPLIER = 0.5;
-			const star = stargen.generateStar(system.settings, parentFormation, SINGLE_FALLBACK_MASS_MULTIPLIER);
+			const star = starGen.generateStar(system.settings, parentFormation, SINGLE_FALLBACK_MASS_MULTIPLIER);
 			appendStarFormation(system, star, parentFormation, starsArray);
 		}
 	}

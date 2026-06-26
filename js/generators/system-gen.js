@@ -5,9 +5,11 @@ import prng from "../utils/prng.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as starsystemgen from "./star-system-gen.js";
-import * as planetsystemgen from "./planet-system-gen.js";
-import * as migrationsim from "./migration-sim.js";
+import * as starSystemGen from "./star-system-gen.js";
+import * as planetSystemGen from "./planet-system-gen.js";
+import * as migrationSim from "./migration-sim.js";
+import * as planetGen from "./planet-gen.js";
+import * as moonSystemGen from "./moon-system-gen.js";
 
 class SystemGenerator {
 	constructor(
@@ -16,12 +18,23 @@ class SystemGenerator {
 		this.settings = settings;
 
 		this.#subscribe();
-		//this.settings.seed_user = '1781390872361';
+		//this.settings.seed_user = '77636919-528a-4881-92e3-02cc47a2c504';
 	}
 
 	#subscribe() {
 		eventBus.on(events.Generator.Generation.Start, () => { 
-			this.generate();
+			///*
+			let gen = true;
+			let attempts = 0+999*1;
+			eventBus.on('shtap', () => { gen = false });
+
+			while (gen && (attempts < 1000)) {
+				this.generate();
+				attempts++;
+			}
+			console.log(attempts);
+			//*/
+			//this.generate();
 		});
 
 		// Settings change subscriptions
@@ -104,7 +117,7 @@ class SystemGenerator {
 	// -------------------------------------------------
 
 	generate() {
-		this.settings.seed = !this.settings.seed_user ? +new Date() : this.settings.seed_user;
+		this.settings.seed = !this.settings.seed_user ? window.crypto.randomUUID() : this.settings.seed_user;
 		prng.seed(this.settings.seed);
 		this.system = new types.System(this.settings);
 
@@ -113,15 +126,15 @@ class SystemGenerator {
 		const stars = []; // single stars and binary stars list
 
 		// Generating the primary single/binary star
-		starsystemgen.generateStarFormation(this.system, null, stars);
+		starSystemGen.generateStarFormation(this.system, null, stars);
 
 		// Generating the secondary single/binary star on a wide orbit
-		if (starsystemgen.decideStarBinary(this.settings.star_binary_chance))
-			starsystemgen.generateStarFormation(this.system, this.system.bodies[0], stars);
+		if (starSystemGen.decideStarBinary(this.settings.star_binary_chance))
+			starSystemGen.generateStarFormation(this.system, this.system.bodies[0], stars);
 
 		// Planets generation around the star(s)
 		stars.forEach(star => {
-			planetsystemgen.generatePlanets(star, this.settings);
+			planetSystemGen.generatePlanets(star, this.settings);
 		});
 
 		// Making the star list correctly include binary components after generating planets
@@ -133,10 +146,16 @@ class SystemGenerator {
 		});
 
 		// Migration simulation
-		migrationsim.simulateMigration(this.settings, stars);
-		
+		migrationSim.simulateMigration(this.settings, stars);
+
 		// Finishing planets generation and generating moons
-		eventBus.emit(events.Generator.Generation.FinishPlanets);
+		stars.forEach(star => { star.bodies.forEach(body => {
+			if ((body instanceof types.Star) || (body instanceof types.Binary))
+				return;
+
+			planetGen.finishGeneration(this.settings, body);
+			moonSystemGen.generateMoons(this.settings, body);
+		}); });
 		
 		console.log(this.system);
 		console.log('-------')

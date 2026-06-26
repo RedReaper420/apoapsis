@@ -34,7 +34,6 @@ export const events = Object.freeze({
 	Generator: Object.freeze({
 		Generation: Object.freeze({
 			Start:			'generator:generation_start',
-			FinishPlanets:	'generator:generation_finish_planets',
 			Completed:		'generator:generation_completed',
 		}),
 		

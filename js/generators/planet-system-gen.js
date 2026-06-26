@@ -4,7 +4,7 @@ import * as utils from "../utils/utils.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as planetgen from "./planet-gen.js";
+import * as planetGen from "./planet-gen.js";
 
 const PLANET_SPAWN_START_DIST = 0.1;
 
@@ -12,19 +12,19 @@ const evilAndIntimidatingRedDwarf = new types.Value(0.3, types.units.Mass.M_Sun)
 const lightYear = new types.Value(1, types.units.Dist.ly);
 
 /**
- * Get SMA for the next orbit with 1.4-2.1 times longer period.
+ * Get SMA for the next orbit with 1.4-2.2 times longer period.
  * 
- * @param {number} smaCurrent - in AU
+ * @param {number} smaCurrent - Current SMA value (AU)
  * 
- * @returns {number} in AU
+ * @returns {number} New SMA value (AU)
  */
 export function getNextOrbit(smaCurrent) {
-	const newPeriod = prng.range(1.4, 2.1);
+	const newPeriod = prng.range(1.4, 2.2);
 	return smaCurrent * ((newPeriod**2)**(1/3)); // Simplified Kepler's 3rd law
 }
 
 /**
- * Skip the current orbit in favor of a further one. Probability of each skip decreases cumulatively.
+ * Skips the current orbit in favor of a new, further one with some probability. Probability of each skip decreases cumulatively.
  * 
  * Probability of skips:
  * - 1: 50%
@@ -34,9 +34,9 @@ export function getNextOrbit(smaCurrent) {
  * - 5: 0.003% (3.13% x 0.098%)
  * - 6 and more: 0% (explicitly forbidden; very unlikely in the first place)
  * 
- * @param {number} sma - in AU
+ * @param {number} sma - Current SMA value (AU)
  * 
- * @returns {number} in AU
+ * @returns {number} New SMA value (AU)
  * 
  * @see {@link getNextOrbit}
  */
@@ -68,7 +68,7 @@ function getPlanetsNumberToGenerate(star, amountMult) {
 	const temperature = star.temperature.getValueAs(types.units.Temp.K);
 	const averagePlanetsNumber = (13 - 0.6 * (Math.pow(Math.log10(temperature), 1.8))) * amountMult; // Default: 7.68 on 2300 K, 3.28 on 50000 K
 	const metallicityMult = 1.5 ** star.metallicity;
-	const variance = prng.range(1/2, 2.0);
+	const variance = prng.range(1/1.5, 1.5);
 	return Math.round(averagePlanetsNumber * metallicityMult * variance);
 }
 
@@ -100,7 +100,7 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
 			break;
 		}
 		
-		const planet = planetgen.generatePlanet(
+		const planet = planetGen.generatePlanet(
 			settings, 
 			star, 
 			new types.Value(sma, types.units.Dist.AU), 
@@ -130,10 +130,16 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
  * 
  * @returns {types.Value} <types.units.Dist.X>
  */
-function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
-	const a_crit = getMaximalSTypeOrbit(mass_greater, mass_lesser, binary_sma);
-	const sma_crit = a_crit.getValueAs(types.units.Dist.AU) * binary_sma.getValueAs(types.units.Dist.AU);
-	return new types.Value(sma_crit, types.units.Dist.AU);
+export function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
+	const mA = mass_greater.getValueAs(types.units.Mass.M_Sun);
+	const mB = mass_lesser.getValueAs(types.units.Mass.M_Sun);
+	const a_bin = binary_sma.getValueAs(types.units.Dist.AU);
+
+	const u = mB / (mA + mB);
+	//const e = 0.075;
+	//const a_crit = ( 1.6 + 5.1 * e - 2.22 * (e**2) + 4.12 * u - 4.27 * e * u - 5.09 * (u**2) + 4.61 * (e**2) * (u**2) ) * a_bin
+	const a_crit = ( 1.6 + 4.12 * u - 5.09 * (u**2) ) * a_bin;
+	return new types.Value(a_crit, types.units.Dist.AU);
 }
 
 /**
@@ -145,13 +151,15 @@ function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
  * 
  * @returns {types.Value} <types.units.Dist.X>
  */
-function getMaximalSTypeOrbit(host_mass, companion_mass, binary_sma) {
+export function getMaximalSTypeOrbit(host_mass, companion_mass, binary_sma) {
 	const mA = host_mass.getValueAs(types.units.Mass.M_Sun);
 	const mB = companion_mass.getValueAs(types.units.Mass.M_Sun);
 	const a_bin = binary_sma.getValueAs(types.units.Dist.AU);
 
 	const u = mB / (mA + mB);
-	const a_crit = (0.464 - 0.38 * u) * a_bin;
+	//const e = 0.075;
+	//const a_crit = ( 0.464 - 0.38 * u - 0.631 * e + 0.586 * u * e + 0.15 * (e**2) - 0.198 * u * (e**2) ) * a_bin
+	const a_crit = ( 0.464 - 0.38 * u ) * a_bin;
 	return new types.Value(a_crit, types.units.Dist.AU);
 }
 

@@ -377,7 +377,16 @@ export class BinaryPlanet extends Binary {
 	}
 
 	combineProperties() {
-		
+		this.mass = new Value(
+			this.primary.mass.getValueAs(units.Mass.M_Earth) + this.secondary.mass.getValueAs(units.Mass.M_Earth), 
+			units.Mass.M_Earth); // Combined value
+		this.genData = {
+			impacts: this.primary.genData.impacts,
+			sma_init: this.primary.genData.sma_init,
+		};
+		this.radius = this.primary.radius;
+		this.core = this.primary.core;
+		this.rings = [];
 	}
 }
 
@@ -392,10 +401,10 @@ export class BinaryPlanet extends Binary {
 export class MassComponent {
 	/**
 	 * 
-	 * @param {number} mass 
+	 * @param {Value} mass 
 	 */
-	constructor (mass=0.0) {
-		this.mass = mass; // M⊕
+	constructor (mass) {
+		this.mass = mass;
 		this.composition = { };
 	}
 }
@@ -403,12 +412,12 @@ export class MassComponent {
 export class Core extends MassComponent {
 	/**
 	 * 
-	 * @param {number} mass 
+	 * @param {Value} mass 
 	 * @param {number} f_iron 
 	 * @param {number} f_rock 
 	 * @param {number} f_ice 
 	 */
-	constructor (mass=1.0, f_iron=0.20, f_rock=0.79, f_ice=0.01) {
+	constructor (mass=new Value(1.0, units.Mass.M_Earth), f_iron=0.20, f_rock=0.79, f_ice=0.01) {
 		super(mass);
 		
 		this.composition = new CoreComposition(f_iron, f_rock, f_ice);
@@ -432,11 +441,11 @@ export class CoreComposition {
 export class Envelope extends MassComponent {
 	/**
 	 * 
-	 * @param {number} mass 
+	 * @param {Value} mass 
 	 * @param {number} f_gas 
 	 * @param {number} f_ice 
 	 */
-	constructor (mass=0.0, f_gas=0.9, f_ice=0.1) {
+	constructor (mass=new Value(0.0, units.Mass.M_Earth), f_gas=0.9, f_ice=0.1) {
 		super(mass);
 
 		this.composition = new EnvelopeComposition(f_gas, f_ice);
@@ -459,7 +468,7 @@ export class RingSystem {
 	constructor (
 		innerRadius = new Value(1.5, units.Dist.R_Jupiter), 
 		outerRadius = new Value(120000, units.Dist.km), 
-		originMass = 1.2, 
+		originMass = new Value(1.2, units.Mass.M_Moon), 
 		albedo = 0.5
 	) {
 		this.innerRadius = innerRadius;

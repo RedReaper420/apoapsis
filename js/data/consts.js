@@ -26,7 +26,7 @@ const consts = Object.freeze({
 	PHY_EARTH_ESCAPE_VELOCITY: 11186, // m/s
 	PHY_EARTH_EQ_TEMP: 278.5, // K
 
-	DEF_BINARY_PLANET_MASS_RATIO: 0.1, // 1:10 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon)
+	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon)
 
 	// ---
 
@@ -73,7 +73,7 @@ const consts = Object.freeze({
 	UI_PLANET_P_TYPE_SAFETY_FACTOR_LIM_MAX: 10.0,
 	UI_PLANET_P_TYPE_SAFETY_FACTOR_VAL_DEF: 2.0,
 
-	UI_PLANET_P_TYPE_ENABLED_VAL_DEF: false,
+	UI_PLANET_P_TYPE_ENABLED_VAL_DEF: true,
 
 	UI_PLANET_MIGRATION_TYPE_1_ENABLED_VAL_DEF: true,
 
@@ -93,7 +93,7 @@ const consts = Object.freeze({
 
 	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_LIM_MIN: 3.0,
 	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_LIM_MAX: 15.0,
-	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF: 10.0,
+	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF: 5.0,
 
 });
 

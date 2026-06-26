@@ -4,7 +4,7 @@ import * as utils from "../utils/utils.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
-import * as namegen from "./name-gen.js";
+import * as nameGen from "./name-gen.js";
 
 /**
  * Calculates a star's lifespan based on its mass and luminosity.
@@ -160,7 +160,7 @@ function getBV(starTemperature) {
  * 
  * @see {@link https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html}
  */
-function temperatureToColor(starTemperature) {
+export function temperatureToColor(starTemperature) {
 	const tempFactor = utils.clamp(starTemperature.getValueAs(types.units.Temp.K), 1000, 40000) / 100;
 	let red = 0; 
 	let green = 0; 
@@ -169,7 +169,8 @@ function temperatureToColor(starTemperature) {
 	// --- Red Component ---
 	if (tempFactor <= 66) {
 		red = 255;
-	} else {
+	} 
+	else {
 		const adjustedTemp = tempFactor - 60;
 		red = 329.698727446 * Math.pow(adjustedTemp, -0.1332047592);
 	}
@@ -178,18 +179,25 @@ function temperatureToColor(starTemperature) {
 	// --- Green Component ---
 	if (tempFactor <= 66) {
 		green = 99.4708025861 * Math.log(tempFactor) - 161.1195681661;
-	} else {
+	} 
+	else {
 		const adjustedTemp = tempFactor - 60;
 		green = 288.1221695283 * Math.pow(adjustedTemp, -0.0755148492);
 	}
 	green = utils.clamp(Math.round(green), 0, 255);
 
 	// --- Blue Component ---
-	if (tempFactor <= 19) {
+	if (tempFactor >= 66) {
 		blue = 255;
-	} else {
-		const adjustedTemp = tempFactor - 10;
-		blue = 138.5177312231 * Math.log(adjustedTemp) - 305.0447927307;
+	}
+	else {
+		if (tempFactor <= 19) {
+			blue = 0;
+		} 
+		else {
+			const adjustedTemp = tempFactor - 10;
+			blue = 138.5177312231 * Math.log(adjustedTemp) - 305.0447927307;
+		}
 	}
 	blue = utils.clamp(Math.round(blue), 0, 255);
 	
@@ -383,7 +391,7 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	}
 
 	// --- 6. Identity ---
-	star.name = namegen.generate();
+	star.name = nameGen.generate();
 
 	return star;
 }

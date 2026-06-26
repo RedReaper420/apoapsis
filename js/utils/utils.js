@@ -44,3 +44,16 @@ export function randomRangeGaussian(min = 0, max = 1) {
 
     return min + (max - min) * normalized;
 }
+
+/**
+ * Generates a seed string from the current time moment, the CPU performance metric, and a random value.
+ * 
+ * @returns {string}
+ */
+export function generateFallbackSeed() {
+	const time = Date.now();
+	const perf = performance.now();
+	const random = Math.random() * 1000000;
+
+	return `${time}-${perf}-${random}`;
+}

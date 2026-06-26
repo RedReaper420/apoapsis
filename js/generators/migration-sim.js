@@ -61,7 +61,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 	planet.sma.value += migrationRate;
 	
 	// Establish structural inner boundary check to halt extreme inward migration
-	const dynamicInnerEdge = planet.genData.sma_min + (INNER_DISK_EDGE_AU * stellarLuminosityFactor);
+	const dynamicInnerEdge = planet.genData.sma_min + (INNER_DISK_EDGE_AU * stellarLuminosityFactor * utils.randomRangeGaussian(0.85, 1.15));
 	planet.sma.value = utils.clamp(planet.sma.value, dynamicInnerEdge, planet.genData.sma_max);
 }
 
@@ -82,8 +82,9 @@ function getMutualHillSphere(planet1, planet2, star) {
 	const starMassKg = star.mass.getValueAs(types.units.Mass.kg);
 
 	// Mass-weighted average semi-major axis
-	const weightedAverageSma = (sma1Meters * mass1Kg + sma2Meters * mass2Kg) / (mass1Kg + mass2Kg);
-	const hillRadiusMeters = weightedAverageSma * Math.pow((mass1Kg + mass2Kg) / (3 * starMassKg), 1 / 3);
+	//const weightedAverageSma = (sma1Meters * mass1Kg + sma2Meters * mass2Kg) / (mass1Kg + mass2Kg);
+	const smaAverage = (sma1Meters + sma2Meters) / 2;
+	const hillRadiusMeters = smaAverage * Math.pow((mass1Kg + mass2Kg) / (3 * starMassKg), 1 / 3);
 	
 	return new types.Value(hillRadiusMeters, types.units.Dist.m);
 }
@@ -103,22 +104,30 @@ function mergePlanets(recipient, donor) {
 	recipient.genData.impacts += donor.genData.impacts + 1;
 
 	// --- Core Composition Merge ---
-	const recipientCoreMass = recipient.core.mass;
-	const donorCoreMass = donor.core.mass;
-	recipient.core.mass += donorCoreMass;
+	recipient.core.mass.convertUnitTo(types.units.Mass.M_Earth);
+	donor.core.mass.convertUnitTo(types.units.Mass.M_Earth);
+
+	const recipientCoreMass = recipient.core.mass.value;
+	const donorCoreMass = donor.core.mass.value;
+
+	recipient.core.mass.value += donorCoreMass;
 	
-	recipient.core.composition.iron = (recipient.core.composition.iron * recipientCoreMass + donor.core.composition.iron * donorCoreMass) / recipient.core.mass;
-	recipient.core.composition.rock = (recipient.core.composition.rock * recipientCoreMass + donor.core.composition.rock * donorCoreMass) / recipient.core.mass;
-	recipient.core.composition.ice = (recipient.core.composition.ice * recipientCoreMass + donor.core.composition.ice * donorCoreMass) / recipient.core.mass;
+	recipient.core.composition.iron = (recipient.core.composition.iron * recipientCoreMass + donor.core.composition.iron * donorCoreMass) / recipient.core.mass.value;
+	recipient.core.composition.rock = (recipient.core.composition.rock * recipientCoreMass + donor.core.composition.rock * donorCoreMass) / recipient.core.mass.value;
+	recipient.core.composition.ice = (recipient.core.composition.ice * recipientCoreMass + donor.core.composition.ice * donorCoreMass) / recipient.core.mass.value;
 
 	// --- Volatile Envelope Merge ---
-	const recipientEnvMass = recipient.envelope.mass;
-	const donorEnvMass = donor.envelope.mass;
-	recipient.envelope.mass += donorEnvMass;
+	recipient.envelope.mass.convertUnitTo(types.units.Mass.M_Earth);
+	donor.envelope.mass.convertUnitTo(types.units.Mass.M_Earth);
 
-	if (recipient.envelope.mass > 0) {
-		recipient.envelope.composition.gas = (recipient.envelope.composition.gas * recipientEnvMass + donor.envelope.composition.gas * donorEnvMass) / recipient.envelope.mass;
-		recipient.envelope.composition.ice = (recipient.envelope.composition.ice * recipientEnvMass + donor.envelope.composition.ice * donorEnvMass) / recipient.envelope.mass;
+	const recipientEnvMass = recipient.envelope.mass.value;
+	const donorEnvMass = donor.envelope.mass.value;
+	
+	recipient.envelope.mass.value += donorEnvMass;
+
+	if (recipient.envelope.mass.value > 0) {
+		recipient.envelope.composition.gas = (recipient.envelope.composition.gas * recipientEnvMass + donor.envelope.composition.gas * donorEnvMass) / recipient.envelope.mass.value;
+		recipient.envelope.composition.ice = (recipient.envelope.composition.ice * recipientEnvMass + donor.envelope.composition.ice * donorEnvMass) / recipient.envelope.mass.value;
 	}
 	else {
 		recipient.envelope.composition.gas = 0;
@@ -126,7 +135,7 @@ function mergePlanets(recipient, donor) {
 	}
 
 	// --- Planet Taxonomy Taxonomy Re-evaluation ---
-	if (recipient.envelope.mass === 0) {
+	if (recipient.envelope.mass.value === 0) {
 		recipient.type = 'Terrestrial';
 	}
 	else {
@@ -134,7 +143,7 @@ function mergePlanets(recipient, donor) {
 			recipient.type = 'Gas Giant';
 		}
 		else {
-			recipient.type = recipient.mass.value < 20.0 ? 'Mini-Neptune' : 'Ice Giant';
+			recipient.type = recipient.mass.value < 15.0 ? 'Mini-Neptune' : 'Ice Giant';
 		}
 	}
 
@@ -287,7 +296,7 @@ export function simulateMigration(settings, starsArray) {
 				}
 				
 				// 3.3. Track active gas giants
-				if (planet.genData.status === '' && planet.type !== 'Terrestrial') {
+				if (planet.genData.status === '' && planet.type === 'Gas Giant') {
 					activeGiantsCount++;
 				}
 			}

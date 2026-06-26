@@ -74,7 +74,7 @@ function addBody(body, bodies) {
 		orbitDirection = body.genData.retrograde ? -1 : 1;
 	}
 
-	if (body instanceof types.BinaryStar) {
+	if (body instanceof types.Binary) {
 		body.genData = { angle: Math.random() * Math.PI * 2 };
 	}
 	
@@ -82,8 +82,8 @@ function addBody(body, bodies) {
 		let angle = Math.random() * Math.PI * 2;
 		let r = body.sma.getValueAs(types.units.Dist.m);
 		
-		if (body.parentBody instanceof types.BinaryStar) {
-			if (body instanceof types.Star) {
+		if (body.parentBody instanceof types.Binary) {
+			if ((body instanceof types.Star) || ((body instanceof types.Planet) && (body.parentBody instanceof types.BinaryPlanet))) {
 				const binary = body.parentBody;
 				const mPrimary = binary.primary.mass.value;
 				const mSecondary = binary.secondary.mass.value;
@@ -93,7 +93,7 @@ function addBody(body, bodies) {
 				angle = binary.genData.angle;
 				
 				// Calculate total orbital separation distance between the two stars
-				const totalSeparation = body.sma.getValueAs(types.units.Dist.m);//binary.sma.getValueAs(types.units.Dist.m);
+				const totalSeparation = body.sma.getValueAs(types.units.Dist.m);
 
 				if (binary.primary === body) {
 					// Primary distance from barycenter depends on secondary's mass fraction
@@ -131,7 +131,7 @@ function addBody(body, bodies) {
 				
 				// Quadrupole correction factor
 				const massFraction = (m1 * m2) / (mTotal * mTotal);
-				const correction = 1 + (0.75 * Math.pow(d / r, 2) * massFraction);
+				const correction = 1// + (0.75 * Math.pow(d / r, 2) * massFraction);
 				
 				// Corrected stable velocity
 				const orbitalSpeed = baseVelocity * Math.sqrt(correction);
@@ -153,14 +153,10 @@ function addBody(body, bodies) {
 			body.vy = body.parentBody.vy + -Math.cos(angle) * orbitalSpeed * orbitDirection;
 		}
 	}
-	
-	if (body instanceof types.Planet) {
-		body.color = body.type === 'Terrestrial' ? '#7fa1b5' : '#e29a4a';
-	}
 
 	bodies.push(body);
 
-	if (body instanceof types.BinaryStar) {
+	if (body instanceof types.Binary) {
 		body.primary.mass.convertUnitTo(types.units.Mass.kg);
 		body.secondary.mass.convertUnitTo(types.units.Mass.kg);
 		addBody(body.primary, bodies);
@@ -242,7 +238,7 @@ function drawBody() {
 	const coords = this.getScreenCoords();
 	ctx.beginPath();
 	const trueVisualRadius = this.radius.getValueAs(types.units.Dist.m) / metersPerPixel;
-	const visualRadius = Math.max(2 + Math.log10(1 + this.radius.getValueAs(types.units.Dist.R_Moon)), trueVisualRadius);
+	const visualRadius = Math.max(Math.log10(1 + 0.1 * this.radius.getValueAs(types.units.Dist.km)), trueVisualRadius);
 	ctx.arc(coords.x, coords.y, visualRadius, 0, Math.PI * 2);
 	ctx.fillStyle = this.color;
 	ctx.fill();
@@ -306,7 +302,7 @@ function generateSystem(system) {
 	let systemMaxRadius = 0;
 	for (const b in bodies) {
 		const body = bodies[b];
-		if (body instanceof types.BinaryStar) {
+		if (body instanceof types.Binary) {
 			body.mass.value = 0;
 			body.radius = new types.Value(1, types.units.Dist.R_Earth);
 			body.color = '#cd0000';
@@ -374,7 +370,7 @@ function updatePhysics(frameTimeSeconds) {
 
 		for (let i = 0; i < n; i++) {
 			const b = bodies[i];
-			if (b instanceof types.BinaryStar) continue
+			if (b instanceof types.Binary) continue
 
 			b.vx += (fxs[i] / b.mass.value) * dt;
 			b.vy += (fys[i] / b.mass.value) * dt;
