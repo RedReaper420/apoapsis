@@ -43,7 +43,7 @@ export function simulateMigration(settings, starsArray) {
 				const planet = star.bodies[i];
 
 				if (!(planet instanceof types.Planet)) continue;
-				if (planet.genData.status === 'Ejected' || planet.genData.status === 'Merged') continue;
+				if ( (planet.genData.status === 'Ejected') || (planet.genData.status === 'Merged') ) continue;
 
 				// 3.1. Compute and Apply Disk Forces
 				applyMigration(settings, planet, currentDiskDensity, TIME_STEP_YEARS, isGrandTackTriggered);
@@ -69,7 +69,7 @@ export function simulateMigration(settings, starsArray) {
 				}
 				
 				// 3.3. Track active gas giants
-				if (planet.genData.status === '' && planet.type === 'Gas Giant') {
+				if ( (planet.genData.status === '') && (planet.type === 'Gas Giant') ) {
 					activeGiantsCount++;
 				}
 			}
@@ -94,7 +94,7 @@ export function simulateMigration(settings, starsArray) {
 	starsArray.forEach(star => {
 		// 4.1. Purge Discarded/Ejected Bodies from Arrays
 		for (let i = star.bodies.length - 1; i >= 0; i--) {
-			if (star.bodies[i] instanceof types.Planet && star.bodies[i].genData.status !== '') {
+			if ( (star.bodies[i] instanceof types.Planet) && (star.bodies[i].genData.status !== '') ) {
 				star.bodies.splice(i, 1);
 			}
 		}
@@ -155,6 +155,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 			migrationRate = type1Rate * (1 - migrationTypeRatio) + type2Rate * migrationTypeRatio;
 		}
 		else {
+			// Abrupt migration regime switch if interpolation is disabled
 			migrationRate = planet.mass.value <= MASS_THRESHOLD_TYPE_1 ? type1Rate : type2Rate;
 		}
 	}
@@ -167,6 +168,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 	planet.sma.value += migrationRate;
 	
 	// Establish structural inner boundary check to halt extreme inward migration
+	// Inner edge being randomly wobbly enables the existance of super hot planets (reaching 1400K)
 	const dynamicInnerEdge = planet.genData.sma_min + (INNER_DISK_EDGE_AU * stellarLuminosityFactor * utils.randomRangeGaussian(0.85, 1.15));
 	planet.sma.value = utils.clamp(planet.sma.value, dynamicInnerEdge, planet.genData.sma_max);
 }
@@ -185,10 +187,11 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 	const orbitalDistanceAU = Math.abs(planet.sma.getValueAs(types.units.Dist.AU) - nextPlanet.sma.getValueAs(types.units.Dist.AU));
 	const safetyThresholdAU = mutualHillSphere.getValueAs(types.units.Dist.AU) * settings.planet_migration_hill_safety_factor;
 	
+	// If two planets are getting dangerously close, then close encounter resolving is being triggered
 	if (orbitalDistanceAU < safetyThresholdAU) {
 		const massRatio = planet.mass.getValueAs(types.units.Mass.M_Earth) / nextPlanet.mass.getValueAs(types.units.Mass.M_Earth);
-		const outcomeRoll = prng();
 		
+		const outcomeRoll = prng();
 		const OUTCOME_MERGE = 'merge';
 		const OUTCOME_EJECT = 'eject';
 		const OUTCOME_SHIFT = 'shift';
@@ -256,7 +259,7 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
  * @param {types.Planet} planet2 - Second planetary body.
  * @param {types.Star|types.BinaryStar} star - The host stellar system gravitational center.
  * 
- * @returns {types.Value} The mutual Hill radius (unit: types.units.Dist).
+ * @returns {types.Value} The mutual Hill radius (unit: `Dist`).
  */
 function getMutualHillSphere(planet1, planet2, star) {
 	const sma1Meters = planet1.sma.getValueAs(types.units.Dist.m);

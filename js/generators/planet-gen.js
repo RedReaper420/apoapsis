@@ -11,7 +11,7 @@ import * as nameGen from "./name-gen.js";
 /**
  * Generates the base of the planet: core mass + possible envelope (ice/gas giants).
  * 
- * Further generation is applied after simulating migration. (@see {@link finishGeneration})
+ * Further generation is applied after simulating migration. (@see {@link planetGeneration_Stage2})
  * 
  * @param {types.GenerationSettings} settings 
  * @param {types.Body} parentBody 
@@ -40,6 +40,8 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 			parentStar: planet.parentBody,
 		}
 
+		planet.age = planet.genData.parentStar.age;
+
 		planet.core = generatePlanetCore(planet);
 		planet.envelope = makeGasGiant(planet);
 		
@@ -51,19 +53,21 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 	}
 	else {
 		// Moon generation
-
-		// Moon.Planet.Binary / Moon.Planet.Star === Binary
+		
 		let sma_norm = 0;
 		let sma_init_norm = 0;
 		let parentStar = null;
+		//	Moon.Planet.(Binary) / Moon.Planet.(Star) / Planet.Binary.(Star)
 		if (planet.parentBody.parentBody instanceof types.BinaryPlanet) {
-			parentStar = planet.parentBody.parentBody.parentBody; // Moon.Planet.Binary.Star
+			//			Moon.Planet.Binary.Star
+			parentStar = planet.parentBody.parentBody.parentBody; 
 			//			Moon.Planet.Binary.property
 			sma_norm = planet.parentBody.parentBody.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentStar.luminosity);
 			sma_init_norm = planet.parentBody.parentBody.genData.sma_init_norm;
 		}
 		else {
-			parentStar = planet.parentBody.parentBody; // Moon.Planet.Star
+			//			Moon.Planet.Star / Planet.Binary.Star
+			parentStar = planet.parentBody.parentBody; 
 			//			Moon.Planet.property
 			sma_norm = planet.parentBody.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(parentStar.luminosity);
 			sma_init_norm = planet.parentBody.genData.sma_init_norm;
@@ -78,6 +82,8 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 			sma_init_norm: sma_init_norm,
 			parentStar: parentStar,
 		}
+
+		planet.age = planet.genData.parentStar.age;
 		
 		planet.core = generatePlanetCore(planet);
 		planet.envelope = planet.genData.type === 'binary'
@@ -90,7 +96,7 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 			types.units.Mass.M_Earth
 		);
 
-		finishGeneration(settings, planet);
+		planetGeneration_Stage2(settings, planet);
 	}
 
 	return planet;
@@ -100,7 +106,7 @@ export function generatePlanet(settings, parentBody, sma, genData) {
  * @param {types.GenerationSettings} settings 
  * @param {types.Planet} planet 
  */
-export function finishGeneration(settings, planet) {
+export function planetGeneration_Stage2(settings, planet) {
 	if (planet.genData.isMoon === false)
 		planet.genData.sma_norm = planet.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(planet.parentBody.luminosity);
 
@@ -116,6 +122,17 @@ export function finishGeneration(settings, planet) {
 	else {
 		planet.color = setGasGiantColor(planet);
 	}
+
+	setInitialRotation(planet);
+}
+
+/**
+ * @param {types.GenerationSettings} settings 
+ * @param {types.Planet} planet 
+ */
+export function planetGeneration_Stage3(settings, planet) {
+	adjustRotationTime(settings, planet);
+	calculatePlanetMagneticField(planet);
 }
 
 /**
@@ -123,13 +140,13 @@ export function finishGeneration(settings, planet) {
  * @param {types.Planet} planet
  */
 function generatePlanetCore(planet) {
-	const coreIronFraction = sampleCoreIronFraction(planet.genData);
+	const planetCoreMass = samplePlanetCoreMass(planet.genData);
+	const coreIronFraction = sampleCoreIronFraction(planet.genData, planetCoreMass);
 	const coreIceFraction = (1.0 - coreIronFraction) * sampleCoreIceFraction(planet.genData);
 	const coreRockFraction = 1.0 - coreIronFraction - coreIceFraction;
 
 	if (planet.genData.isMoon === false) {
 		// Generating a planet
-		const planetCoreMass = samplePlanetCoreMass(planet.genData);
 		return new types.Core(
 			planetCoreMass, 
 			coreIronFraction, 
@@ -140,7 +157,6 @@ function generatePlanetCore(planet) {
 	else {
 		// Generating a moon
 		const parentBody = planet.parentBody;
-		console.log(planet.genData);
 		switch (planet.genData.type) {
 			case 'impact':
 				const f_iron = parentBody.core.composition.iron**2;
@@ -209,22 +225,23 @@ function samplePlanetCoreMass(genData) {
 /**
  * 
  * @param {object} genData
+ * @param {number} coreMass 
  * 
  * @returns {number}
  */
-function sampleCoreIronFraction(genData) {
-	const randomBase = 0.1; const randomScatter = 0.3;
+function sampleCoreIronFraction(genData, coreMass) {
+	const randomBase = 0.20; const randomScatter = 0.25;
 	const randIronFraction = randomBase + utils.randomRangeGaussian(-randomScatter, randomScatter);
 	
 	const starMetallicity = genData.parentStar.metallicity;
-	const starMetallicityFactor = 0.15 * Math.exp(0.6 * starMetallicity);
+	const starMetallicityFactor = 0.15 * Math.exp(0.5 * starMetallicity);
 
 	const sma_norm = genData.sma_norm;
-	const distanceFactor = sma_norm > consts.PHY_DIST_SNOW_LINE
-		? Math.exp(-0.2 * (sma_norm - consts.PHY_DIST_SNOW_LINE)) - 0.0005 * (sma_norm - consts.PHY_DIST_SNOW_LINE)
-		: 1;
+	const distanceFactor = Math.exp(-0.125 * (sma_norm - consts.PHY_DIST_SNOW_LINE));
 
-	return utils.clamp((randIronFraction + starMetallicityFactor) * distanceFactor, 0, 1);
+	const massFactor = coreMass > 1 ? 1.0 + 0.05 * Math.log10(planetMass_MEarth) : 1.0;
+
+	return utils.clamp((randIronFraction + starMetallicityFactor) * distanceFactor * massFactor, 0.01, 0.85);
 }
 
 /**
@@ -464,8 +481,9 @@ function getEffectiveTemperature(planet) {
 
 /**
  * Assumes the planet's albedo based on the planet's type and its black-body temperature.
+ * 
  * @param {types.Planet} planet 
- * @param {types.Value} T_blackbody Black-body temperature (unit: types.units.Temp)
+ * @param {types.Value} T_blackbody Black-body temperature (unit: Temp)
  */
 function assumeAlbedo(planet, T_blackbody) {
 	const temp = T_blackbody.getValueAs(types.units.Temp.K);
@@ -715,4 +733,372 @@ function generateAtmosphere(planet) {
 		composition: { },
 	};
 	for (const gas in atmosphere) planet.atmosphere.composition[gas] = atmosphere[gas].f;
+}
+
+/**
+ * Sets the initial rotation period for a planet.
+ * 
+ * @param {types.Planet} planet - Current planet
+ */
+function setInitialRotation(planet) {
+	planet.isRotationRetrograde = false;
+
+	// Setting an initial rotation period from an empirical formula.
+	let rotationPeriod_h = 24.0 * Math.pow(planet.mass.getValueAs(types.units.Mass.M_Earth), -utils.randomRangeGaussian(0.3, 0.5)) * prng.range(0.8, 1.2);
+	
+	// Cumulatively modifying rotation period from giant impacts.
+	let rotationSpeedModifier = 1.0;
+	for (let i = 0; i < planet.genData.impacts; i++) {
+		if (prng() < 0.25) {// 25% chance for a significant impact.
+			if (Math.pow(prng(), 2) < 0.5) {
+				// ~71% chance (sqrt(0.5)) for a moderate impact, can decelerate or accelerate rotation.
+				rotationSpeedModifier *= prng.range(0.5, 2.0);
+			}
+			else {
+				// ~29% chance for a strong impact, decelerates rotation.
+				rotationSpeedModifier *= prng.range(0.05, 0.5);
+
+				// Chance for turning the planet around.
+				if (prng() < 0.5)
+					planet.isRotationRetrograde = !planet.isRotationRetrograde;
+			}
+		}
+	}
+	rotationPeriod_h /= rotationSpeedModifier; // Applying rotation speed modifier.
+
+	// Preventing too fast rotation that would lead to planet's breakdown.
+	rotationPeriod_h = correctRotationPeriod(planet, rotationPeriod_h);
+
+	planet.rotationPeriod = new types.Value(rotationPeriod_h, types.units.Time.h);
+	planet.isTidallyLocked = false;
+}
+
+/**
+ * Prevents the planet's rotation period from getting too fast.
+ * 
+ * @param {types.Planet} planet - Current planet
+ * @param {number} currentRotationPeriod_h - Current rotation period in hours
+ * 
+ * @returns {number} Same rotation period value in hours if it's safe, a new rotation period value slightly above critical threshold otherwise.
+ */
+function correctRotationPeriod(planet, currentRotationPeriod_h) {
+	const currentRotationPeriod_s = new types.Value(currentRotationPeriod_h, types.units.Time.h).getValueAs(types.units.Time.s);
+
+	const R_m = planet.radius.getValueAs(types.units.Dist.m);
+	const M_kg = planet.mass.getValueAs(types.units.Mass.kg);
+
+	// Orbital period at the planet's surface
+	const surfOrbitPeriod_s = 2 * Math.PI * R_m * Math.sqrt(R_m / (consts.PHY_G * M_kg));
+
+	if (currentRotationPeriod_s > surfOrbitPeriod_s)
+		// Current rotation speed is slower than critical limit, leaving the value as is.
+		return currentRotationPeriod_h;
+	else {
+		// Current rotation speed passed the limit, setting the slightly slowed down limit value.
+		const surfOrbitPeriod_h = new types.Value(surfOrbitPeriod_s, types.units.Time.s).getValueAs(types.units.Time.h);
+		return surfOrbitPeriod_h * prng.range(1.1, 1.6);
+	}
+}
+
+/**
+ * 
+ * @param {types.GenerationSettings} settings 
+ * @param {types.Planet} planet 
+ */
+function adjustRotationTime(settings, planet) {
+	let parent = planet.parentBody;
+	if (parent instanceof types.BinaryPlanet) {
+		if (planet.parentBody.primary === planet)
+			parent = planet.parentBody.secondary;
+		else if (planet.parentBody.secondary === planet)
+			parent = planet.parentBody.primary;
+	}
+
+	const age_s = planet.age.getValueAs(types.units.Time.s);
+	const tidalLockTime_s = getTidalLockTime(planet, parent).getValueAs(types.units.Time.s);
+
+	const ageToTLRatio = Math.min(1, age_s / tidalLockTime_s);
+
+	const interpolationFactor = 1 - Math.pow(1 - ageToTLRatio, 2);
+
+	const targetRotationPeriod_s = getTidalLockRotationPeriod(planet, parent).getValueAs(types.units.Time.s);
+	const targetOmega = 2 * Math.PI / targetRotationPeriod_s;
+
+	const currentRotationPeriod_s = planet.rotationPeriod.getValueAs(types.units.Time.s);
+	let currentOmega = 2 * Math.PI / currentRotationPeriod_s;
+	if (planet.isRotationRetrograde) currentOmega = -currentOmega;
+
+	const adjustedOmega = currentOmega * (1 - interpolationFactor) + targetOmega * interpolationFactor;
+
+	if (ageToTLRatio === 1.0) {
+		planet.isTidallyLocked = true;
+		planet.isRotationRetrograde = false;
+		planet.rotationPeriod = new types.Value(targetRotationPeriod_s, types.units.Time.s);
+	}
+	else {
+		planet.isTidallyLocked = false;
+
+		if (adjustedOmega < 0) {
+			planet.isRotationRetrograde = true;
+			const newPeriod_s = 2 * Math.PI / Math.abs(adjustedOmega);
+			planet.rotationPeriod = new types.Value(newPeriod_s, types.units.Time.s);
+		}
+		else if (adjustedOmega > 0) {
+			planet.isRotationRetrograde = false;
+			const newPeriod_s = 2 * Math.PI / adjustedOmega;
+			planet.rotationPeriod = new types.Value(newPeriod_s, types.units.Time.s);
+		}
+		else {
+			planet.rotationPeriod = new types.Value(Infinity, types.units.Time.s);
+			/*
+			planet.isRotationRetrograde = false;
+			planet.rotationPeriod = new types.Value(100000, types.units.Time.h);
+			*/
+		}
+	}
+
+	planet.rotationPeriod.convertUnitTo(types.units.Time.h);
+}
+
+/**
+ * Calculates planet's tidal lock time.
+ * 
+ * @param {types.Planet} planet - Current planet
+ * @param {types.Planet|types.BinaryPlanet|types.Star|types.BinaryStar} parent - Planet's parent body (star or binary companion)
+ * 
+ * @returns {types.Value} Approximate tidal lock time (unit: Time)
+ */
+function getTidalLockTime(planet, parent) {
+	const m_s = planet.mass.getValueAs(types.units.Mass.kg); // Satellite's mass
+	const m_p = parent.mass.getValueAs(types.units.Mass.kg); // Parent body's mass
+	const R = planet.radius.getValueAs(types.units.Dist.m); // Satellite's radius
+
+	const w = 2 * Math.PI / planet.rotationPeriod.getValueAs(types.units.Time.s); // Satellite's spin rate, rad/s
+	const a = planet.sma.getValueAs(types.units.Dist.m); // Satellite's SMA
+
+	const I_factor = calculateMomentOfInertiaFactor(planet);
+	const I = I_factor * m_s * (R**2); // Satellite's moment of inertia
+
+	const Q = calculateTidalQ(planet); // Satellite's dissipation function value
+
+	const rho = planet.density * 1000; // Satellite's density, kg/m^3
+	const g = consts.PHY_G * m_s / (R**2); // Satellite's surface gravity
+
+	const totalMass = m_s;
+	const coreIce = planet.core.composition.ice * planet.core.mass.getValueAs(types.units.Mass.kg);
+	const envIce = planet.envelope.composition.ice * planet.envelope.mass.getValueAs(types.units.Mass.kg);
+	const totalIceFraction = (coreIce + envIce) / totalMass;
+
+	const mu = 3e10 * (1 - totalIceFraction) + 4e9 * totalIceFraction; // Linear interpolation of satellite's rigidity ("rocky" and "icy" regimes)
+	const k2 = 1.5 / (1 + ((19 * mu) / (2 * rho * g * R))); // Satellite's tidal Love number 
+
+	const t = (w * (a**6) * I * Q) / (3 * consts.PHY_G * (m_p**2) * k2 * (R**5)); // Approximate satellite's tidal locking time
+	return new types.Value(t, types.units.Time.s);
+}
+
+/**
+ * Calculates planet's moment of inertia factor.
+ * 
+ * @param {types.Planet} planet - Current planet
+ * 
+ * @returns {number} Moment of inertia factor (0.205-0.38)
+ */
+function calculateMomentOfInertiaFactor(planet) {
+	const m_core = planet.core.mass.getValueAs(types.units.Mass.kg);
+	const m_env = planet.envelope.mass.getValueAs(types.units.Mass.kg);
+	const m_total = m_core + m_env;
+
+	const f_env = m_env / m_total;
+	
+	const ironFraction = planet.core.composition.iron;
+	const baseCoreFactor = 0.38 - (ironFraction * 0.07);
+
+	if (f_env === 0) {
+		return baseCoreFactor;
+	}
+
+	const targetGasFactor = 0.21;
+
+	const i_factor = baseCoreFactor * (1 - f_env) + targetGasFactor * f_env;
+
+	return Math.max(0.205, i_factor);
+}
+
+/**
+ * Calculates planet's approximate dissipation function value (Q).
+ * 
+ * @param {types.Planet} planet - Current planet
+ * 
+ * @returns {number} Q value (\~50...\~100,000).
+ */
+function calculateTidalQ(planet) {
+	const m_core = planet.core.mass.getValueAs(types.units.Mass.kg);
+	const m_env = planet.envelope.mass.getValueAs(types.units.Mass.kg);
+	const m_total = m_core + m_env;
+	
+	const f_env = m_env / m_total;
+
+	// 1. Bodies w/o envelope
+	if (f_env === 0) {
+		const iceFraction = planet.core.composition.ice;
+		// Ice is more flexible under pressure than rock and dissipates energy more effectively (lower Q).
+		return 100 * (1 - iceFraction) + 25 * iceFraction;
+	}
+
+	// 2. Mini-Neptunes / Puffy Super-Earths
+	// Q starts to increase since the gas envelope partially absorbs the tidal wave.
+	if (f_env < 0.5) {
+		// A smooth transition from the Q of a rigid body (about 100) to that of a gaseous (about 10,000)
+		return 100 * Math.pow(100, f_env / 0.5);
+	}
+
+	// 3. Ice Giants, Gas Giants, Brown Dwarfs
+	// Jupiter's Q is estimated to be 10^5 - 10^6. Saturn's is even larger.
+	// Brown dwarfs must have a huge Q value.
+	const mass_M_Earth = planet.mass.getValueAs(types.units.Mass.M_Earth);
+	
+	if (mass_M_Earth > 400) { 
+		// Super-Jupiters and Brown Dwarfs
+		return 1e6 * (mass_M_Earth / 400); 
+	} else {
+		// Classic giant planets
+		// Ice giants dissipate better than gas giants.
+		const envIceFraction = planet.envelope.composition.ice;
+		const baseGiantQ = 1e5;
+
+		// Expected Q values for ice giants are ~30,000, for gas giants - ~100,000
+		return baseGiantQ * (1 - envIceFraction * 0.7); 
+	}
+}
+
+/**
+ * Calculates planet's rotation period at tidal lock.
+ * 
+ * @param {types.Planet} planet - Current planet
+ * @param {types.Planet|types.BinaryPlanet|types.Star|types.BinaryStar} parent - Planet's parent body (star or binary companion)
+ * 
+ * @returns {types.Value} Rotation period at tidal lock (unit: Time)
+ */
+function getTidalLockRotationPeriod(planet, parent) {
+	const m1 = planet.mass.getValueAs(types.units.Mass.kg);
+	const m2 = parent.mass.getValueAs(types.units.Mass.kg);
+	const a = planet.sma.getValueAs(types.units.Dist.m);
+
+	// Rotation period = Orbital period
+	const t = Math.sqrt( ((4 * (Math.PI**2)) / (consts.PHY_G * (m1 + m2))) * (a**3) );
+
+	return new types.Value(t, types.units.Time.s);
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ * 
+ * @returns {types.Value}
+ */
+function getMagnetosphereSize(planet) {
+	const B = 7.906e31 / 1e4;
+	const P = getSolarWindPressure(planet);
+	const Rp = planet.radius.getValueAs(types.units.Dist.m);
+	const Rcf = Math.pow( (B**2) / (consts.PHY_MU_0 * P) , 1/6) * Rp;
+	return new types.Value(Rcf, types.units.Dist.m);
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ * 
+ * @returns {number}
+ */
+function getSolarWindPressure(planet) {
+	const star = planet.genData.parentStar;
+	const L = star.luminosity;
+	const dist_AU = planet.genData.sma_norm * Math.sqrt(L); // Converting AU☉ back to actual AU
+	const D = new types.Value(dist_AU, types.units.Dist.AU).getValueAs(types.units.Dist.m);
+	const c = new types.Value(1, types.units.Spd.c).getValueAs(types.units.Spd.m_s);
+	const P = L / (4 * Math.PI * (D**2) * c);
+	return P;
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ * 
+ * @returns {number}
+ */
+export function calculatePlanetMagneticField(planet) {
+	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
+	const planetMass_MJup = planet.mass.getValueAs(types.units.Mass.M_Jupiter);
+
+	const planetRadius_m = planet.radius.getValueAs(types.units.Dist.m);
+
+	let r_core, rho_core, f_ad, k_tectonics, c;
+	if (planet.type === 'Terrestrial') {
+		const coreMass_MEarth = planet.core.mass.getValueAs(types.units.Mass.M_Earth);
+		const r_core_iron_REarth = getMaterialRadius(coreMass_MEarth * planet.core.composition.iron, 'iron');
+		r_core = new types.Value(r_core_iron_REarth, types.units.Dist.R_Earth).getValueAs(types.units.Dist.m);
+		rho_core = 7500;
+		f_ad = 0.04;
+		if (planet.temperature.getValueAs(types.units.Temp.C) > -10)
+			k_tectonics = planet.core.composition.ice > 0.005 ? 0.25 : 0.08;
+		else
+			k_tectonics = planet.core.composition.ice > 0.2 ? 0.15 : 0.08;
+		c = 20;
+	}
+	else if (planet.type !== 'Gas Giant') {
+		r_core = planet.core.radius.getValueAs(types.units.Dist.m);
+		rho_core = 3500;
+		f_ad = 0.04;
+		k_tectonics = 0.3;
+		c = 20;
+	}
+	else {
+		r_core = planetRadius_m * Math.min(0.9, 0.7 + 0.15 * Math.log10(3 * planetMass_MJup + 1));
+		rho_core = 4000;
+		f_ad = 0.6;
+		k_tectonics = 1.0;
+		c = 35;
+	}
+
+	const planetAge_Gy = planet.age.getValueAs(types.units.Time.Gy);
+	let q_total;
+	if (planetMass_MJup < 0.15)
+		q_total = 4.6e13 * planetMass_MEarth * Math.pow(4.5 / planetAge_Gy, 0.5);
+	else if (planetMass_MJup < 13) 
+		q_total = 4.0e17 * Math.pow(planetMass_MJup, 1.5) * Math.pow(4.5 / planetAge_Gy, 0.5);
+	else 
+		q_total = 4.0e17 * Math.pow(planetMass_MJup, 2.5) * Math.pow(1.0 / planetAge_Gy, 0.4);
+
+	const q_core = q_total * k_tectonics;
+	const area_core = 4 * Math.PI * (r_core**2);
+	const f_total_core = q_core / area_core;
+
+	const f_c = f_total_core - f_ad;
+
+	if (f_c <= 0) {
+		planet.magneticField = 0;
+		console.log(
+			(0).toFixed(2), 
+			(r_core / planetRadius_m).toFixed(2), 
+			planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), 
+			planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), 
+			planet.age.getValueAs(types.units.Time.Gy).toFixed(2),
+			planet.type
+		);
+		return;
+	}
+	
+	const b_core = c * Math.sqrt(consts.PHY_MU_0) * Math.pow(rho_core, 1/6) * Math.pow(f_c / r_core, 1/3);
+	
+	const b_surf = b_core * Math.pow(r_core / planetRadius_m, 3) * utils.randomRangeGaussian(0.8, 1.2);
+
+	planet.magneticField = b_surf;
+	console.log(
+		(b_surf * 1e6).toFixed(2), 
+		(r_core / planetRadius_m).toFixed(2), 
+		planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), 
+		planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), 
+		planet.age.getValueAs(types.units.Time.Gy).toFixed(2),
+		planet.type
+	);
 }

@@ -18,7 +18,7 @@ class SystemGenerator {
 		this.settings = settings;
 
 		this.#subscribe();
-		//this.settings.seed_user = '77636919-528a-4881-92e3-02cc47a2c504';
+		//this.settings.seed_user = '333ab1df-ab7a-496a-96be-ab20721c5c03';
 	}
 
 	generate() {
@@ -37,7 +37,7 @@ class SystemGenerator {
 		if (starSystemGen.decideStarBinary(this.settings.star_binary_chance))
 			starSystemGen.generateStarFormation(this.system, this.system.bodies[0], stars);
 
-		// Planets generation around the star(s)
+		// Planets generation around single stars and binaries
 		stars.forEach(star => {
 			planetSystemGen.generatePlanets(star, this.settings);
 		});
@@ -53,17 +53,39 @@ class SystemGenerator {
 		// Migration simulation
 		migrationSim.simulateMigration(this.settings, stars);
 
-		// Finishing planets generation and generating moons
-		stars.forEach(star => { star.bodies.forEach(body => {
-			if ((body instanceof types.Star) || (body instanceof types.Binary))
-				return;
+		// Performing stage 2 generation for main planets and generating moons for them
+		stars.forEach(star => {
+			for (let i = star.bodies.length-1; i >= 0; i--) {
+				const body = star.bodies[i]
+				if ((body instanceof types.Star) || (body instanceof types.Binary))
+					continue;
 
-			planetGen.finishGeneration(this.settings, body);
-			moonSystemGen.generateMoons(this.settings, body);
-		}); });
+				planetGen.planetGeneration_Stage2(this.settings, body);
+				moonSystemGen.generateMoons(this.settings, body);
+			}
+		});
+
+		// Performing stage 3 generation for all planetary bodies
+		const finishGeneration = (body) => {
+			// Recursive calls
+			body.bodies.forEach(child => { 
+				finishGeneration(child) 
+			});
+			if (body instanceof types.Binary) {
+				finishGeneration(body.primary);
+				finishGeneration(body.secondary);
+			}
+
+			// -------
+
+			if (body instanceof types.Planet) {
+				planetGen.planetGeneration_Stage3(this.settings, body);
+			}
+		};
+		stars.forEach(star => { finishGeneration(star) });
 		
 		console.log(this.system);
-		console.log('-------')
+		console.log('--------------------')
 
 		eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
 	}

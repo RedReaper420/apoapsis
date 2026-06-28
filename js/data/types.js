@@ -7,8 +7,10 @@ import consts from "./consts.js";
 
 /**
  * Enum for available units.
+ * 
  * @readonly
  * @enum {string}
+ * 
  * @see {@link Value}
  */
 export const units = Object.freeze({
@@ -96,9 +98,9 @@ const unitValues = new Map([
 
 export class Value {
 	/**
-	 * A value with the assigned unit (convertable)
-	 * @param {number} value 
-	 * @param {string} unit - <types.units.GROUP.UNIT>
+	 * A value with an assigned unit (convertable).
+	 * @param {number} value - Numeric value.
+	 * @param {string} unit - Unit name. Use `units` enum to assssign (`types.units.GROUP.UNIT`).
 	 */
 	constructor (value, unit) {
 		this.value = value;
@@ -106,8 +108,8 @@ export class Value {
 	}
 
 	/**
-	 * Get the raw number value converted to the specified unit.
-	 * @param {string} targetUnit - <types.units.GROUP.UNIT>
+	 * Gets a raw number value converted to a specified unit.
+	 * @param {string} targetUnit - Unit enum (`types.units.GROUP.UNIT`).
 	 * @returns {number}
 	 */
 	getValueAs(targetUnit) {
@@ -148,6 +150,11 @@ export class Value {
 		}
 	}
 
+	/**
+	 * Converts value object's unit to a new specified one (of the same unit type).
+	 * @param {string} targetUnit - Unit enum (`types.units.GROUP.UNIT`).
+	 * @returns {Value}
+	 */
 	convertUnitTo(targetUnit) {
 		if (targetUnit !== this.unit) {
 			this.value = this.getValueAs(targetUnit);
@@ -383,6 +390,7 @@ export class BinaryPlanet extends Binary {
 		this.genData = {
 			impacts: this.primary.genData.impacts,
 			sma_init: this.primary.genData.sma_init,
+			parentStar: this.primary.genData.parentStar,
 		};
 		this.radius = this.primary.radius;
 		this.core = this.primary.core;
@@ -401,7 +409,7 @@ export class BinaryPlanet extends Binary {
 export class MassComponent {
 	/**
 	 * 
-	 * @param {Value} mass 
+	 * @param {Value} mass - Mass component's mass (unit: `Mass`).
 	 */
 	constructor (mass) {
 		this.mass = mass;
@@ -412,10 +420,10 @@ export class MassComponent {
 export class Core extends MassComponent {
 	/**
 	 * 
-	 * @param {Value} mass 
-	 * @param {number} f_iron 
-	 * @param {number} f_rock 
-	 * @param {number} f_ice 
+	 * @param {Value} mass - Core's mass (unit: `Mass`).
+	 * @param {number} f_iron - Iron fraction in the core (0.0-1.0).
+	 * @param {number} f_rock - Rock fraction in the core (0.0-1.0).
+	 * @param {number} f_ice - Ice fraction in the core (0.0-1.0).
 	 */
 	constructor (mass=new Value(1.0, units.Mass.M_Earth), f_iron=0.20, f_rock=0.79, f_ice=0.01) {
 		super(mass);
@@ -427,9 +435,9 @@ export class Core extends MassComponent {
 export class CoreComposition {
 	/**
 	 * 
-	 * @param {number} f_iron 
-	 * @param {number} f_rock 
-	 * @param {number} f_ice 
+	 * @param {number} f_iron - Iron fraction in the core (0.0-1.0).
+	 * @param {number} f_rock - Rock fraction in the core (0.0-1.0).
+	 * @param {number} f_ice - Ice fraction in the core (0.0-1.0).
 	 */
 	constructor (f_iron, f_rock, f_ice) {
 		this.iron = f_iron;
@@ -441,9 +449,9 @@ export class CoreComposition {
 export class Envelope extends MassComponent {
 	/**
 	 * 
-	 * @param {Value} mass 
-	 * @param {number} f_gas 
-	 * @param {number} f_ice 
+	 * @param {Value} mass - Envelope's mass (unit: `Mass`).
+	 * @param {number} f_gas - Gas fraction in the envelope (0.0-1.0).
+	 * @param {number} f_ice - Ice fraction in the envelope (0.0-1.0).
 	 */
 	constructor (mass=new Value(0.0, units.Mass.M_Earth), f_gas=0.9, f_ice=0.1) {
 		super(mass);
@@ -455,8 +463,8 @@ export class Envelope extends MassComponent {
 export class EnvelopeComposition {
 	/**
 	 * 
-	 * @param {number} f_gas 
-	 * @param {number} f_ice 
+	 * @param {number} f_gas - Gas fraction in the envelope (0.0-1.0).
+	 * @param {number} f_ice - Ice fraction in the envelope (0.0-1.0).
 	 */
 	constructor (f_gas, f_ice) {
 		this.gas = f_gas;

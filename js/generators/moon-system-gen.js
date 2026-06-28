@@ -10,9 +10,18 @@ import * as planetGen from "./planet-gen.js";
 import {events, eventBus} from "../utils/eventbus.js";
 
 /**
+ * Attempts to generate a moon system for a planet. Possible outcomes:
+ * - Planet gets a regular moons system.
+ * - Planet gets an impact moon (1:50...1:100 mass ratio).
+ * - Planet gets a similar mass companion (1:1...1:25 mass ratio), the pair turns into a binary planet. Additionally, the binary may get regular moons.
+ * - No moons generated (insufficient mass, no giant impacts).
  * 
- * @param {types.GenerationSettings} settings 
- * @param {types.Planet} planet 
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
+ * @param {types.Planet} planet - Current planet.
+ * 
+ * @see {@link generateBinary}
+ * @see {@link generateImpactMoon}
+ * @see {@link generateRegularMoons}
  */
 export function generateMoons(settings, planet) {
 	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
@@ -20,45 +29,45 @@ export function generateMoons(settings, planet) {
 
 	const hillSphere = getHillSphere(planet, planet.parentBody);
 	const hillSphere_REarth = hillSphere.getValueAs(types.units.Dist.R_Earth);
-	const moonSmaMax_REarth = hillSphere_REarth * 0.3;
+	const moonSmaMax_REarth = hillSphere_REarth * 0.3; // Maximal stable orbit's SMA for a moon around its parent body.
 
-	// Minimal SMA values are rough approximations of Roche limits
+	// Minimal SMA values are rough approximations of Roche limits.
 	const binarySmaMin_REarth = 2.5 * (1 + 1) * planetRadius_REarth;
 	const moonSmaMin_REarth = 2.5 * (1 + 1/3) * planetRadius_REarth;
 
-	// Preventing generation beforehand if there's no room for stable orbits
+	// Preventing generation beforehand if there's no room for stable orbits.
 	if (moonSmaMax_REarth < moonSmaMin_REarth)
 		return;
 	
 	const binaryChance = 0.1 * Math.exp(-Math.log10(planetMass_MEarth + 1));
 
+	// Calculating a binary companion mass budget that won't disturb orbits of neighbor planets.
 	const maxSafeMass = calculateMaxSafeMass(planet, planet.parentBody, settings.planet_migration_hill_safety_factor);
 	const maxSafeMass_MEarth = maxSafeMass.getValueAs(types.units.Mass.M_Earth);
 	const maxCompanionMass_MEarth = Math.min(maxSafeMass_MEarth, planetMass_MEarth);
-
 	const availableMassRatio = Math.min(0.99, maxCompanionMass_MEarth / planetMass_MEarth);
 	
 	// Chance to add an impact to the planet's stats, even if there were no impact during migration simulation.
 	const bonusImpactChance = 0.1 * Math.exp(-0.5 * planetMass_MEarth); 
 	if (prng() < bonusImpactChance) planet.genData.impacts += 1;
 	
-	let regularMoonsOverrideChance = 0;
-	let isBinary = false;
-
+	let regularMoonsOverrideChance = 0; // If the planet didn't have giant impacts, it won't have an impact moon.
+	let isBinary = false; // If the planet didn't have giant impacts, it won't have a binary companion.
 	if (planet.genData.impacts > 0) {
-		// Deciding about making an impact moon or regular moons
+		// Deciding about making an impact moon or regular moons.
 		const impactMoonsOnlyMass = 5; // M⊕
 		const regularMoonsOnlyMass = 20; // M⊕
+
+		if (planetMass_MEarth <= impactMoonsOnlyMass)
+			regularMoonsOverrideChance = 1.0; // An impact moon always replaces regular moons for planets with lower mass.
+		else if (planetMass_MEarth >= regularMoonsOnlyMass) 
+			regularMoonsOverrideChance = 0.0; // An impact moon never replaces regular moons for planets with higher mass.
+		else 
+			regularMoonsOverrideChance = Math.exp(-0.75 * (planetMass_MEarth - impactMoonsOnlyMass));
 		
-		regularMoonsOverrideChance = planetMass_MEarth >= impactMoonsOnlyMass 
-			? (planetMass_MEarth <= regularMoonsOnlyMass 
-				? Math.exp(-0.75 * (planetMass_MEarth - impactMoonsOnlyMass)) 
-				: 0.0) 
-			: 1.0;
-		
-		// Deciding about making a binary planet instead moons
-		if (moonSmaMax_REarth > binarySmaMin_REarth) {
-			if (availableMassRatio >= consts.DEF_BINARY_PLANET_MASS_RATIO) {
+		// Deciding about making a binary planet instead moons.
+		if (moonSmaMax_REarth > binarySmaMin_REarth) { // There should be a corridor between binary's Roche limit and Hill sphere's fraction.
+			if (availableMassRatio >= consts.DEF_BINARY_PLANET_MASS_RATIO) { // There should be enough mass available for a binary companion.
 				for (let i = 0; i < planet.genData.impacts; i++) {
 					if (prng() < binaryChance) {
 						isBinary = true;
@@ -69,29 +78,32 @@ export function generateMoons(settings, planet) {
 		}
 	}
 
+	// Generation
 	if (isBinary === true) {
-		// Binary planet decided
+		// Binary planet decided.
 		generateBinary(settings, planet, binarySmaMin_REarth, moonSmaMax_REarth, availableMassRatio);
 	}
 	else {
-		// Moon(s) decided
+		// Moon(s) decided.
+
 		if (prng() < regularMoonsOverrideChance) {
-			// Impact moon generation
+			// Impact moon generation.
 			generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REarth);
 		}
 		else {
-			// Regular moons generation
+			// Regular moons generation.
 			generateRegularMoons(settings, planet, moonSmaMax_REarth);
 		}
 	}
 }
 
 /**
+ * Calculates Hill sphere radius of a planet.
  * 
- * @param {types.Planet} planet 
- * @param {types.Star} star 
+ * @param {types.Planet} planet - Current planet.
+ * @param {types.Star|types.BinaryStar} star - Star around which the planet is orbiting.
  * 
- * @returns {types.Value} (unit: types.units.Dist)
+ * @returns {types.Value} Hill sphere radius (unit: `Dist`).
  */
 function getHillSphere(planet, star) {
 	const a = planet.sma.getValueAs(types.units.Dist.m);
@@ -105,11 +117,11 @@ function getHillSphere(planet, star) {
 /**
  * Calculates maximal allowed mass that won't destabilize neighbors' orbits.
  * 
- * @param {types.Planet} planet 
- * @param {types.Star|types.BinaryStar} star 
- * @param {number} safetyFactor - Stability factor (usually >=3.5)
+ * @param {types.Planet} planet - Current planet.
+ * @param {types.Star|types.BinaryStar} star - Star around which the planet is orbiting.
+ * @param {number} safetyFactor - Stability factor (usually >=3.5).
  * 
- * @returns {types.Value} Maximal allowed mass (unit: types.unuts.Mass)
+ * @returns {types.Value} Maximal allowed mass (unit: `Mass`).
  */
 function calculateMaxSafeMass(planet, star, safetyFactor = 4.0) {
 	const M_star = star.mass.getValueAs(types.units.Mass.kg);
@@ -149,10 +161,12 @@ function calculateMaxSafeMass(planet, star, safetyFactor = 4.0) {
 }
 
 /**
+ * Calculates moon's Roche limit.
  * 
- * @param {types.Planet} planet 
- * @param {types.Planet} moon 
- * @returns {types.Value} (unit: types.units.Dist)
+ * @param {types.Planet} planet - Current planet hosting a moon.
+ * @param {types.Planet} moon - Current moon orbiting the planet.
+ * 
+ * @returns {types.Value} Roche limit (unit: `Dist`)
  */
 function getRocheLimit(planet, moon) {
 	const r_p = planet.radius.getValueAs(types.units.Dist.m);
@@ -164,24 +178,29 @@ function getRocheLimit(planet, moon) {
 }
 
 /**
+ * Generates a binary companion for a planet, turns the pair into a binary planet, and generates regular moons for the binary.
  * 
- * @param {types.GenerationSettings} settings 
- * @param {types.Planet} planet 
- * @param {number} binarySmaMin_REarth 
- * @param {number} binarySmaMax_REarth 
- * @param {number} availableMassRatio 
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
+ * @param {types.Planet} planet - Current planet.
+ * @param {number} binarySmaMin_REarth - Calculated minimal SMA of a binary (approximate Roche limit).
+ * @param {number} binarySmaMax_REarth - Calculated maximal SMA of a binary (planet's Hill sphere fraction).
+ * @param {number} availableMassRatio - Calculated maximal safe mass ratio of a binary.
+ * 
+ * @see {@link generateRegularMoons}
  */
 function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REarth, availableMassRatio) {
-	// Generating a companion planet
+	// --- 1. Generating a companion planet ---
+
+	// Companion's SMA around the planet (later will be assigned to the planet too).
 	const companionSma_REarth = utils.clamp(
 		utils.randomRangeGaussian(binarySmaMin_REarth, binarySmaMin_REarth * 20), 
 		binarySmaMin_REarth, binarySmaMax_REarth
 	);
 	const companionSma = new types.Value(companionSma_REarth, types.units.Dist.R_Earth);
 	
+	// Generating companion instance.
 	const companionMass_MEarth = planet.core.mass.getValueAs(types.units.Mass.M_Earth) * prng.range(consts.DEF_BINARY_PLANET_MASS_RATIO, availableMassRatio);
 	const companionMass = new types.Value(companionMass_MEarth, types.units.Mass.M_Earth);
-	
 	const companion = planetGen.generatePlanet(settings, planet, companionSma,
 		{
 			isMoon: true,
@@ -191,6 +210,8 @@ function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REar
 		}
 	);
 	
+	// --- 2. Making a binary planet instance ---
+
 	// Removing the planet receiving the companion from the parent's body list
 	for (let i = 0; i < planet.parentBody.bodies.length; i++) {
 		if (planet.parentBody.bodies[i] === planet) {
@@ -199,14 +220,23 @@ function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REar
 		}
 	}
 
-	// Making a binary container
+	// Making and setting up a binary container
+
+	// Saving values for binary
 	const binaryParent = planet.parentBody;
 	const binarySma = new types.Value(planet.sma.value, planet.sma.unit);
-	const binary = new types.BinaryPlanet(planet, companion, companion.sma);
+
+	const binary = new types.BinaryPlanet(planet, companion, companion.sma); // Binary constructor reassigns values of the planets
+
+	// Setting values for binary
 	binary.sma = binarySma;
 	binary.parentBody = binaryParent;
-	binaryParent.bodies.push(binary);
 
+	binaryParent.bodies.push(binary); // Adding the binary to the star's body list
+
+	// --- 3. Generating regular moons ---
+
+	// Calculating maximal safe SMA for circumbinary moons.
 	const hillSphere = getHillSphere(binary, binaryParent);
 	const hillSphere_REarth = hillSphere.getValueAs(types.units.Dist.R_Earth);
 	const moonSmaMax_REarth = hillSphere_REarth * 0.3;
@@ -219,60 +249,69 @@ function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REar
 		? binary.primary.mass
 		: binary.secondary.mass;
 
-	// Calculating minimal stable P-type orbit
+	// Calculating minimal stable P-type orbit.
 	const moonSmaStartOffset = planetSystemGen.getMinimalPTypeOrbit(massMax, massMin, binary.primary.sma);
 	const moonSmaStartOffset_AU = moonSmaStartOffset.getValueAs(types.units.Dist.AU) * settings.planet_p_type_safety_factor;
 	
-	// Generating circumbinary moons
+	// Generating circumbinary moons.
 	generateRegularMoons(settings, binary, moonSmaMax_REarth, moonSmaStartOffset_AU);
 	
+	// Calculating maximal stable S-type orbit for primary, then generating moons.
 	const moonSmaMax_primary = planetSystemGen.getMaximalSTypeOrbit(binary.primary.mass, binary.secondary.mass, binary.primary.sma);
 	const moonSmaMax_primary_REarth = moonSmaMax_primary.getValueAs(types.units.Dist.R_Earth);
 	generateRegularMoons(settings, binary.primary, moonSmaMax_primary_REarth);
 
+	// Calculating maximal stable S-type orbit for secondary, then generating moons.
 	const moonSmaMax_secondary = planetSystemGen.getMaximalSTypeOrbit(binary.secondary.mass, binary.primary.mass, binary.primary.sma);
 	const moonSmaMax_secondary_REarth = moonSmaMax_secondary.getValueAs(types.units.Dist.R_Earth);
 	generateRegularMoons(settings, binary.secondary, moonSmaMax_secondary_REarth);
-
+	
 	if (binary.primary.type !== 'Terrestrial')
 		eventBus.emit('shtap');
 }
 
 /**
+ * Attempts to generate regular moons for a planet.
  * 
- * @param {types.GenerationSettings} settings 
- * @param {types.Planet} planet 
- * @param {number} moonSmaMax_REarth 
+ * Moons minimal mass threshold is 0.1 M☾, minimal possible moon mass is 0.01 M☾.
+ * 
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
+ * @param {types.Planet} planet - Current planet.
+ * @param {number} moonSmaMax_REarth - Calculated maximal SMA of a moon (planet's Hill sphere fraction).
+ * @param {number} moonSmaStartOffset_AU - SMA start offset: 0 for normal moons (default), a calculated minimal P-orbit value for circumbinary moons.
  */
 function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartOffset_AU = 0) {
+	
+	// Mass budget calculation
+	const planetMass_MMoon = planet.mass.getValueAs(types.units.Mass.M_Moon);
+	const planetMassFactor = 0.5 * Math.log10(planet.mass.getValueAs(types.units.Mass.M_Earth) + 1);
+	let massBudget = planetMass_MMoon * planetMassFactor * 1e-4 * utils.randomRangeGaussian(0.7, 1.3);
+	if (planet instanceof types.BinaryPlanet)
+		massBudget /= 3; // A semblance of mass preservation (B1-S-moons + B2-S-moons + P-moons)
+
+	// Chance to loose a moon due to violent collissions in the past
 	const moonLossChance = planet.genData.impacts > 0
 		? Math.pow(0.5, 1/(0.25 * (planet.genData.impacts + 1)))
 		: 0;
 	
-	const planetMass_MMoon = planet.mass.getValueAs(types.units.Mass.M_Moon);
-	const planetMassFactor = 0.5 * Math.log10(planet.mass.getValueAs(types.units.Mass.M_Earth) + 1);
-	let massBudget = planetMass_MMoon * planetMassFactor * 1e-4 * utils.randomRangeGaussian(0.7, 1.3);
-	if (planet instanceof types.BinaryPlanet) massBudget /= 3;
-	
 	const moonMasses = [];
-	const massThreshold = 0.01; // M☾
+	const massThreshold = 0.1; // M☾
 	while (massBudget >= massThreshold) {
-		const moonMass = moonMasses.length > 0 
-			? massBudget * prng.range(0.2, 0.6) / prng.range(1.0, Math.max(1.0, planet.genData.impacts / 1.5))
+		const moonMass = moonMasses.length === 0 
 			// The first moon in the list may be deliberately placed too close to later give rings to the planet.
 			// Making that moon smaller to make 2nd and 3rd moons more interesting.
-			: massBudget * prng.range(0.1, 0.4); 
+			? massBudget * prng.range(0.1, 0.4) // Minimal first: budget 0.1 * random 0.1 = 0.01 M☾
+			: massBudget * prng.range(0.2, 0.6) // Minimal rest: budget 0.1 * random 0.2 = 0.02 M☾
 		massBudget -= moonMass;
-
-		// Chance to loose a moon due to giant impacts in the past
-		if (prng() < moonLossChance) continue; // Moon "ejects"
 		
 		moonMasses.push(moonMass);
 	}
 	
+	// Picking SMA for the first moon
 	const planetRadius_AU = planet.radius.getValueAs(types.units.Dist.AU);
 	const moonSmaStart_AU = planetRadius_AU * (10**prng.range(0.25, 0.75));
-	const moonSmaMax_AU = new types.Value(moonSmaMax_REarth, types.units.Dist.R_Earth).getValueAs(types.units.Dist.AU); 
+	const moonSmaMax_AU = new types.Value(moonSmaMax_REarth, types.units.Dist.R_Earth).getValueAs(types.units.Dist.AU);
+
 	let sma = moonSmaStart_AU + moonSmaStartOffset_AU;
 	for (let i = 0; i < moonMasses.length; i++) {
 		sma = planetSystemGen.tryToSkipOrbit(sma);
@@ -280,13 +319,21 @@ function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartO
 		if (sma > moonSmaMax_AU)
 			break;
 
-		// Chance to loose a moon due to violent collisions in the past (moon "plunges")
-		const moonSma_AU = prng() < moonLossChance ? 0 : sma; 
+		let moonSma_AU = sma;
+		
+		if (prng() < moonLossChance) {
+			if (prng() < 0.5)
+				continue; // 50% chance: moon "ejects"
+			else
+				moonSma_AU = 0; // 50% chance: moon "plunges"
+		} 
+
 		const moonSma = new types.Value(moonSma_AU, types.units.Dist.AU);
 
 		const moonMass_MMoon = moonMasses[i];
 		const moonMass = new types.Value(moonMass_MMoon, types.units.Mass.M_Moon);
 
+		// 20% chance to make a retrograde moon if SMA passed half of the limit
 		const moonIsRetrograde = sma >= moonSmaMax_AU * 0.5 ? prng() < 0.2 : false;
 
 		const moon = planetGen.generatePlanet(settings, planet, moonSma, 
@@ -324,17 +371,27 @@ function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartO
 	}
 }
 
+/**
+ * Attempts to generate an impact moon for a planet. The moon's mass ratio is 1:50 to 1:100.
+ * 
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
+ * @param {types.Planet} planet - Current planet.
+ * @param {number} moonSmaMin_REarth - Calculated minimal SMA of a moon (approximate Roche limit).
+ * @param {number} moonSmaMax_REarth - Calculated maximal SMA of a moon (planet's Hill sphere fraction).
+ */
 function generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REarth) {
 	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
 
-	const moonLossChance = 1 - Math.exp(-(planet.genData.impacts - 1));
+	// Chance to loose a moon due to violent collissions in the past, starting from 2nd impact.
+	const moonLossChance = 1 - Math.exp(-0.5 * (planet.genData.impacts - 1));
 			
-	let sma = 0; // Moon plunges (if loss triggered)
+	let sma = 0; // Moon "plunges" (if loss triggered).
 	if (prng() < moonLossChance) {
-		if (prng() < 0.5) sma = Infinity; // Moon ejects
+		if (prng() < 0.5) sma = Infinity; // 50% chance: moon "ejects".
+		// 50% chance: moon "plunges" instead.
 	}
 	else {
-		// Moon stays
+		// Moon stays.
 		sma = moonSmaMin_REarth + (moonSmaMax_REarth - moonSmaMin_REarth) * Math.pow(prng(), 2);
 	}
 
@@ -350,10 +407,11 @@ function generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REar
 				type: 'impact',
 			}
 		);
-
+		
 		const rocheLimit = getRocheLimit(planet, moon);
 		const rocheLimit_REarth = rocheLimit.getValueAs(types.units.Dist.R_Earth);
 		if (sma <= rocheLimit_REarth) {
+			// Turning the moon into rings if it falls on the planet.
 			planet.rings.push(new types.RingSystem(
 				new types.Value(planet.radius.value * 1.5, planet.radius.unit), 
 				rocheLimit, 

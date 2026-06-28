@@ -6,7 +6,7 @@ import consts from "../data/consts.js";
 
 import * as planetGen from "./planet-gen.js";
 
-const PLANET_SPAWN_START_DIST = 0.1;
+const PLANET_SPAWN_START_DIST = 0.1; // AU
 
 const evilAndIntimidatingRedDwarf = new types.Value(0.3, types.units.Mass.M_Sun);
 const lightYear = new types.Value(0.2, types.units.Dist.ly);
@@ -14,8 +14,8 @@ const lightYear = new types.Value(0.2, types.units.Dist.ly);
 /**
  * Wrapper for generating planets for the specified star formation.
  * 
- * @param {types.Star} star 
- * @param {types.GenerationSettings} settings 
+ * @param {types.Star|types.BinaryStar} star - Current star formation.
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
  * 
  * @see {@link generatePlanetsForBinary}
  * @see {@link generatePlanetsForSingleStar}
@@ -32,8 +32,8 @@ export function generatePlanets(star, settings) {
  * 
  * @see {@link generatePlanetsForStar}
  * 
- * @param {types.Star} star 
- * @param {types.GenerationSettings} settings 
+ * @param {types.Star} star - Current star.
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
  */
 function generatePlanetsForSingleStar(star, settings) {
 	// Calculating distance limit
@@ -59,8 +59,8 @@ function generatePlanetsForSingleStar(star, settings) {
  * 
  * @see {@link generatePlanetsForStar}
  * 
- * @param {types.BinaryStar} binary 
- * @param {types.GenerationSettings} settings 
+ * @param {types.BinaryStar} binary - Current binary star.
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
  */
 function generatePlanetsForBinary(binary, settings) {
 	let limit = new types.Value(Infinity, types.units.Dist.m);
@@ -98,13 +98,13 @@ function generatePlanetsForBinary(binary, settings) {
 }
 
 /**
- * Get maximal stable S-type orbit (around the star) from Holman & Wiegert 1999 (simplified for circular binaries).
+ * Gets maximal stable S-type orbit (around the star) from Holman & Wiegert 1999 (simplified for circular binaries).
  * 
- * @param {types.Value} host_mass	   - <types.units.Mass.X>
- * @param {types.Value} companion_mass - <types.units.Mass.X>
- * @param {types.Value} binary_sma	   - <types.units.Dist.X>
+ * @param {types.Value} host_mass	   - Satellite's host body mass (unit: `Mass`).
+ * @param {types.Value} companion_mass - Host's companion mass (unit: `Mass`).
+ * @param {types.Value} binary_sma	   - Separation between binary components (unit: `Dist`).
  * 
- * @returns {types.Value} <types.units.Dist.X>
+ * @returns {types.Value} Maximal S-type orbit SMA (unit: `Dist`).
  */
 export function getMaximalSTypeOrbit(host_mass, companion_mass, binary_sma) {
 	const mA = host_mass.getValueAs(types.units.Mass.M_Sun);
@@ -119,15 +119,15 @@ export function getMaximalSTypeOrbit(host_mass, companion_mass, binary_sma) {
 }
 
 /**
- * Get minimal stable P-type orbit (around the binary's barycenter) from Holman & Wiegert 1999 (simplified for circular binaries).
+ * Gets minimal stable P-type orbit (around the binary's barycenter) from Holman & Wiegert 1999 (simplified for circular binaries).
  * 
  * @see {@link getMaximalSTypeOrbit}
  * 
- * @param {types.Value} mass_greater - <types.units.Mass.X>
- * @param {types.Value} mass_lesser  - <types.units.Mass.X>
- * @param {types.Value} binary_sma	 - <types.units.Dist.X>
+ * @param {types.Value} mass_greater - Greater binary component's mass (unit: `Mass`).
+ * @param {types.Value} mass_lesser  - Lesser binary component's mass (unit: `Mass`).
+ * @param {types.Value} binary_sma	 - Separation between binary components (unit: `Dist`).
  * 
- * @returns {types.Value} <types.units.Dist.X>
+ * @returns {types.Value} Minimal P-type orbit SMA (unit: `Dist`).
  */
 export function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
 	const mA = mass_greater.getValueAs(types.units.Mass.M_Sun);
@@ -144,11 +144,11 @@ export function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
 /**
  * Generates planets for the specified (binary) star instance.
  * 
- * @param {types.GenerationSettings} settings - generating system, containing generation settings
- * @param {types.Star} star		 - a (binary) star instance getting the planets generated
- * @param {number} distanceLimit - distance limit (in AU) beyond which planets will not be generated
- * @param {number} distanceStart - [min, default: {@link PLANET_SPAWN_START_DIST}] distance (in AU) from which planets will start generating
- * @param {number} planetsNumber - [optional] specified planets number to generate instead of a random one (@see {@link generatePlanetsForBinary})
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
+ * @param {types.Star|types.BinaryStar} star - Current star formation.
+ * @param {number} distanceLimit - Distance limit (in AU) beyond which planets won't be generated.
+ * @param {number} distanceStart - *[min, default: {@link PLANET_SPAWN_START_DIST}]* distance (in AU) from which planets will start generating.
+ * @param {number} planetsNumber - *[optional]* specified planets number to generate instead of a random one (@see {@link generatePlanetsForBinary}).
  * 
  * @returns {number} number of not generated planets, as they've got beyond the allowed distance limit.
  */
@@ -189,18 +189,22 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
 }
 
 /**
- * Get an average number of planets around the star from its temperature and metallicity.
+ * Samples a number of planets to generate around the star from its temperature and metallicity.
  * 
- * @param {types.Star} star   - a star instance. For binaries, amount of P-type orbiting planets is instead calculated from discarded S-type orbiting planets (@see {@link generatePlanetsForBinary}).
- * @param {number} amountMult - planets amount multiplier setting
+ * @param {types.Star} star - Current star. For binaries, amount of P-type orbiting planets is instead calculated from discarded S-type orbiting planets (@see {@link generatePlanetsForBinary}).
+ * @param {number} amountMult - Planets amount multiplier setting.
  * 
- * @returns {number}
+ * @returns {number} Number of planets to generate.
  */
 function getPlanetsNumberToGenerate(star, amountMult) {
 	const temperature = star.temperature.getValueAs(types.units.Temp.K);
-	const averagePlanetsNumber = (13 - 0.6 * (Math.pow(Math.log10(temperature), 1.8))) * amountMult; // Default: 7.68 on 2300 K, 3.28 on 50000 K
+	// Default: 7.68 on 2300 K, 3.28 on 50000 K
+	const averagePlanetsNumber = (13 - 0.6 * (Math.pow(Math.log10(temperature), 1.8))) * amountMult;
+
 	const metallicityMult = 1.5 ** star.metallicity;
+
 	const variance = prng.range(1/1.5, 1.5);
+
 	return Math.round(averagePlanetsNumber * metallicityMult * variance);
 }
 
@@ -215,9 +219,9 @@ function getPlanetsNumberToGenerate(star, amountMult) {
  * - 5: 0.003% (3.13% x 0.098%)
  * - 6 and more: 0% (explicitly forbidden; very unlikely in the first place)
  * 
- * @param {number} sma - Current SMA value (AU)
+ * @param {number} sma - Current SMA value (AU).
  * 
- * @returns {number} New SMA value (AU)
+ * @returns {number} New SMA value (AU).
  * 
  * @see {@link getNextOrbit}
  */
@@ -240,9 +244,9 @@ export function tryToSkipOrbit(sma) {
 /**
  * Get SMA for the next orbit with 1.4-2.2 times longer period.
  * 
- * @param {number} smaCurrent - Current SMA value (AU)
+ * @param {number} smaCurrent - Current SMA value (AU).
  * 
- * @returns {number} New SMA value (AU)
+ * @returns {number} New SMA value (AU).
  */
 export function getNextOrbit(smaCurrent) {
 	const newPeriod = prng.range(1.4, 2.2);

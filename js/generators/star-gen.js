@@ -9,11 +9,11 @@ import * as nameGen from "./name-gen.js";
 /**
  * Generates a completely initialized Star object instance.
  * 
- * @param {types.GenerationSettings} settings - Context settings configuration for procedural generation
- * @param {types.Star|types.BinaryStar|null} constraint - Optional star object to inherit baseline parameters from
- * @param {number} constraintMassMult  - [default: 1.0] Mass modifier factor used to prevent sub-threshold star system generations (see starsystemgen.js, generateStarFormation())
+ * @param {types.GenerationSettings} settings - Generation settings configuration.
+ * @param {types.Star|types.BinaryStar|null} constraint - Optional star instance to inherit baseline parameters from.
+ * @param {number} constraintMassMult  - *[default: 1.0]* Mass modifier factor used to prevent sub-threshold star system generations (see `star-system-gen.js` -> `generateStarFormation()`).
  * 
- * @returns {types.Star} An instantiated and fully calculated Star object
+ * @returns {types.Star} An instantiated and fully calculated Star object.
  */
 export function generateStar(settings, constraint = null, constraintMassMult = 1.0) {
 	const star = new types.Star();
@@ -52,12 +52,12 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	let radius = getRadius(star.mass);
 
 	// Physical effects: Higher metallicity -> more opaque core -> dimmer but structurally expanded
-	luminosity *= Math.pow(10, -0.15 * metallicity); 
+	luminosity *= Math.pow(10, -0.125 * metallicity); 
 	radius.value *= (1 + 0.08 * metallicity);
 
 	// Apply natural scatter (variability simulation)
-	const luminosityScatter = 0.04 + 0.08 * Math.abs(metallicity); // Extreme metal content causes higher instability
-	const radiusScatter = 0.025;
+	const luminosityScatter = 0.04 + 0.05 * Math.abs(metallicity); // Extreme metal content causes higher instability
+	const radiusScatter = 0.02 + 0.01 * Math.abs(metallicity);
 	luminosity *= Math.pow(10, utils.gaussianRandom(0, luminosityScatter));
 	radius.value *= Math.exp(utils.gaussianRandom(0, radiusScatter));
 
@@ -78,7 +78,7 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	// --- 5. Lifespan & Age Progression ---
 	star.lifespan = getLifespan(star.mass, star.luminosity);
 	if (constraint === null) {
-		const randomAgeFraction = prng.range(0.2, 0.8);
+		const randomAgeFraction = prng.range(0.2, 0.5);
 		const ageGy = star.lifespan.getValueAs(types.units.Time.Gy) * randomAgeFraction;
 		star.age = new types.Value(ageGy, types.units.Time.Gy);
 	} else {
@@ -94,24 +94,25 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 /**
  * Samples a valid stellar mass from the IMF within a strictly bounded range.
  * 
- * @param {number} minMass - Minimum allowed mass in M☉
- * @param {number} maxMass - Maximum allowed mass in M☉
+ * @param {number} minMass - Minimum allowed mass in M☉.
+ * @param {number} maxMass - Maximum allowed mass in M☉.
  * 
- * @returns {types.Value} The bounded star mass (unit: types.units.Mass)
+ * @returns {types.Value} The bounded star mass (unit: Mass).
  * 
  * @see {@link sampleKroupaIMF}
  */
 function sampleIMF(minMass, maxMass) {
-	const MAX_ATTEMPTS = 100;
 	let mass = 0;
+
+	const MAX_ATTEMPTS = 100;
 	let attempts = 0;
-	
 	do {
 		mass = sampleKroupaIMF();
 		attempts++;
-	} while ((mass < minMass || mass > maxMass) && attempts < MAX_ATTEMPTS);
+	} while ( ((mass < minMass) || (mass > maxMass)) && (attempts < MAX_ATTEMPTS) );
 
 	const finalMass = utils.clamp(mass, minMass, maxMass);
+
 	return new types.Value(finalMass, types.units.Mass.M_Sun);
 }
 
@@ -121,14 +122,14 @@ function sampleIMF(minMass, maxMass) {
  * Broken power-law distribution: 
  * - α = 0.3 (0.01 - 0.08 M☉), 
  * - α = 1.3 (0.08 - 0.5 M☉), 
- * - α = 2.3 (> 0.5 M☉)
+ * - α = 2.3 (> 0.5 M☉).
  * 
  * Uses inverse transform sampling with proper normalization across boundaries.
  * 
- * @param {number} minMass - Lower limit boundary (default: {@link consts.PHY_STAR_MASS_MIN})
- * @param {number} maxMass - Upper limit boundary (default: {@link consts.PHY_STAR_MASS_MAX})
+ * @param {number} minMass - Lower limit boundary *[default: {@link consts.PHY_STAR_MASS_MIN}]*.
+ * @param {number} maxMass - Upper limit boundary *[default: {@link consts.PHY_STAR_MASS_MAX}]*.
  * 
- * @returns {number} Sampled mass value in solar masses (M☉)
+ * @returns {number} Sampled mass value in solar masses (M☉).
  */
 function sampleKroupaIMF(minMass = consts.PHY_STAR_MASS_MIN, maxMass = consts.PHY_STAR_MASS_MAX) {
 	const alpha1 = 0.3;   // Brown dwarfs segment (0.01 - 0.08 M☉)
@@ -177,22 +178,22 @@ function sampleKroupaIMF(minMass = consts.PHY_STAR_MASS_MIN, maxMass = consts.PH
 /**
  * Samples stellar metallicity [Fe/H] from a truncated normal distribution.
  * 
- * @param {number} mean  - Mean of the distribution (usually 0 or -0.1)
- * @param {number} stdev - Standard deviation (typical: 0.2 to 0.4)
- * @param {number} min	 - Minimum allowed [Fe/H]
- * @param {number} max	 - Maximum allowed [Fe/H]
+ * @param {number} mean  - Mean of the distribution (usually 0 or -0.1).
+ * @param {number} stdev - Standard deviation (typical: 0.2 to 0.4).
+ * @param {number} min	 - Minimum allowed [Fe/H].
+ * @param {number} max	 - Maximum allowed [Fe/H].
  * 
- * @returns {number} Calculated metallicity value
+ * @returns {number} Calculated metallicity value ([Fe/H]).
  */
 function sampleMetallicity(mean, stdev, min, max) {
-	const MAX_ATTEMPTS = 100;
-
 	let metallicity = 0;
+	
+	const MAX_ATTEMPTS = 100;
 	let attempts = 0;
 	do {
 		metallicity = utils.gaussianRandom(mean, stdev);
 		attempts++;
-	} while ((metallicity < min || metallicity > max) && attempts < MAX_ATTEMPTS);
+	} while ( ((metallicity < min) || (metallicity > max)) && (attempts < MAX_ATTEMPTS) );
 
 	return utils.clamp(metallicity, min, max);
 }
@@ -200,9 +201,9 @@ function sampleMetallicity(mean, stdev, min, max) {
 /**
  * Calculates a star's base luminosity from its mass using the Mass-Luminosity relation.
  * 
- * @param {types.Value} starMass - The mass of the star (unit: types.units.Mass)
+ * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
  * 
- * @returns {number} The base luminosity in solar units (L☉)
+ * @returns {number} The base luminosity in solar units (L☉).
  * 
  * @see {@link https://en.wikipedia.org/wiki/Mass-luminosity_relation#Advanced_forms} (slightly modified to make the curve almost seamless)
  */
@@ -222,9 +223,9 @@ function getLuminosity(starMass) {
 /**
  * Calculates a star's base radius from its mass.
  * 
- * @param {types.Value} starMass - The mass of the star (unit: types.units.Mass)
+ * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
  * 
- * @returns {types.Value} The base radius (unit: types.units.Dist)
+ * @returns {types.Value} The base radius (unit: `Dist`).
  * 
  * @see {@link https://academic.oup.com/mnras/article/479/4/5491/5056185}
  * @see {@link http://astro.vaporia.com/start/massradius.html}
@@ -242,10 +243,10 @@ function getRadius(starMass) {
 /**
  * Calculates effective temperature from luminosity and radius using Stefan-Boltzmann law relation.
  * 
- * @param {number} starLuminosity  - The luminosity in solar units (L☉)
- * @param {types.Value} starRadius - The radius of the star (unit: types.units.Dist)
+ * @param {number} starLuminosity  - The luminosity in solar units (L☉).
+ * @param {types.Value} starRadius - The radius of the star (unit: `Dist`).
  * 
- * @returns {types.Value} The effective temperature (unit: types.units.Temp)
+ * @returns {types.Value} The effective temperature (unit: `Temp`).
  */
 function getTemperature(starLuminosity, starRadius) {
 	const radius = starRadius.getValueAs(types.units.Dist.R_Sun);
@@ -267,14 +268,14 @@ const starTypeChart = [
 /**
  * Determines the 2-character spectral type (e.g., "G2", "K8", "O0") from temperature.
  * 
- * @param {types.Value} starTemperature - The effective temperature (unit: types.units.Temp)
+ * @param {types.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
- * @returns {string} A 2-character string from "O0" to "M9"
+ * @returns {string} A 2-character string from "O0" to "M9".
  */
 function getType(starTemperature) {
 	const temperature = starTemperature.getValueAs(types.units.Temp.K);
 
-	// Very hot stars (beyond O)
+	// Very hot stars
 	if (temperature >= starTypeChart[0].max)
 		return 'O0';
 
@@ -295,9 +296,9 @@ function getType(starTemperature) {
 /**
  * Calculates the absolute magnitude of a star from its luminosity.
  * 
- * @param {number} starLuminosity - The luminosity in solar units (L☉)
+ * @param {number} starLuminosity - The luminosity in solar units (L☉).
  * 
- * @returns {number} Absolute magnitude
+ * @returns {number} Absolute magnitude value.
  */
 function getAbsMagnitude(starLuminosity) {
 	return 4.74 - 2.5 * Math.log10(starLuminosity);
@@ -306,9 +307,9 @@ function getAbsMagnitude(starLuminosity) {
 /**
  * Estimates the B-V (Blue minus Visual) color index from temperature.
  * 
- * @param {types.Value} starTemperature - The effective temperature (unit: types.units.Temp)
+ * @param {types.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
- * @returns {number} B-V color index
+ * @returns {number} B-V color index.
  */
 function getBV(starTemperature) {
 	// Ballesteros 2012 approximation inverted (T -> B-V)
@@ -325,9 +326,9 @@ function getBV(starTemperature) {
 /**
  * Converts stellar effective temperature to an RGB hex color code string.
  * 
- * @param {types.Value} starTemperature - The effective temperature (unit: types.units.Temp)
+ * @param {types.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
- * @returns {string} Hex color string format: "#RRGGBB"
+ * @returns {string} Hex color string format: "#RRGGBB".
  * 
  * @see {@link https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html}
  */
@@ -379,10 +380,10 @@ export function temperatureToColor(starTemperature) {
 /**
  * Calculates a star's lifespan based on its mass and luminosity.
  * 
- * @param {types.Value} starMass  - The mass of the star (unit: types.units.Mass)
- * @param {number} starLuminosity - The luminosity of the star in solar units (L☉)
+ * @param {types.Value} starMass  - The mass of the star (unit: `Mass`).
+ * @param {number} starLuminosity - The luminosity of the star in solar units (L☉).
  * 
- * @returns {types.Value} The total lifespan of the star (unit: types.units.Time)
+ * @returns {types.Value} The total lifespan of the star (unit: `Time`).
  */
 function getLifespan(starMass, starLuminosity) {
 	const mass = starMass.getValueAs(types.units.Mass.M_Sun);

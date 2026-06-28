@@ -6,7 +6,7 @@ import consts from "../data/consts.js";
 import * as starGen from "./star-gen.js";
 
 /**
- * Generates a complete stellar subsystem (single or binary star) and injects it into the system environment.
+ * Generates a stellar system (single or binary star) and injects it into the system environment.
  * 
  * @param {types.System} system	- The core system instance (containing configuration rules).
  * @param {types.Star|types.BinaryStar|null} parentFormation - Parent hierarchical component, or null if generating system baseline.
@@ -14,12 +14,12 @@ import * as starGen from "./star-gen.js";
  */
 export function generateStarFormation(system, parentFormation = null, starsArray) {
 	if (decideStarBinary(system.settings.star_binary_chance) === false) {
-		// Single star decided and generated
+		// Single star decided and generated.
 		const star = starGen.generateStar(system.settings, parentFormation);
 		appendStarFormation(system, star, parentFormation, starsArray);
 	}
 	else {
-		// Binary star decided
+		// Binary star decided.
 		let isBinaryAllowed = true;
 		if (parentFormation !== null) {
 			if ((parentFormation.mass.value / 2) < consts.PHY_STAR_MASS_MIN) {
@@ -33,7 +33,7 @@ export function generateStarFormation(system, parentFormation = null, starsArray
 		}
 
 		if (isBinaryAllowed) {
-			// Binary star generated
+			// Binary star generated.
 			const primary = starGen.generateStar(system.settings, parentFormation);
 			const secondary = starGen.generateStar(system.settings, primary);
 			const sma = generateStarSeparation(primary.mass, secondary.mass, true);
@@ -42,7 +42,7 @@ export function generateStarFormation(system, parentFormation = null, starsArray
 			appendStarFormation(system, binary, parentFormation, starsArray);
 		}
 		else {
-			// Single star generated (fallback)
+			// Single star generated (fallback).
 			const SINGLE_FALLBACK_MASS_MULTIPLIER = 0.5;
 			const star = starGen.generateStar(system.settings, parentFormation, SINGLE_FALLBACK_MASS_MULTIPLIER);
 			appendStarFormation(system, star, parentFormation, starsArray);
@@ -53,7 +53,7 @@ export function generateStarFormation(system, parentFormation = null, starsArray
 /**
  * Determines whether a star system should form as a binary configuration.
  * 
- * Under default 33.3% chance settings ({@link consts.UI_STAR_BINARY_CHANCE_VAL_DEF}), recursive nesting calculations approximate the following structural outcomes:
+ * Under the default 33.3% chance setting ({@link consts.UI_STAR_BINARY_CHANCE_VAL_DEF}), generations with two subsequent function calls result in:
  * - 44.44% Single Star				  [ ✹ ]
  * - 22.22% Close Binary			  [ ✹✷ ]
  * - 14.81% Wide Binary				  [ ✹ ··· ✷ ]
@@ -63,9 +63,9 @@ export function generateStarFormation(system, parentFormation = null, starsArray
  * 
  * Note: there's actually a bit greater amount of single stars on a wide orbit (@see {@link generateStarFormation}).
  * 
- * @param {number} binaryChance - Probability factor between 0.0 and 1.0
+ * @param {number} binaryChance - Probability factor between 0.0 and 1.0.
  * 
- * @returns {boolean} True if binary architecture is selected
+ * @returns {boolean} `true` if binary architecture is selected, `false` otherwise.
  */
 export function decideStarBinary(binaryChance) {
 	return prng() < binaryChance;
@@ -98,11 +98,11 @@ function appendStarFormation(system, starFormation, parentFormation, starsArray)
 /**
  * Calculates the Semi-Major Axis (SMA) for a binary star system using Kepler's Third Law.
  * 
- * @param {types.Value} primaryMass	  - Mass of the primary component (unit: types.units.Mass)
- * @param {types.Value} secondaryMass - Mass of the secondary component (unit: types.units.Mass)
- * @param {boolean} isCloseOrbit	  - [default: true] If true, samples tight short-period orbits; otherwise samples wide orbits.
+ * @param {types.Value} primaryMass	  - Mass of the primary component (unit: `Mass`)
+ * @param {types.Value} secondaryMass - Mass of the secondary component (unit: `Mass`)
+ * @param {boolean} isCloseOrbit	  - *[default: `true`]* If `true`, samples tight short-period orbits; otherwise samples wide orbits.
  * 
- * @returns {types.Value} Semi-major axis distance value (unit: types.units.Dist)
+ * @returns {types.Value} Semi-major axis distance value (unit: `Dist`)
  */
 function generateStarSeparation(primaryMass, secondaryMass, isCloseOrbit = true) {
 	const totalMassKg = primaryMass.getValueAs(types.units.Mass.kg) + secondaryMass.getValueAs(types.units.Mass.kg);

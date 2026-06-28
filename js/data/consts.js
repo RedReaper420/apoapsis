@@ -1,15 +1,14 @@
 
 const consts = Object.freeze({
-	PHY_G: 6.6743015e-11, // gravitational constant
-
+	PHY_G: 6.6743015e-11, // Gravitational constant
+	PHY_MU_0: 1.2566370612720e-6, // Magnetic constant
+	PHY_R_GAS: 8.31446261815324, // Molar gas constant
 	PHY_SIGMA: 5.670374419e-8, // Stefan-Boltzmann constant
-
-	PHY_R_GAS: 8.31446261815324, // molar gas constant
 
 	PHY_STAR_MASS_MIN: 0.08, // M☉
 	PHY_STAR_MASS_MAX: 150.0,
 	
-	PHY_STAR_METALLICITY_MIN: -3.0, // Fe/H
+	PHY_STAR_METALLICITY_MIN: -3.0, // [Fe/H]
 	PHY_STAR_METALLICITY_MAX: 2.0,
 
 	PHY_SUN_LIFESPAN: 10, // Gyr
@@ -19,14 +18,11 @@ const consts = Object.freeze({
 	
 	PHY_DIST_SNOW_LINE: 2.7, // AU☉
 
-	PHY_DIST_HZ_INNER: 0.95, // AU☉
-	PHY_DIST_HZ_OUTER: 1.37,
-
 	PHY_EARTH_DENSITY: 5.51, // g/cm^3
 	PHY_EARTH_ESCAPE_VELOCITY: 11186, // m/s
 	PHY_EARTH_EQ_TEMP: 278.5, // K
 
-	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon)
+	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon).
 
 	// ---
 

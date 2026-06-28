@@ -11,6 +11,9 @@ Redistribution and use in source and binary forms, with or without modification,
 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ////////////////////////////////////////////////////////////////*/
+
+// !!! RedReaper420: Code around line ~140 is modified to always return float.
+
 function aleaPRNG() {
 	return( function( args ) {
 		"use strict";
@@ -135,6 +138,7 @@ function aleaPRNG() {
 				hiBound = arguments[ 0 ];
 			}
 
+			/*
 			// return integer
 			if( _isInteger( loBound ) && _isInteger( hiBound ) ) { 
 				return Math.floor( random() * ( hiBound - loBound + 1 ) ) + loBound; 
@@ -143,6 +147,8 @@ function aleaPRNG() {
 			} else {
 				return random() * ( hiBound - loBound ) + loBound; 
 			}
+			*/
+			return random() * ( hiBound - loBound ) + loBound; 
 		};
 
 		/* public: initialize generator with the seed values used upon instantiation */
