@@ -133,6 +133,10 @@ export function planetGeneration_Stage2(settings, planet) {
 export function planetGeneration_Stage3(settings, planet) {
 	adjustRotationTime(settings, planet);
 	calculatePlanetMagneticField(planet);
+	calculateMagnetosphereRadius(planet);
+
+	if (planet.mass.getValueAs(types.units.Mass.M_Jupiter) > 8)
+		eventBus.emit('shtap');
 }
 
 /**
@@ -994,36 +998,6 @@ function getTidalLockRotationPeriod(planet, parent) {
  * 
  * @param {types.Planet} planet 
  * 
- * @returns {types.Value}
- */
-function getMagnetosphereSize(planet) {
-	const B = 7.906e31 / 1e4;
-	const P = getSolarWindPressure(planet);
-	const Rp = planet.radius.getValueAs(types.units.Dist.m);
-	const Rcf = Math.pow( (B**2) / (consts.PHY_MU_0 * P) , 1/6) * Rp;
-	return new types.Value(Rcf, types.units.Dist.m);
-}
-
-/**
- * 
- * @param {types.Planet} planet 
- * 
- * @returns {number}
- */
-function getSolarWindPressure(planet) {
-	const star = planet.genData.parentStar;
-	const L = star.luminosity;
-	const dist_AU = planet.genData.sma_norm * Math.sqrt(L); // Converting AU☉ back to actual AU
-	const D = new types.Value(dist_AU, types.units.Dist.AU).getValueAs(types.units.Dist.m);
-	const c = new types.Value(1, types.units.Spd.c).getValueAs(types.units.Spd.m_s);
-	const P = L / (4 * Math.PI * (D**2) * c);
-	return P;
-}
-
-/**
- * 
- * @param {types.Planet} planet 
- * 
  * @returns {number}
  */
 export function calculatePlanetMagneticField(planet) {
@@ -1050,7 +1024,7 @@ export function calculatePlanetMagneticField(planet) {
 		rho_core = 3500;
 		f_ad = 0.04;
 		k_tectonics = 0.3;
-		c = 20;
+		c = 25;
 	}
 	else {
 		r_core = planetRadius_m * Math.min(0.9, 0.7 + 0.15 * Math.log10(3 * planetMass_MJup + 1));
@@ -1078,11 +1052,11 @@ export function calculatePlanetMagneticField(planet) {
 	if (f_c <= 0) {
 		planet.magneticField = 0;
 		console.log(
-			(0).toFixed(2), 
-			(r_core / planetRadius_m).toFixed(2), 
-			planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), 
-			planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), 
-			planet.age.getValueAs(types.units.Time.Gy).toFixed(2),
+			'Bsurf:', (-0.001).toFixed(2), '|',
+			'Rc/Rp:', (r_core / planetRadius_m).toFixed(2), '|',
+			'Rp:', planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), '|',
+			'Mp:', planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), '|',
+			'Age:', planet.age.getValueAs(types.units.Time.Gy).toFixed(2), '|',
 			planet.type
 		);
 		return;
@@ -1094,11 +1068,49 @@ export function calculatePlanetMagneticField(planet) {
 
 	planet.magneticField = b_surf;
 	console.log(
-		(b_surf * 1e6).toFixed(2), 
-		(r_core / planetRadius_m).toFixed(2), 
-		planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), 
-		planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), 
-		planet.age.getValueAs(types.units.Time.Gy).toFixed(2),
+		'Bsurf:', (b_surf * 1e6).toFixed(2), '|',
+		'Rc/Rp:', (r_core / planetRadius_m).toFixed(2), '|',
+		'Rp:', planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), '|',
+		'Mp:', planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), '|',
+		'Age:', planet.age.getValueAs(types.units.Time.Gy).toFixed(2), '|',
 		planet.type
+	);
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ */
+function calculateMagnetosphereRadius(planet) {
+	if (planet.magneticField === 0) {
+		planet.magnetosphereRadius = new types.Value(planet.radius.value, planet.radius.unit);
+		console.log('Rmp_R:', (1).toFixed(2), '(no MF)');
+		return;
+	}
+
+	const B_surf = planet.magneticField;
+
+	const distance_AU = planet.genData.sma_norm * Math.sqrt(planet.genData.parentStar.luminosity);
+
+	let base_density = 8.4e-21;
+
+	const starAge_Gy = planet.genData.parentStar.age.getValueAs(types.units.Time.Gy);
+	base_density *= 1.0 + (0.5 / starAge_Gy);
+
+	const rho_sw = base_density / (distance_AU**2);
+	const v_sw = 400e3;
+
+	const p_sw = rho_sw * (v_sw**2);
+
+	const f = 2.0;
+
+	const r_p_m = planet.radius.getValueAs(types.units.Dist.m);
+	const r_mp_m = Math.pow((f ** 2 * (B_surf ** 2)) / (2 * consts.PHY_MU_0 * p_sw), 1 / 6) * r_p_m;
+
+	planet.magnetosphereRadius = new types.Value(Math.max(r_p_m, r_mp_m), types.units.Dist.m);
+	console.log(
+		'Rmp_R:', (r_mp_m / r_p_m).toFixed(2), '|',
+		'Dist:', distance_AU.toFixed(2), '|',
+		'Ms:', planet.genData.parentStar.mass.getValueAs(types.units.Mass.M_Sun).toFixed(2),
 	);
 }

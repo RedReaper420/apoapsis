@@ -265,9 +265,6 @@ function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REar
 	const moonSmaMax_secondary = planetSystemGen.getMaximalSTypeOrbit(binary.secondary.mass, binary.primary.mass, binary.primary.sma);
 	const moonSmaMax_secondary_REarth = moonSmaMax_secondary.getValueAs(types.units.Dist.R_Earth);
 	generateRegularMoons(settings, binary.secondary, moonSmaMax_secondary_REarth);
-	
-	if (binary.primary.type !== 'Terrestrial')
-		eventBus.emit('shtap');
 }
 
 /**

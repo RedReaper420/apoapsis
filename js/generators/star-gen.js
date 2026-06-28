@@ -79,8 +79,9 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	star.lifespan = getLifespan(star.mass, star.luminosity);
 	if (constraint === null) {
 		const randomAgeFraction = prng.range(0.2, 0.5);
-		const ageGy = star.lifespan.getValueAs(types.units.Time.Gy) * randomAgeFraction;
-		star.age = new types.Value(ageGy, types.units.Time.Gy);
+		const fractionAgeGy = star.lifespan.getValueAs(types.units.Time.Gy) * randomAgeFraction;
+		const flatAgeGy = prng.range(1.5, 15.0);
+		star.age = new types.Value(Math.min(fractionAgeGy, flatAgeGy), types.units.Time.Gy);
 	} else {
 		star.age = constraint.age;
 	}

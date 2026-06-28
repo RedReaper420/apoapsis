@@ -234,8 +234,101 @@ function drawRing(ctx, x, y, scale, ring) {
     ctx.fill();
 }
 
+function drawMagneticField(ctx, x, y, metersPerPixel, planet) {
+	const starPosition = planet.genData.parentStar.getScreenCoords();
+	const starAngle = Math.atan2(starPosition.y - y, starPosition.x - x);
+	
+	let fieldAngle = starAngle + Math.PI;
+	if (planet.parentBody instanceof types.Planet) {
+		if (planet.parentBody.magneticField > 0) {
+			if (planet.parentBody.magnetosphereRadius.getValueAs(types.units.Dist.m) > planet.sma.getValueAs(types.units.Dist.m)) {
+				const parentPosition = planet.parentBody.getScreenCoords();
+				const parentAngle = Math.atan2(parentPosition.y - y, parentPosition.x - x);
+				fieldAngle = parentAngle - Math.PI/2;
+			}
+		}
+	}
+
+	const r_mp_px = planet.magnetosphereRadius.getValueAs(types.units.Dist.m) / metersPerPixel;
+
+	ctx.save();
+	ctx.translate(x, y);
+	ctx.rotate(fieldAngle);
+
+	ctx.strokeStyle = 'rgba(0, 191, 255, 0.25)';
+	ctx.lineWidth = 1.5;
+
+	const lineCount = 8;
+	for (let i = 1; i <= lineCount; i++) {
+		const sizeFactor = (i / lineCount) * r_mp_px * 1.5;
+
+		drawAsymmetricLoop(ctx, sizeFactor, r_mp_px, 1);
+		drawAsymmetricLoop(ctx, sizeFactor, r_mp_px, -1);
+	}
+
+	drawBowShock(ctx, r_mp_px);
+
+	ctx.restore();
+}
+
+function drawAsymmetricLoop(ctx, sizeFactor, r_mp_px, side) {
+	ctx.beginPath();
+
+	// Проходим по углам от 0 (хвост) до PI (лобовая точка)
+	const steps = 60;
+	for (let j = 0; j <= steps; j++) {
+		const theta = (j / steps) * Math.PI; // от 0 до π
+		
+		// Идеальный диполь: r = L * sin^2(theta)
+		let r = sizeFactor * Math.sin(theta) ** 2;
+
+		// Геометрический хак для сжатия/вытягивания:
+		// Расчитываем асимметрию в зависимости от угла к ветру
+		// cos(theta) = 1 в хвосте, cos(theta) = -1 на лобовой стороне
+		const asymmetry = 1.0 - 0.4 * (1.0 - Math.cos(theta)); 
+		r *= asymmetry;
+
+		// Жесткое ограничение дневной стороны радиусом магнитопаузы
+		if (Math.cos(theta) < 0 && r > r_mp_px) {
+			r = r_mp_px;
+		}
+
+		// Перевод в декартовы координаты (side контролирует верх/низ)
+		const x = r * Math.cos(theta);
+		const y = r * Math.sin(theta) * side;
+
+		if (j === 0) ctx.moveTo(x, y);
+		else ctx.lineTo(x, y);
+	}
+	ctx.stroke();
+}
+
+function drawBowShock(ctx, r_mp_px) {
+	ctx.beginPath();
+	ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+	ctx.lineWidth = 2;
+	
+	// Рисуем параболу, описывающую обтекание планеты газом
+	// Лобовая точка находится на расстоянии -r_mp_px (так как развернуто к звезде)
+	for (let y = -r_mp_px * 2.5; y <= r_mp_px * 2.5; y += 5) {
+		// Уравнение параболы хвоста: x = -r_mp + (y^2 / (3 * r_mp))
+		const x = -r_mp_px + (y ** 2) / (3.5 * r_mp_px);
+		
+		if (y === -r_mp_px * 2.5) ctx.moveTo(x, y);
+		else ctx.lineTo(x, y);
+	}
+	ctx.stroke();
+}
+
 function drawBody() {
 	const coords = this.getScreenCoords();
+
+	if (this instanceof types.Planet) {
+		if (this.magneticField > 0) {
+			drawMagneticField(ctx, coords.x, coords.y, metersPerPixel, this);
+		}
+	}
+
 	ctx.beginPath();
 	const trueVisualRadius = this.radius.getValueAs(types.units.Dist.m) / metersPerPixel;
 	const visualRadius = Math.max(Math.log10(1 + 0.1 * this.radius.getValueAs(types.units.Dist.km)), trueVisualRadius);
