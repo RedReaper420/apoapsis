@@ -2,6 +2,7 @@
 import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
 import * as types from "../data/types.js";
+import consts from "../data/consts.js";
 
 /**
  * Simulates multi-body planetary migration and dynamic scattering within a decaying protoplanetary gas disk.
@@ -24,7 +25,6 @@ export function simulateMigration(settings, starsArray) {
 	// --- 2. Protoplanetary Disk Parameters Configuration ---
 	const TIME_STEP_YEARS = 10000; // Δt step size
 	const diskLifetimeYears = new types.Value(5, types.units.Time.My).getValueAs(types.units.Time.y); // 5 Myr lifespan
-	const totalDiscreteSteps = Math.round(diskLifetimeYears / TIME_STEP_YEARS);
 	
 	// --- 3. Discrete Migration Simulation Engine ---
 	starsArray.forEach(star => {
@@ -33,6 +33,9 @@ export function simulateMigration(settings, starsArray) {
 		
 		let activeGiantsCount = 0;
 		let isGrandTackTriggered = false;
+		
+		const starAgeYears = star.age.getValueAs(types.units.Time.y);
+		const totalDiscreteSteps = Math.round(Math.min(diskLifetimeYears, starAgeYears) / TIME_STEP_YEARS);
 
 		for (let step = 0; step < totalDiscreteSteps; step++) {
 			// Exponential disk gas dispersion model over time
@@ -94,8 +97,17 @@ export function simulateMigration(settings, starsArray) {
 	starsArray.forEach(star => {
 		// 4.1. Purge Discarded/Ejected Bodies from Arrays
 		for (let i = star.bodies.length - 1; i >= 0; i--) {
-			if ( (star.bodies[i] instanceof types.Planet) && (star.bodies[i].genData.status !== '') ) {
+			if (!(star.bodies[i] instanceof types.Planet)) continue;
+
+			if (star.bodies[i].genData.status !== '') {
 				star.bodies.splice(i, 1);
+				continue;
+			}
+
+			const rocheLimit = getRocheLimit(star, star.bodies[i]).getValueAs(types.units.Dist.AU);
+			if (star.bodies[i].sma.getValueAs(types.units.Dist.AU) <= rocheLimit) {
+				star.bodies.splice(i, 1);
+				continue;
 			}
 		}
 
@@ -337,4 +349,21 @@ function mergePlanets(recipient, donor) {
 	// --- Purge Donor Status ---
 	donor.genData.status = 'Merged';
 	donor.sma = new types.Value(Infinity, types.units.Dist.AU);
+}
+
+/**
+ * Calculates planet's Roche limit.
+ * 
+ * @param {types.Planet} star - Current star hosting a planet.
+ * @param {types.Planet} planet - Current planet orbiting the star.
+ * 
+ * @returns {types.Value} Roche limit (unit: `Dist`)
+ */
+function getRocheLimit(star, planet) {
+	const r_s = star.radius.getValueAs(types.units.Dist.m);
+	const rho_s = star.density;
+	const rho_p = planet.density;
+
+	const R = 2.44 * r_s * Math.pow(rho_s / rho_p, 1/3);
+	return new types.Value(R, types.units.Dist.m);
 }

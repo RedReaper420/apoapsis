@@ -198,12 +198,22 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
  */
 function getPlanetsNumberToGenerate(star, amountMult) {
 	const temperature = star.temperature.getValueAs(types.units.Temp.K);
-	// Default: 7.68 on 2300 K, 3.28 on 50000 K
-	const averagePlanetsNumber = (13 - 0.6 * (Math.pow(Math.log10(temperature), 1.8))) * amountMult;
 
-	const metallicityMult = 1.5 ** star.metallicity;
+	const minNumber = 0.4;
+	const temperatureBorder = 5500;
+	const softSlopeParam = 200;
+	const component_1 = temperature < temperatureBorder
+		? Math.log10(temperatureBorder - softSlopeParam)
+		: Math.log10(temperature);
+	const component_2 = temperature < temperatureBorder
+		? Math.log10((temperature - softSlopeParam) / temperature)
+		: 0;
+	const component_3 = Math.log10(4600);
+	const averagePlanetsNumber = minNumber + 18 * Math.exp(-8 * (component_1 - component_2 - component_3)); 
 
-	const variance = prng.range(1/1.5, 1.5);
+	const metallicityMult = 1.25 ** star.metallicity;
+
+	const variance = utils.randomRangeGaussian(1/1.5, 1.5);
 
 	return Math.round(averagePlanetsNumber * metallicityMult * variance);
 }

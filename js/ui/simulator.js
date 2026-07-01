@@ -411,6 +411,7 @@ function generateSystem(system) {
 		const dist = Math.sqrt(body.x**2 + body.y**2);
 		if (dist > systemMaxRadius)
 			systemMaxRadius = dist;
+		systemMaxRadius = Math.max(AU, systemMaxRadius);
 	}
 
 	document.getElementById('totalCountDisplay').innerText = bodies.length;
@@ -545,7 +546,7 @@ function loop(timestamp) {
 	updatePhysics(simDt);
 
 	// Camera Interpolation & Smoothing
-	const trackingTightness = Math.min(1.0, 0.1 + (timeMultiplier / 5000000));
+	const trackingTightness = 1;//Math.min(1.0, 0.1 + (timeMultiplier / 5000000));
 	if (trackedBody) {
 		// Linear interpolation to smoothly follow tracked targets
 		cameraX += (trackedBody.x - cameraX) * trackingTightness;

@@ -7,6 +7,7 @@ import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
 import * as nameGen from "./name-gen.js";
+import * as planetEvolutionSim from "./planet-evolution-sim.js";
 
 /**
  * Generates the base of the planet: core mass + possible envelope (ice/gas giants).
@@ -50,6 +51,8 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 			planet.envelope.mass.getValueAs(types.units.Mass.M_Earth), 
 			types.units.Mass.M_Earth
 		);
+
+		setPlanetRadius(planet);
 	}
 	else {
 		// Moon generation
@@ -96,6 +99,8 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 			types.units.Mass.M_Earth
 		);
 
+		setPlanetRadius(planet);
+
 		planetGeneration_Stage2(settings, planet);
 	}
 
@@ -110,20 +115,11 @@ export function planetGeneration_Stage2(settings, planet) {
 	if (planet.genData.isMoon === false)
 		planet.genData.sma_norm = planet.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(planet.parentBody.luminosity);
 
-	setPlanetRadius(planet);
+	
+	setInitialRotation(planet);
 
 	planet.temperature_eq = getEffectiveTemperature(planet);
 	planet.temperature = planet.temperature_eq;
-
-	if (planet.type === 'Terrestrial') {
-		generateAtmosphere(planet);
-		planet.color = '#867470';
-	}
-	else {
-		planet.color = setGasGiantColor(planet);
-	}
-
-	setInitialRotation(planet);
 }
 
 /**
@@ -131,12 +127,21 @@ export function planetGeneration_Stage2(settings, planet) {
  * @param {types.Planet} planet 
  */
 export function planetGeneration_Stage3(settings, planet) {
-	adjustRotationTime(settings, planet);
-	calculatePlanetMagneticField(planet);
-	calculateMagnetosphereRadius(planet);
+	planet.planetEvolution = new planetEvolutionSim.PlanetEvolution(settings, planet);
+	planet.planetEvolution.doTheEvolution();
 
+	if (planet.type === 'Terrestrial') {
+		//generateAtmosphere(planet);
+		planet.color = '#867470';
+	}
+	else {
+		planet.color = setGasGiantColor(planet);
+	}
+
+	/*
 	if (planet.mass.getValueAs(types.units.Mass.M_Jupiter) > 8)
 		eventBus.emit('shtap');
+	*/
 }
 
 /**
@@ -147,7 +152,7 @@ function generatePlanetCore(planet) {
 	const planetCoreMass = samplePlanetCoreMass(planet.genData);
 	const coreIronFraction = sampleCoreIronFraction(planet.genData, planetCoreMass);
 	const coreIceFraction = (1.0 - coreIronFraction) * sampleCoreIceFraction(planet.genData);
-	const coreRockFraction = 1.0 - coreIronFraction - coreIceFraction;
+	const coreRockFraction = 1.0 - (coreIronFraction + coreIceFraction);
 
 	if (planet.genData.isMoon === false) {
 		// Generating a planet
@@ -175,9 +180,7 @@ function generatePlanetCore(planet) {
 					f_ice / f_total
 				);
 			default:
-				const likeness = planet.genData.type === 'binary'
-					? utils.randomRangeGaussian(0.9, 1.0)
-					: utils.clamp(utils.randomRangeGaussian(0.0, 0.7*2), 0.3, 0.9);
+				const likeness = utils.clamp(utils.randomRangeGaussian(0.0, 0.7*2), 0.35, 0.95);
 				
 				return new types.Core(
 					planet.genData.mass,
@@ -200,28 +203,32 @@ function samplePlanetCoreMass(genData) {
 	const sma_norm = genData.sma_norm;
 
 	// Defining the curve
-	const curveMinMass = 2.0;
+	const curveBaseMass = 2.0;
 	const peakMaxMass = 25.0;
 
-	const m = peakMaxMass - curveMinMass;
+	const m = peakMaxMass - curveBaseMass;
 	const x = sma_norm - consts.PHY_DIST_SNOW_LINE;
 
-	const baseCurve = curveMinMass - 0.015 * x**2;
+	const baseCurve = curveBaseMass - 0.015 * (x**2);
 	const snowLinePeak = m * Math.exp(-Math.pow(x / 1.2, 2));
 	const postSnowLineSlope = sma_norm > consts.PHY_DIST_SNOW_LINE
-		? curveMinMass + m * Math.exp(-0.2 * x) - 0.02 * sma_norm
+		? curveBaseMass * Math.exp(-0.02 * x) + m * Math.exp(-0.2 * x)
 		: 0;
 	const baseMass = Math.max(baseCurve * snowLinePeak, postSnowLineSlope);
 
 	const metalFactor = Math.pow(1.6, 2.1 * star.metallicity);
 	const starMass = star.mass.getValueAs(types.units.Mass.M_Sun);
-	const starMassFactor = 1 - (starMass + 1)**(-3) + 0.2 * Math.log10(starMass);
-	const variance = utils.randomRangeGaussian(0.05, 1.0);
+	const starMassFactor = ( 1 - Math.pow(starMass + 1.5, -3) ) + ( 0.4 * Math.log10(starMass) );
+	const variance = utils.randomRangeGaussian(0.1, 1.0);
 
-	let coreMass = utils.clamp(baseMass * metalFactor * starMassFactor * variance, 0.1, 55);
+	let coreMass = baseMass * metalFactor * starMassFactor * variance;
 	if (sma_norm > consts.PHY_DIST_SNOW_LINE * 6.66)
 		if (prng() < (0.4 + 0.1 * (sma_norm - consts.PHY_DIST_SNOW_LINE * 6.66))) 
-			coreMass *= prng.range(0.05, 0.5); // "failed" distant cores
+			coreMass *= prng.range(0.1, 0.5); // "failed" distant cores
+	
+	// Filtering out very small bodies. Those will be automatically removed during migration simulation.
+	if (coreMass < 0.001)
+		genData.status = 'Ejected'; 
 
 	return new types.Value(coreMass, types.units.Mass.M_Earth);
 }
@@ -301,7 +308,7 @@ function makeGasGiant(planet) {
 
 			if (isIceGiant) {
 				// Ice Giant
-				envelopeMass = coreMass * prng.range(0.7, 2.7);
+				envelopeMass = coreMass * prng.range(0.5, 2.7);
 				planet.type = 'Ice Giant';
 			}
 			else {
@@ -326,7 +333,7 @@ function makeGasGiant(planet) {
 		else if (prng() < 0.5) {
 			// Mini-Neptune / puffed super-Earth
 			isIceGiant = true;
-			envelopeMass = coreMass * prng.range(0.05, 0.7);
+			envelopeMass = coreMass * prng.range(0.05, 0.5);
 			planet.type = 'Mini-Neptune';
 		}
 	}
@@ -452,7 +459,7 @@ const EOS = {
  * 
  * @returns {number}
  */
-function getMaterialRadius(mass, material) {
+export function getMaterialRadius(mass, material) {
 	if (mass <= 0) return 0;
 	const config = EOS[material];
 	// R = r0 * M^alpha + beta * M^gamma
@@ -617,23 +624,226 @@ function setGasGiantColor(planet) {
 	}
 }
 
+class PlanetaryOutgassingSimulation {
+	/**
+	 * 
+	 * @param {types.Planet} planet 
+	 */
+	constructor(planet) {
+		// Параметры планеты
+		this.M_p = planet.core.mass.getValueAs(types.units.Mass.kg); // кг
+		this.R_p = planet.core.radius.getValueAs(types.units.Dist.m); // м
+		this.A_planet = 4 * Math.PI * Math.pow(this.R_p, 2); // м^2
+		this.g = (consts.PHY_G * this.M_p) / Math.pow(this.R_p, 2); // м/с^2
+		
+		// Масса мантии (приблизительно 67% от общей массы для железо-каменных планет)
+		this.M_mantle = this.M_p * planet.core.composition.rock; 
+
+		// Геодинамические параметры
+		this.F_int_0 = 0.36; // Вт/м^2 (в 4 раза выше современного земного)
+		this.beta = 0.5; // Индекс затухания конвекции мантии
+		
+		// Начальные запасы летучих веществ в мантии (массовые доли)
+		this.mantleVolatiles = {
+			H2O: 0.001, // 0.1% от массы мантии
+			CO2: 0.0003, // 0.03%
+			N2:  0.000005 // 0.0005%
+		};
+
+		// Текущее состояние атмосферы (массы газов в кг)
+		this.atmosphere = { H2O: 0, CO2: 0, N2: 0 };
+		this.totalAtmosphereMass = 0;
+		this.P_surface = 0; // Паскали (Н/м^2)
+
+		this.v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(this.M_p / this.R_p);
+		this.planet = planet;
+		this.oceanMass = 0;
+		this.dryIceMass = 0;
+	}
+
+	/**
+	 * Расчет шага дегазации за промежуток времени dt
+	 * @param {number} t_Myr - Текущий возраст системы в миллионах лет
+	 * @param {number} dt_Myr - Шаг симуляции в миллионах лет
+	 */
+	runStep(t_Myr, dt_Myr) {
+		const YEAR_IN_SECONDS = 31536000;
+		const dt_seconds = dt_Myr * 1e6 * YEAR_IN_SECONDS;
+		
+		const coolingFactor = Math.pow(this.R_p / 6371e3, -0.5);
+		const t_effective = t_Myr / coolingFactor;
+
+		// 1. Расчет внутреннего теплового потока планеты на момент времени t
+		// За базовую точку t0 берем 100 млн лет (время окончания бурной аккреции)
+		const t0 = 100;
+		const t_current = Math.max(t0, t_effective);
+		const F_int = this.F_int_0 * Math.pow(t_current / t0, -this.beta);
+
+		// Если планета остыла ниже критического значения, вулканизм прекращается
+		if (F_int < 0.04) {
+			console.log('stop at', t_Myr);
+			return this.getAtmosphereState();
+		}
+
+		// 2. Расчет объема генерируемой магмы в секунду (м^3/с)
+		const rho_m = 3300;   // Плотность мантии, кг/м^3
+		const C_p = 1200;     // Удельная теплоемкость, Дж/(кг*К)
+		const DeltaT = 100;   // Перегрев мантии, К
+		const L_f = 4.0e5;    // Теплота плавления, Дж/кг
+		const chi = 0.2;      // Эффективность выноса тепла расплавом
+		
+		const V_magma_dot = (this.A_planet * F_int) / (rho_m * (C_p * DeltaT + L_f)) * chi;
+
+		// Масса плавящейся породы в секунду
+		const M_magma_dot = V_magma_dot * rho_m;
+
+		// 3. Расчет частичного плавления (Melt fraction). Допустим, плавится в среднем 10% плюма
+		const F_m = 0.1; 
+		const f_ext = 0.15; // Только 15% магмы доходит до поверхности (эффузивный вулканизм)
+		
+		let temp_eq = this.planet.temperature_eq.getValueAs(types.units.Temp.K);
+
+		// 4. Расчет дегазации каждого компонента
+		for (let gas in this.mantleVolatiles) {
+			if (this.mantleVolatiles[gas] <= 0) continue;
+
+			// Концентрация газа в жидкой магме (Критерий несовместимых элементов, D ~ 0)
+			const C_magma = this.mantleVolatiles[gas] / F_m;
+
+			// Эффективность выхода газа из лавы на поверхности
+			let epsilon_degas = 0.95; // Для CO2 и N2 выход почти полный
+
+			if (this.P_surface > 100 * 100000) { // Если давление > 100 бар
+				// Атмосфера настолько плотная, что газам тяжело покидать магму
+				epsilon_degas *= Math.max(0.01, 100 / (this.P_surface / 100000));
+			}
+			/*
+			if (gas === 'H2O') {
+				// Закон Генри для воды: сильное атмосферное давление удерживает воду в лаве
+				// 100000 Па = 1 бар. При давлении > 100 бар дегазация воды падает почти до нуля
+				const P_bar = this.P_surface / 100000;
+				epsilon_degas = Math.max(0.01, 1.0 / (1.0 + 0.1 * Math.sqrt(P_bar)));
+			}
+			*/
+
+			// Масса выделенного газа за секунду (кг/с)
+			let M_gas_dot = M_magma_dot * C_magma * epsilon_degas * f_ext;
+			let pressureFactor = Math.max(0.01, 1.0 - (this.P_surface / 50000000)); // затухание к 500 барам
+			M_gas_dot *= pressureFactor;
+
+			// Всего выделилось за шаг dt
+			let total_gas_outgassed = M_gas_dot * dt_seconds;
+
+			// Проверяем, чтобы не выжать из мантии больше, чем там есть
+			const max_available = this.mantleVolatiles[gas] * this.M_mantle;
+			if (total_gas_outgassed > max_available) {
+				total_gas_outgassed = max_available;
+			}
+
+			// Обновляем состояние
+			this.atmosphere[gas] += total_gas_outgassed;
+			this.mantleVolatiles[gas] -= (total_gas_outgassed / this.M_mantle);
+
+			// Calculating escape velocity for the planet
+			const planetAge_y = this.planet.age.getValueAs(types.units.Time.y);
+
+			/*
+			const magnetopauseRatio = planet.magnetosphereRadius.getValueAs(types.units.Dist.R_Earth) / coreRadius;
+			if (magnetopauseRatio < 2.5) {
+				// The closer magnetosphere is, the stronger stellar wind heats up exosphere
+				const exposureFactor = Math.max(1, 4 - magnetopauseRatio); 
+				temp_ex *= exposureFactor; 
+			}
+			*/
+			let temp_ex = temp_eq * 3.5; // Exosphere temperature
+			let m_w;
+			switch (gas) {
+				case 'H2O': m_w = 0.018; break;
+				case 'CO2': m_w = 0.044; break;
+				case  'N2': m_w = 0.028; break
+			}
+			let v_th = Math.sqrt( (3 * consts.PHY_R_GAS * (temp_ex * 3)) / m_w );
+			const escapeRatio = (this.v_esc / v_th);
+			const tau = 0.001 * Math.exp(Math.pow(escapeRatio, 2));
+			this.atmosphere[gas] *= Math.exp(-(dt_Myr*1e6) / tau);
+		}
+
+		if (temp_eq < 470) {
+			let water_f = temp_eq > 370 ? 0.95 : 1.0;
+			this.oceanMass += this.atmosphere['H2O'] * water_f;
+			this.atmosphere['H2O'] *= (1.0 - water_f);
+		}
+
+		if (temp_eq < 195) {
+			this.dryIceMass += this.atmosphere['CO2'] * 0.95;
+			this.atmosphere['CO2'] *= 0.05;
+		}
+
+		// 5. Пересчет глобального атмосферного давления
+		this.updateAtmosphericPressure();
+		
+		return this.getAtmosphereState();
+	}
+
+	updateAtmosphericPressure() {
+		this.totalAtmosphereMass = this.atmosphere.H2O + this.atmosphere.CO2 + this.atmosphere.N2;
+		// P = (M * g) / A
+		this.P_surface = (this.totalAtmosphereMass * this.g) / this.A_planet;
+	}
+
+	getAtmosphereState() {
+		return {
+			pressureBar: this.P_surface / 100000,
+			totalMassKg: this.totalAtmosphereMass,
+			composition: {
+				H2O: this.atmosphere.H2O / this.totalAtmosphereMass,
+				CO2: this.atmosphere.CO2 / this.totalAtmosphereMass,
+				N2:  this.atmosphere.N2 / this.totalAtmosphereMass
+			},
+			mantleRemaining: { ...this.mantleVolatiles },
+			oceanMass: this.oceanMass,
+			dryIceMass: this.dryIceMass,
+		};
+	}
+}
+
 /**
  * 
  * @param {types.Planet} planet 
  */
 function generateAtmosphere(planet) {
+	const sim = new PlanetaryOutgassingSimulation(planet);
+
+	console.log('-------------------');
+	console.log(planet.name, planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(3));
+
+	// Эволюционный цикл от 100 млн лет до 4.5 млрд лет с шагом 100 млн лет
+	const currentAge_My = planet.age.getValueAs(types.units.Time.My);
+	for (let age = 100; age <= currentAge_My; age += 100) {
+		sim.runStep(age, 100);
+	}
+
+	console.log(`--- РЕЗУЛЬТАТ ЧЕРЕЗ ${(currentAge_My/1000).toFixed(2)} МЛРД ЛЕТ ---`);
+	console.log(sim.getAtmosphereState());
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ */
+function generateAtmosphere1(planet) {
 	const sma_norm = planet.genData.sma_norm;
 	const coreMass = planet.core.mass.getValueAs(types.units.Mass.M_Earth);
 	const atmosphere = {
-		// molecular weight | gas escape velocity | mass | fraction
-		H2:  { m_w: 0.002,		v_th: 0,			mass: 0, f: 0 },
-		H2O: { m_w: 0.018,		v_th: 0,			mass: 0, f: 0 },
-		N2:  { m_w: 0.028,		v_th: 0,			mass: 0, f: 0 },
-		CO2: { m_w: 0.044,		v_th: 0,			mass: 0, f: 0 },
-		CH4: { m_w: 0.016,		v_th: 0,			mass: 0, f: 0 },
-		NH3: { m_w: 0.017,		v_th: 0,			mass: 0, f: 0 },
-		O2:  { m_w: 0.032,		v_th: 0,			mass: 0, f: 0 },
-		Ar:  { m_w: 0.040,		v_th: 0,			mass: 0, f: 0 }
+		// molecular weight (kg/mol) | gas escape velocity | mass | fraction
+		H2:  { m_w: 0.002,				v_th: 0,			mass: 0, f: 0 },
+		H2O: { m_w: 0.018,				v_th: 0,			mass: 0, f: 0 },
+		N2:  { m_w: 0.028,				v_th: 0,			mass: 0, f: 0 },
+		CO2: { m_w: 0.044,				v_th: 0,			mass: 0, f: 0 },
+		CH4: { m_w: 0.016,				v_th: 0,			mass: 0, f: 0 },
+		NH3: { m_w: 0.017,				v_th: 0,			mass: 0, f: 0 },
+		O2:  { m_w: 0.032,				v_th: 0,			mass: 0, f: 0 },
+		Ar:  { m_w: 0.040,				v_th: 0,			mass: 0, f: 0 }
 	}
 
 	// Sources fractions
@@ -641,11 +851,12 @@ function generateAtmosphere(planet) {
 	const f_ice = planet.core.composition.ice;
 
 	// Scaling factors
-	const phi_volcanic = 10**prng.range(-2.0, 2.0) * prng.range(0.5, 1.5); // Some worlds are dead, some are hyper-active
+	//const phi_volcanic = 10**prng.range(-2.0, 2.0) * prng.range(0.5, 1.5); // Some worlds are dead, some are hyper-active
+	const phi_volcanic = 1;
 	const phi_sublime = (sma_norm < 0.5 ? 0.01 : 0.01 * Math.min(2.0, 1 + f_ice * 5)) * prng.range(0.5, 1.5);
 	
 	// Yielding factors
-	const Y_rock = 0.000003 * phi_volcanic * Math.pow(coreMass, 1/3);
+	const Y_rock = 0*0.000002 * phi_volcanic * Math.pow(coreMass, 1/3);
 	const Y_ice = 0.0002 * phi_sublime * Math.pow(coreMass, 1/3);
 
 	// Asssigning primordial gases from volcanic outgassing and volatile vaporization
@@ -682,29 +893,24 @@ function generateAtmosphere(planet) {
 	// Calculating escape velocity for the planet
 	const coreRadius = planet.radius.getValueAs(types.units.Dist.R_Earth);
 	const v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(coreMass / coreRadius);
+	const planetAge_y = planet.age.getValueAs(types.units.Time.y);
 	
+	let temp_ex = temp_eq * 3.5; // Exosphere temperature
+	const magnetopauseRatio = planet.magnetosphereRadius.getValueAs(types.units.Dist.R_Earth) / coreRadius;
+	if (magnetopauseRatio < 2.5) {
+		// The closer magnetosphere is, the stronger stellar wind heats up exosphere
+		const exposureFactor = Math.max(1, 4 - magnetopauseRatio); 
+		temp_ex *= exposureFactor; 
+	}
 	for (const gas in atmosphere) {
 		// Calculating escape velocities for various gases
-		atmosphere[gas].v_th = Math.sqrt((3 * consts.PHY_R_GAS * temp_eq) / atmosphere[gas].m_w);
+		atmosphere[gas].v_th = Math.sqrt((3 * consts.PHY_R_GAS * (temp_eq * 3)) / atmosphere[gas].m_w);
 
-		// Jeans escape check
-		// A planet can hold gas for a long time if planet's escape velocity is at least 6 times the thermal velocity of that gas
-		if (v_esc < 6 * atmosphere[gas].v_th)
-			atmosphere[gas].mass = 0;
+		// Jeans dissipation
+		const escapeRatio = (v_esc / atmosphere[gas].v_th);
+		const tau = 0.001 * Math.exp(Math.pow(escapeRatio, 2));
+		atmosphere[gas].mass *= Math.exp(-planetAge_Gy / tau);
 	}
-
-	// Stellar Wind Stripping / Photoevaporation
-	const stripIntensity = 1 / Math.sqrt(sma_norm); // Near the star = huge modifier
-	for (const gas in atmosphere) {
-		if (atmosphere[gas].mass > 0) {
-			// Heavier molecular weight = resists stripping much better
-			const weightProtection = atmosphere[gas].m_w / atmosphere.CO2.m_w;
-			atmosphere[gas].mass /= 1 + stripIntensity / weightProtection;
-		}
-	}
-
-	const strippingFactor = Math.pow(sma_norm / 0.70, 2); // Closer = harsher stripping
-	for (const gas in atmosphere) atmosphere[gas].mass *= Math.min(1, (atmosphere[gas].m_w / atmosphere.H2O.m_w) * strippingFactor);
 
 	// Absolute total atmospheric mass
 	let M_atm_total = 0;
@@ -737,6 +943,8 @@ function generateAtmosphere(planet) {
 		composition: { },
 	};
 	for (const gas in atmosphere) planet.atmosphere.composition[gas] = atmosphere[gas].f;
+
+	console.log(planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(3), planet.atmosphere.pressure.toFixed(3), planet.age.getValueAs(types.units.Time.Gy).toFixed(2));
 }
 
 /**
@@ -800,317 +1008,6 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 	else {
 		// Current rotation speed passed the limit, setting the slightly slowed down limit value.
 		const surfOrbitPeriod_h = new types.Value(surfOrbitPeriod_s, types.units.Time.s).getValueAs(types.units.Time.h);
-		return surfOrbitPeriod_h * prng.range(1.1, 1.6);
+		return surfOrbitPeriod_h * prng.range(1.2, 2.4);
 	}
-}
-
-/**
- * 
- * @param {types.GenerationSettings} settings 
- * @param {types.Planet} planet 
- */
-function adjustRotationTime(settings, planet) {
-	let parent = planet.parentBody;
-	if (parent instanceof types.BinaryPlanet) {
-		if (planet.parentBody.primary === planet)
-			parent = planet.parentBody.secondary;
-		else if (planet.parentBody.secondary === planet)
-			parent = planet.parentBody.primary;
-	}
-
-	const age_s = planet.age.getValueAs(types.units.Time.s);
-	const tidalLockTime_s = getTidalLockTime(planet, parent).getValueAs(types.units.Time.s);
-
-	const ageToTLRatio = Math.min(1, age_s / tidalLockTime_s);
-
-	const interpolationFactor = 1 - Math.pow(1 - ageToTLRatio, 2);
-
-	const targetRotationPeriod_s = getTidalLockRotationPeriod(planet, parent).getValueAs(types.units.Time.s);
-	const targetOmega = 2 * Math.PI / targetRotationPeriod_s;
-
-	const currentRotationPeriod_s = planet.rotationPeriod.getValueAs(types.units.Time.s);
-	let currentOmega = 2 * Math.PI / currentRotationPeriod_s;
-	if (planet.isRotationRetrograde) currentOmega = -currentOmega;
-
-	const adjustedOmega = currentOmega * (1 - interpolationFactor) + targetOmega * interpolationFactor;
-
-	if (ageToTLRatio === 1.0) {
-		planet.isTidallyLocked = true;
-		planet.isRotationRetrograde = false;
-		planet.rotationPeriod = new types.Value(targetRotationPeriod_s, types.units.Time.s);
-	}
-	else {
-		planet.isTidallyLocked = false;
-
-		if (adjustedOmega < 0) {
-			planet.isRotationRetrograde = true;
-			const newPeriod_s = 2 * Math.PI / Math.abs(adjustedOmega);
-			planet.rotationPeriod = new types.Value(newPeriod_s, types.units.Time.s);
-		}
-		else if (adjustedOmega > 0) {
-			planet.isRotationRetrograde = false;
-			const newPeriod_s = 2 * Math.PI / adjustedOmega;
-			planet.rotationPeriod = new types.Value(newPeriod_s, types.units.Time.s);
-		}
-		else {
-			planet.rotationPeriod = new types.Value(Infinity, types.units.Time.s);
-			/*
-			planet.isRotationRetrograde = false;
-			planet.rotationPeriod = new types.Value(100000, types.units.Time.h);
-			*/
-		}
-	}
-
-	planet.rotationPeriod.convertUnitTo(types.units.Time.h);
-}
-
-/**
- * Calculates planet's tidal lock time.
- * 
- * @param {types.Planet} planet - Current planet
- * @param {types.Planet|types.BinaryPlanet|types.Star|types.BinaryStar} parent - Planet's parent body (star or binary companion)
- * 
- * @returns {types.Value} Approximate tidal lock time (unit: Time)
- */
-function getTidalLockTime(planet, parent) {
-	const m_s = planet.mass.getValueAs(types.units.Mass.kg); // Satellite's mass
-	const m_p = parent.mass.getValueAs(types.units.Mass.kg); // Parent body's mass
-	const R = planet.radius.getValueAs(types.units.Dist.m); // Satellite's radius
-
-	const w = 2 * Math.PI / planet.rotationPeriod.getValueAs(types.units.Time.s); // Satellite's spin rate, rad/s
-	const a = planet.sma.getValueAs(types.units.Dist.m); // Satellite's SMA
-
-	const I_factor = calculateMomentOfInertiaFactor(planet);
-	const I = I_factor * m_s * (R**2); // Satellite's moment of inertia
-
-	const Q = calculateTidalQ(planet); // Satellite's dissipation function value
-
-	const rho = planet.density * 1000; // Satellite's density, kg/m^3
-	const g = consts.PHY_G * m_s / (R**2); // Satellite's surface gravity
-
-	const totalMass = m_s;
-	const coreIce = planet.core.composition.ice * planet.core.mass.getValueAs(types.units.Mass.kg);
-	const envIce = planet.envelope.composition.ice * planet.envelope.mass.getValueAs(types.units.Mass.kg);
-	const totalIceFraction = (coreIce + envIce) / totalMass;
-
-	const mu = 3e10 * (1 - totalIceFraction) + 4e9 * totalIceFraction; // Linear interpolation of satellite's rigidity ("rocky" and "icy" regimes)
-	const k2 = 1.5 / (1 + ((19 * mu) / (2 * rho * g * R))); // Satellite's tidal Love number 
-
-	const t = (w * (a**6) * I * Q) / (3 * consts.PHY_G * (m_p**2) * k2 * (R**5)); // Approximate satellite's tidal locking time
-	return new types.Value(t, types.units.Time.s);
-}
-
-/**
- * Calculates planet's moment of inertia factor.
- * 
- * @param {types.Planet} planet - Current planet
- * 
- * @returns {number} Moment of inertia factor (0.205-0.38)
- */
-function calculateMomentOfInertiaFactor(planet) {
-	const m_core = planet.core.mass.getValueAs(types.units.Mass.kg);
-	const m_env = planet.envelope.mass.getValueAs(types.units.Mass.kg);
-	const m_total = m_core + m_env;
-
-	const f_env = m_env / m_total;
-	
-	const ironFraction = planet.core.composition.iron;
-	const baseCoreFactor = 0.38 - (ironFraction * 0.07);
-
-	if (f_env === 0) {
-		return baseCoreFactor;
-	}
-
-	const targetGasFactor = 0.21;
-
-	const i_factor = baseCoreFactor * (1 - f_env) + targetGasFactor * f_env;
-
-	return Math.max(0.205, i_factor);
-}
-
-/**
- * Calculates planet's approximate dissipation function value (Q).
- * 
- * @param {types.Planet} planet - Current planet
- * 
- * @returns {number} Q value (\~50...\~100,000).
- */
-function calculateTidalQ(planet) {
-	const m_core = planet.core.mass.getValueAs(types.units.Mass.kg);
-	const m_env = planet.envelope.mass.getValueAs(types.units.Mass.kg);
-	const m_total = m_core + m_env;
-	
-	const f_env = m_env / m_total;
-
-	// 1. Bodies w/o envelope
-	if (f_env === 0) {
-		const iceFraction = planet.core.composition.ice;
-		// Ice is more flexible under pressure than rock and dissipates energy more effectively (lower Q).
-		return 100 * (1 - iceFraction) + 25 * iceFraction;
-	}
-
-	// 2. Mini-Neptunes / Puffy Super-Earths
-	// Q starts to increase since the gas envelope partially absorbs the tidal wave.
-	if (f_env < 0.5) {
-		// A smooth transition from the Q of a rigid body (about 100) to that of a gaseous (about 10,000)
-		return 100 * Math.pow(100, f_env / 0.5);
-	}
-
-	// 3. Ice Giants, Gas Giants, Brown Dwarfs
-	// Jupiter's Q is estimated to be 10^5 - 10^6. Saturn's is even larger.
-	// Brown dwarfs must have a huge Q value.
-	const mass_M_Earth = planet.mass.getValueAs(types.units.Mass.M_Earth);
-	
-	if (mass_M_Earth > 400) { 
-		// Super-Jupiters and Brown Dwarfs
-		return 1e6 * (mass_M_Earth / 400); 
-	} else {
-		// Classic giant planets
-		// Ice giants dissipate better than gas giants.
-		const envIceFraction = planet.envelope.composition.ice;
-		const baseGiantQ = 1e5;
-
-		// Expected Q values for ice giants are ~30,000, for gas giants - ~100,000
-		return baseGiantQ * (1 - envIceFraction * 0.7); 
-	}
-}
-
-/**
- * Calculates planet's rotation period at tidal lock.
- * 
- * @param {types.Planet} planet - Current planet
- * @param {types.Planet|types.BinaryPlanet|types.Star|types.BinaryStar} parent - Planet's parent body (star or binary companion)
- * 
- * @returns {types.Value} Rotation period at tidal lock (unit: Time)
- */
-function getTidalLockRotationPeriod(planet, parent) {
-	const m1 = planet.mass.getValueAs(types.units.Mass.kg);
-	const m2 = parent.mass.getValueAs(types.units.Mass.kg);
-	const a = planet.sma.getValueAs(types.units.Dist.m);
-
-	// Rotation period = Orbital period
-	const t = Math.sqrt( ((4 * (Math.PI**2)) / (consts.PHY_G * (m1 + m2))) * (a**3) );
-
-	return new types.Value(t, types.units.Time.s);
-}
-
-/**
- * 
- * @param {types.Planet} planet 
- * 
- * @returns {number}
- */
-export function calculatePlanetMagneticField(planet) {
-	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
-	const planetMass_MJup = planet.mass.getValueAs(types.units.Mass.M_Jupiter);
-
-	const planetRadius_m = planet.radius.getValueAs(types.units.Dist.m);
-
-	let r_core, rho_core, f_ad, k_tectonics, c;
-	if (planet.type === 'Terrestrial') {
-		const coreMass_MEarth = planet.core.mass.getValueAs(types.units.Mass.M_Earth);
-		const r_core_iron_REarth = getMaterialRadius(coreMass_MEarth * planet.core.composition.iron, 'iron');
-		r_core = new types.Value(r_core_iron_REarth, types.units.Dist.R_Earth).getValueAs(types.units.Dist.m);
-		rho_core = 7500;
-		f_ad = 0.04;
-		if (planet.temperature.getValueAs(types.units.Temp.C) > -10)
-			k_tectonics = planet.core.composition.ice > 0.005 ? 0.25 : 0.08;
-		else
-			k_tectonics = planet.core.composition.ice > 0.2 ? 0.15 : 0.08;
-		c = 20;
-	}
-	else if (planet.type !== 'Gas Giant') {
-		r_core = planet.core.radius.getValueAs(types.units.Dist.m);
-		rho_core = 3500;
-		f_ad = 0.04;
-		k_tectonics = 0.3;
-		c = 25;
-	}
-	else {
-		r_core = planetRadius_m * Math.min(0.9, 0.7 + 0.15 * Math.log10(3 * planetMass_MJup + 1));
-		rho_core = 4000;
-		f_ad = 0.6;
-		k_tectonics = 1.0;
-		c = 35;
-	}
-
-	const planetAge_Gy = planet.age.getValueAs(types.units.Time.Gy);
-	let q_total;
-	if (planetMass_MJup < 0.15)
-		q_total = 4.6e13 * planetMass_MEarth * Math.pow(4.5 / planetAge_Gy, 0.5);
-	else if (planetMass_MJup < 13) 
-		q_total = 4.0e17 * Math.pow(planetMass_MJup, 1.5) * Math.pow(4.5 / planetAge_Gy, 0.5);
-	else 
-		q_total = 4.0e17 * Math.pow(planetMass_MJup, 2.5) * Math.pow(1.0 / planetAge_Gy, 0.4);
-
-	const q_core = q_total * k_tectonics;
-	const area_core = 4 * Math.PI * (r_core**2);
-	const f_total_core = q_core / area_core;
-
-	const f_c = f_total_core - f_ad;
-
-	if (f_c <= 0) {
-		planet.magneticField = 0;
-		console.log(
-			'Bsurf:', (-0.001).toFixed(2), '|',
-			'Rc/Rp:', (r_core / planetRadius_m).toFixed(2), '|',
-			'Rp:', planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), '|',
-			'Mp:', planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), '|',
-			'Age:', planet.age.getValueAs(types.units.Time.Gy).toFixed(2), '|',
-			planet.type
-		);
-		return;
-	}
-	
-	const b_core = c * Math.sqrt(consts.PHY_MU_0) * Math.pow(rho_core, 1/6) * Math.pow(f_c / r_core, 1/3);
-	
-	const b_surf = b_core * Math.pow(r_core / planetRadius_m, 3) * utils.randomRangeGaussian(0.8, 1.2);
-
-	planet.magneticField = b_surf;
-	console.log(
-		'Bsurf:', (b_surf * 1e6).toFixed(2), '|',
-		'Rc/Rp:', (r_core / planetRadius_m).toFixed(2), '|',
-		'Rp:', planet.radius.getValueAs(types.units.Dist.R_Earth).toFixed(2), '|',
-		'Mp:', planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(2), '|',
-		'Age:', planet.age.getValueAs(types.units.Time.Gy).toFixed(2), '|',
-		planet.type
-	);
-}
-
-/**
- * 
- * @param {types.Planet} planet 
- */
-function calculateMagnetosphereRadius(planet) {
-	if (planet.magneticField === 0) {
-		planet.magnetosphereRadius = new types.Value(planet.radius.value, planet.radius.unit);
-		console.log('Rmp_R:', (1).toFixed(2), '(no MF)');
-		return;
-	}
-
-	const B_surf = planet.magneticField;
-
-	const distance_AU = planet.genData.sma_norm * Math.sqrt(planet.genData.parentStar.luminosity);
-
-	let base_density = 8.4e-21;
-
-	const starAge_Gy = planet.genData.parentStar.age.getValueAs(types.units.Time.Gy);
-	base_density *= 1.0 + (0.5 / starAge_Gy);
-
-	const rho_sw = base_density / (distance_AU**2);
-	const v_sw = 400e3;
-
-	const p_sw = rho_sw * (v_sw**2);
-
-	const f = 2.0;
-
-	const r_p_m = planet.radius.getValueAs(types.units.Dist.m);
-	const r_mp_m = Math.pow((f ** 2 * (B_surf ** 2)) / (2 * consts.PHY_MU_0 * p_sw), 1 / 6) * r_p_m;
-
-	planet.magnetosphereRadius = new types.Value(Math.max(r_p_m, r_mp_m), types.units.Dist.m);
-	console.log(
-		'Rmp_R:', (r_mp_m / r_p_m).toFixed(2), '|',
-		'Dist:', distance_AU.toFixed(2), '|',
-		'Ms:', planet.genData.parentStar.mass.getValueAs(types.units.Mass.M_Sun).toFixed(2),
-	);
 }
