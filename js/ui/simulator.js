@@ -320,6 +320,30 @@ function drawBowShock(ctx, r_mp_px) {
 	ctx.stroke();
 }
 
+/*
+function drawAtmosphereGlow(ctx, x, y, radius, atmosphere) {
+    if (atmosphere.totalPressure < 0.01) return; // Безвоздушный мир не подсвечиваем
+
+    ctx.save();
+    // Создаем радиальный градиент чуть больше радиуса планеты
+    let glowRadius = radius * 1.05;
+    let grad = ctx.createRadialGradient(x, y, radius * 0.85, x, y, glowRadius);
+
+    // Цвет дымки зависит от состава
+    // Азот/Кислород = Голубой, CO2 = Желтовато-белый, Метан = Оранжевый/Титан, SO2 = Едко-зеленый
+    let atmColor = getAtmosphereColor(atmosphere.dominantGas); 
+
+    grad.addColorStop(0, 'rgba(' + atmColor + ', 0.0)');   // Прозрачно в центре
+    grad.addColorStop(0.8, 'rgba(' + atmColor + ', 0.2)'); // Мягкое проявление ближе к краю
+    grad.addColorStop(0.95, 'rgba(' + atmColor + ', 0.6)');// Яркий лимб на самом краю диска
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+*/
+
 function drawBody() {
 	const coords = this.getScreenCoords();
 

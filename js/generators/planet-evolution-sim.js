@@ -14,32 +14,28 @@ export class PlanetEvolution {
 		this.settings = settings;
 		this.planet = planet;
 
-		this.rotationManager = new RotationManager(settings, planet);
-		this.magnetManager = new MagnetManager(settings, planet);
+		this.rotationManager = new RotationManager(this);
+		this.solarManager = new SolarManager(this);
+		this.magnetManager = new MagnetManager(this);
+		this.dissipationManager = new DissipationManager(this);
 	}
 
 	doTheEvolution() {
+		let counter = 0;
 		let T = 0;
 		const T_target = this.planet.age.getValueAs(types.units.Time.y);
 		let dT = 1e5;
 
 		while (T < T_target) {
-			// 1. Core heat & Magnetic Field
 			this.rotationManager.setRotationTime(T);
+			this.solarManager.calculateSolarActivity(T);
 			this.magnetManager.setMagneticField(T);
-
-			// 2. Volcanism (gases addition)
-
-			// 3. Atmosphere dissipation
-
-			// 4. Temperature
-
-			// 5. Geology
-
-			// 6. Phase transfers
+			if (this.planet.type === types.planetTypes.Terrestrial)
+				this.dissipationManager.dissipateAtmosphere(dT, T);
 
 			T += dT;
 			dT *= 1.05;
+			counter++;
 		}
 	}
 }
@@ -47,23 +43,23 @@ export class PlanetEvolution {
 class RotationManager {
 	/**
 	 * 
-	 * @param {types.GenerationSettings} settings 
-	 * @param {types.Planet} planet 
+	 * @param {PlanetEvolution} evo
 	 */
-	constructor (settings, planet) {
-		this.settings = settings;
-		this.planet = planet;
+	constructor (evo) {
+		this.evo = evo;
 
-		let parent = planet.parentBody;
+		this.planet = evo.planet;
+
+		let parent = this.planet.parentBody;
 		if (parent instanceof types.BinaryPlanet) {
-			if (planet.parentBody.primary === planet)
-				parent = planet.parentBody.secondary;
-			else if (planet.parentBody.secondary === planet)
-				parent = planet.parentBody.primary;
+			if (this.planet.parentBody.primary === this.planet)
+				parent = this.planet.parentBody.secondary;
+			else if (this.planet.parentBody.secondary === this.planet)
+				parent = this.planet.parentBody.primary;
 		}
 
-		this.tidalLockTime_s = getTidalLockTime(planet, parent).getValueAs(types.units.Time.s);
-		this.targetRotationPeriod_s = getTidalLockRotationPeriod(planet, parent).getValueAs(types.units.Time.s);
+		this.tidalLockTime_s = getTidalLockTime(this.planet, parent).getValueAs(types.units.Time.s);
+		this.targetRotationPeriod_s = getTidalLockRotationPeriod(this.planet, parent).getValueAs(types.units.Time.s);
 		this.targetOmega = 2 * Math.PI / this.targetRotationPeriod_s;
 	}
 
@@ -242,22 +238,65 @@ function getTidalLockRotationPeriod(planet, parent) {
 	return new types.Value(t, types.units.Time.s);
 }
 
+class SolarManager {
+	/**
+	 * 
+	 * @param {PlanetEvolution} evo 
+	 */
+	constructor (evo) {
+		this.evo = evo;
+		
+		this.planet = evo.planet;
+
+		this.distance_AU = this.planet.genData.sma_norm * Math.sqrt(this.planet.genData.parentStar.luminosity);
+
+		this.star = this.planet.genData.parentStar;
+		this.starTemperature = this.star.temperature.getValueAs(types.units.Temp.K);
+
+		this.saturation = true;
+		this.saturationTime_Gy = 0.01 + (5000 / Math.pow(this.starTemperature, 1.2));
+
+		this.p_sw = 0;
+		this.rho_sw = 1;
+		this.L_XUV = 0;
+	}
+
+	calculateSolarActivity(t) {
+		const starAge_Gy = new types.Value(t, types.units.Time.y).getValueAs(types.units.Time.Gy);
+
+		this.saturation = starAge_Gy <= this.saturationTime_Gy;
+
+		this.L_XUV = this.saturation === true
+			? this.star.luminosity * 1e-3
+			: this.star.luminosity * 1e-3 * Math.pow(starAge_Gy / this.saturationTime_Gy, -1.1);
+
+		const base_density = 8.4e-21; // Base stellar wind density at 1 AU
+		const v_sw = 400e3; // Stellar wind velocity
+		const solarActivity = Math.min(1000, 1 + Math.pow(starAge_Gy / this.saturationTime_Gy, -1.1));
+
+		this.rho_sw = (base_density * solarActivity) / (this.distance_AU**2); // Stellar wind density
+
+		this.p_sw = this.rho_sw * (v_sw**2); // Stellar wind pressure
+	}
+}
+
 import {getMaterialRadius} from './planet-gen.js';
 
 class MagnetManager {
 	/**
 	 * 
-	 * @param {types.GenerationSettings} settings 
-	 * @param {types.Planet} planet 
+	 * @param {PlanetEvolution} evo 
 	 */
-	constructor (settings, planet) {
-		this.settings = settings;
-		this.planet = planet;
+	constructor (evo) {
+		this.evo = evo;
 
-		this.mass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
-		this.mass_MJupiter = planet.mass.getValueAs(types.units.Mass.M_Jupiter);
+		this.planet = evo.planet;
 
-		this.radius_m = planet.radius.getValueAs(types.units.Dist.m);
+		this.mass_MEarth = this.planet.mass.getValueAs(types.units.Mass.M_Earth);
+		this.mass_MJupiter = this.planet.mass.getValueAs(types.units.Mass.M_Jupiter);
+
+		this.radius_m = this.planet.radius.getValueAs(types.units.Dist.m);
+		this.planet.magnetosphereHistory = new Map();
 
 		/*
 		r_core		- Conducting core radius
@@ -266,23 +305,23 @@ class MagnetManager {
 		k_tectonics - Core's thermal flow fraction (depends on the planet's geology)
 		c			- Calibrating coefficient
 		*/
-		switch (planet.type) {
-			case 'Terrestrial':
-				const coreMass_MEarth = planet.core.mass.getValueAs(types.units.Mass.M_Earth);
-				const r_core_iron_REarth = getMaterialRadius(coreMass_MEarth * planet.core.composition.iron, 'iron');
+		switch (this.planet.type) {
+			case types.planetTypes.Terrestrial:
+				const coreMass_MEarth = this.planet.core.mass.getValueAs(types.units.Mass.M_Earth);
+				const r_core_iron_REarth = getMaterialRadius(coreMass_MEarth * this.planet.core.composition.iron, 'iron');
 				this.r_core = new types.Value(r_core_iron_REarth, types.units.Dist.R_Earth).getValueAs(types.units.Dist.m);
 				this.rho_core = 7500;
 				
-				// No tectonics by default (stagnant lid)
+				// No plate tectonics assumed (stagnant lid)
 				this.k_tectonics = 0.08; 
 				
 				this.f_ad = 0.04;
 				this.c = 20;
 				break;
-			case 'Mini-Neptune':
-			case 'Ice Giant':
+			case types.planetTypes.MiniNeptune:
+			case types.planetTypes.IceGiant:
 				// Rocky core radius to entire planet radius ratio is around 0.6 
-				this.r_core = planet.core.radius.getValueAs(types.units.Dist.m);
+				this.r_core = this.planet.core.radius.getValueAs(types.units.Dist.m);
 				this.rho_core = 3500;
 
 				// The dynamo occurs in the thin outer layer of the ionosphere,
@@ -292,7 +331,8 @@ class MagnetManager {
 				this.f_ad = 0.05;
 				this.c = 25;
 				break;
-			case 'Gas Giant':
+			case types.planetTypes.GasGiant:
+			case types.planetTypes.BrownDwarf:
 				this.r_core = this.radius_m * Math.min(0.9, 0.7 + 0.15 * Math.log10(3 * this.mass_MJupiter + 1));
 				this.rho_core = 4500;
 
@@ -307,12 +347,13 @@ class MagnetManager {
 		}
 
 		// Distance from the star
-		this.distance_AU = planet.genData.sma_norm * Math.sqrt(planet.genData.parentStar.luminosity);
+		this.distance_AU = this.planet.genData.sma_norm * Math.sqrt(this.planet.genData.parentStar.luminosity);
 	}
 
 	setMagneticField(t) {
 		this.planet.magneticField = this.calculatePlanetMagneticField(t);
 		this.planet.magnetosphereRadius = this.calculateMagnetosphereRadius(t);
+		this.planet.magnetosphereHistory.set(t, this.planet.magnetosphereRadius);
 	}
 	
 	/**
@@ -365,17 +406,8 @@ class MagnetManager {
 		}
 
 		const B_surf = this.planet.magneticField;
-
-		let base_density = 8.4e-21; // Base stellar wind density at 1 AU
-
-		// Correcting density according to the star's age
-		const starAge_Gy = new types.Value(t, types.units.Time.y).getValueAs(types.units.Time.Gy);
-		base_density *= 1.0 + (0.5 / starAge_Gy); // Young star = very active; strong stellar winds | old = stable; moderate winds
-
-		const rho_sw = base_density / (this.distance_AU**2); // Stellar wind density
-		const v_sw = 400e3; // Stellar wind velocity
-
-		const p_sw = rho_sw * (v_sw**2); // Stellar wind pressure
+		
+		const p_sw = this.evo.solarManager.p_sw; // Stellar wind pressure
 
 		const f = 2.0; // Magnetic field compression coefficient
 		
@@ -383,5 +415,140 @@ class MagnetManager {
 		const r_mp_m = Math.pow( ((f**2) * (B_surf**2)) / (2 * consts.PHY_MU_0 * p_sw) , 1/6) * r_p_m; // Magnetopause radius
 
 		return new types.Value(Math.max(r_p_m, r_mp_m), types.units.Dist.m);
+	}
+}
+
+class DissipationManager {
+	/**
+	 * 
+	 * @param {PlanetEvolution} evo 
+	 */
+	constructor (evo) {
+		this.evo = evo;
+
+		this.planet = evo.planet;
+
+		const coreMass = this.planet.core.mass.getValueAs(types.units.Mass.M_Earth);
+		this.coreRadius = this.planet.radius.getValueAs(types.units.Dist.R_Earth);
+		this.v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(coreMass / this.coreRadius);
+
+		this.distance_AU = this.planet.genData.sma_norm * Math.sqrt(this.planet.genData.parentStar.luminosity);
+		this.distance_m = new types.Value(this.distance_AU, types.units.Dist.AU).getValueAs(types.units.Dist.m);
+	}
+
+	dissipateAtmosphere(dT, T) {
+		const temp_ex = this.planet.temperature_eq.getValueAs(types.units.Temp.K) * 5; // Exosphere temperature
+		let M_atm_total = 0;
+		for (const gas in this.planet.atmosphere) {
+			// Calculating escape velocities for various gases
+			this.planet.atmosphere[gas].v_th = Math.sqrt((3 * consts.PHY_R_GAS * (temp_ex * 3)) / this.planet.atmosphere[gas].m_w);
+
+			// Jeans escape
+			const escapeRatio = (this.v_esc / this.planet.atmosphere[gas].v_th);
+			const tau = 0.001 * Math.exp(Math.pow(escapeRatio, 2));
+			this.planet.atmosphere[gas].mass *= Math.exp(-(dT / 1e9) / tau);
+
+			M_atm_total += this.planet.atmosphere[gas].mass;
+		}
+
+		// Energy-limited escape
+		const eps = 0.10;
+		const R_p = this.planet.radius.getValueAs(types.units.Dist.m);
+		const M_p = this.planet.mass.getValueAs(types.units.Mass.kg);
+		const M_thermal = (eps * this.evo.solarManager.L_XUV * (R_p**3)) / (4 * consts.PHY_G * M_p * this.distance_m);
+
+		// Solar wind stripping
+		const eta = 0.005;
+		const P_sw = this.evo.solarManager.p_sw;
+		const M_wind = eta * ((P_sw * Math.PI * (R_p**2)) / (this.v_esc**2));
+
+		let parentMagneticField = 0;
+		if ( (this.planet.parentBody instanceof types.Planet) || (this.planet.parentBody instanceof types.BinaryPlanet) ) {
+			if (this.planet.parentBody instanceof types.BinaryPlanet) {
+				if (this.planet === this.planet.parentBody.primary) {
+					parentMagneticField = 0;
+					//parentMagneticField = this.planet.parentBody.secondary.magnetosphereHistory.get(T).getValueAs(types.units.Dist.m) - this.planet.sma.getValueAs(types.units.Dist.m);
+				}
+				else if (this.planet === this.planet.parentBody.secondary) {
+					parentMagneticField = this.planet.parentBody.primary.magnetosphereHistory.get(T).getValueAs(types.units.Dist.m) - this.planet.sma.getValueAs(types.units.Dist.m);
+				}
+				else {
+					parentMagneticField = Math.max(
+						this.planet.parentBody.primary.magnetosphereHistory.get(T).getValueAs(types.units.Dist.m) - this.planet.sma.getValueAs(types.units.Dist.m),
+						this.planet.parentBody.secondary.magnetosphereHistory.get(T).getValueAs(types.units.Dist.m) - this.planet.sma.getValueAs(types.units.Dist.m)
+					);
+				}
+			}
+			else {
+				parentMagneticField = this.planet.parentBody.magnetosphereHistory.get(T).getValueAs(types.units.Dist.m) - this.planet.sma.getValueAs(types.units.Dist.m);
+			}
+		}
+		parentMagneticField = Math.max(0, parentMagneticField);
+
+		const magnetopauseRatio = Math.max(
+			this.planet.magnetosphereRadius.getValueAs(types.units.Dist.m) / R_p,
+			parentMagneticField / R_p
+		);
+		const f_mag = utils.clamp(Math.exp(-(magnetopauseRatio - 1.2)), 0.01, 1);
+
+		// Applying energy-limited escape and solar wind
+		const years_to_seconds = 365.25 * 24 * 60 * 60;
+		const M_loss = (M_thermal + f_mag * M_wind) * dT * years_to_seconds;
+		const f_loss = Math.min(1, M_loss / M_atm_total);
+		for (const gas in this.planet.atmosphere) {
+			this.planet.atmosphere[gas].mass -= this.planet.atmosphere[gas].mass * f_loss
+		}
+		M_atm_total -= M_loss;
+	}
+}
+
+class TemperatureManager {
+	/**
+	 * 
+	 * @param {PlanetEvolution} evo 
+	 */
+	constructor (evo) {
+		this.evo = evo;
+
+		this.planet = evo.planet;
+
+		this.coreRadius = this.planet.radius.getValueAs(types.units.Dist.R_Earth);
+	}
+
+	getSurfaceTemperature() {
+		// Absolute total atmospheric mass
+		let M_atm_total = 0;
+		for (const gas in this.planet.atmosphere)
+			M_atm_total += this.planet.atmosphere[gas].mass; // in M⊕
+		const atmosphereMass = new types.Value(M_atm_total, types.units.Mass.kg)
+
+		// Atmosphere pressure at the surface
+		const P_surf_atm = (atmosphereMass.getValueAs(types.units.Mass.M_Earth_atm) * this.planet.mass.getValueAs(types.units.Mass.M_Earth)) / (this.coreRadius**4);
+		const P_surf_bar = P_surf_atm * 1.01325;
+
+		this.planet.atmosphere_pressure = P_surf_bar;
+
+		// Gases fractions
+		for (const gas in this.planet.atmosphere)
+			this.planet.atmosphere[gas].f = M_atm_total === 0 ? 0 : this.planet.atmosphere[gas].mass / M_atm_total;
+
+		// Optical depth
+		const tau = Math.pow(P_surf_bar, 1.5) * ( 
+			(this.planet.atmosphere.H2O.f * 0.30) + 
+			(this.planet.atmosphere.CO2.f * 0.03) + 
+			(this.planet.atmosphere.CH4.f * 0.06) + 
+			(this.planet.atmosphere.NH3.f * 0.50) + 
+			(this.planet.atmosphere.SO2.f * 0.13)
+		) + Math.pow(P_surf_bar, 2) * (
+			(this.planet.atmosphere.H2.f * 1e-4) + 
+			(this.planet.atmosphere.He.f * 1e-5) + 
+			(this.planet.atmosphere.N2.f * 1e-5) + 
+			(this.planet.atmosphere.O2.f * 1e-5) 
+		);
+	
+		// Calculating surface temperature using a grey-atmosphere approximation
+		const temp_surf = this.planet.temperature_eq.getValueAs(types.units.Temp.K) * Math.pow(1 + 3/4 * tau, 1/4);
+		const T_surf = new types.Value(temp_surf, types.units.Temp.K);
+		this.planet.temperature = T_surf;
 	}
 }

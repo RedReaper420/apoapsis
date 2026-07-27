@@ -26,7 +26,7 @@ tabLinks.forEach(tab => {
 	if (tab.classList.contains('btn'))
 		return;
 
-	tab.addEventListener('click', (e) => { openTab(event, tab.dataset.tab); });
+	tab.addEventListener('click', (event) => { openTab(event, tab.dataset.tab); });
 });
 closeTab();
 
@@ -230,11 +230,13 @@ setupSetting(
 	consts.UI_PLANET_MIGRATION_INTERPOLATED_VAL_DEF
 );
 
-// Enable Grand Tack toggle
+// Grand Tack chance field
 setupSetting(
-	'gen_planet_migration_grand_tack_enabled', 
-	events.Generator.Settings.Planet.grandTackEnabled, 
-	consts.UI_PLANET_MIGRATION_GRAND_TACK_ENABLED_VAL_DEF
+	'gen_planet_migration_grand_tack_chance', 
+	events.Generator.Settings.Planet.grandTackChance, 
+	consts.UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_VAL_DEF,
+	consts.UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_LIM_MIN,
+	consts.UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_LIM_MAX,
 );
 
 // Hill safety factor field

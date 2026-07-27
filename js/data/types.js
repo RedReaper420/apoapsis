@@ -204,7 +204,7 @@ export class GenerationSettings {
 		planet_migration_type_2_enabled = consts.UI_PLANET_MIGRATION_TYPE_2_ENABLED_VAL_DEF,
 		planet_migration_type_2_coeff = consts.UI_PLANET_MIGRATION_TYPE_2_COEFF_VAL_DEF,
 		planet_migration_interpolated = consts.UI_PLANET_MIGRATION_INTERPOLATED_VAL_DEF,
-		planet_migration_grand_tack_enabled = consts.UI_PLANET_MIGRATION_GRAND_TACK_ENABLED_VAL_DEF,
+		planet_migration_grand_tack_chance = consts.UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_VAL_DEF,
 		planet_migration_hill_safety_factor = consts.UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF,
 
 		// ---
@@ -241,7 +241,7 @@ export class GenerationSettings {
 		this.planet_migration_type_2_enabled = planet_migration_type_2_enabled;
 		this.planet_migration_type_2_coeff = planet_migration_type_2_coeff;
 		this.planet_migration_interpolated = planet_migration_interpolated;
-		this.planet_migration_grand_tack_enabled = planet_migration_grand_tack_enabled;
+		this.planet_migration_grand_tack_chance = planet_migration_grand_tack_chance;
 		this.planet_migration_hill_safety_factor = planet_migration_hill_safety_factor;
 
 		// ---
@@ -302,6 +302,26 @@ export class Star extends Body {
 	}
 }
 
+export const planetTypes = Object.freeze({
+	Terrestrial: 'Terrestrial',
+	MiniNeptune: 'Mini-Neptune',
+	IceGiant: 'Ice Giant',
+	GasGiant: 'Gas Giant',
+	BrownDwarf: 'Brown Dwarf',
+});
+
+export const moonTypes = Object.freeze({
+	Binary: 'Binary',
+	Impact: 'Impact',
+	Regular: 'Regular'
+});
+
+export const migrationStatus = Object.freeze({
+	Still: '',
+	Ejected: 'Ejected',
+	Merged: 'Merged',
+});
+
 export class Planet extends Body {
 	constructor (parentBody = null, name = 'Terra') {
 		super(parentBody, name);
@@ -314,7 +334,7 @@ export class Planet extends Body {
 		this.core = new Core();
 		this.envelope = new Envelope();
 
-		this.type = 'Terrestrial';
+		this.type = planetTypes.Terrestrial;
 		this.rings = [];
 		this.genData = {};
 	}

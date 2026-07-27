@@ -66,7 +66,7 @@ export const events = Object.freeze({
 				type2MigrationEnabled:	'settings_planet_migration_type_2_enabled',
 				type2MigrationCoeff:	'settings_planet_migration_type_2_coeff',
 				migrationInterpolated:	'settings_planet_migration_interpolated',
-				grandTackEnabled:		'settings_planet_migration_grand_tack_enabled',
+				grandTackChance:		'settings_planet_migration_grand_tack_chance',
 				hillSafetyFactor:		'settings_planet_migration_hill_safety_factor',
 			}),
 		}),

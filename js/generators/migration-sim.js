@@ -4,6 +4,8 @@ import * as utils from "../utils/utils.js";
 import * as types from "../data/types.js";
 import consts from "../data/consts.js";
 
+const GIANT_MASS = 60;
+
 /**
  * Simulates multi-body planetary migration and dynamic scattering within a decaying protoplanetary gas disk.
  * Modifies orbits, handles planetary collisions, and ejects unstable bodies.
@@ -32,6 +34,7 @@ export function simulateMigration(settings, starsArray) {
 		const initialDiskDensity = 1 * Math.pow(10, star.metallicity * 0.2) * Math.pow(10, utils.randomRangeGaussian(-0.5, 0.5));
 		
 		let activeGiantsCount = 0;
+		const canActivateGrandTack = prng() < settings.planet_migration_grand_tack_chance;
 		let isGrandTackTriggered = false;
 		
 		const starAgeYears = star.age.getValueAs(types.units.Time.y);
@@ -45,8 +48,12 @@ export function simulateMigration(settings, starsArray) {
 			for (let i = 0; i < star.bodies.length; i++) {
 				const planet = star.bodies[i];
 
-				if (!(planet instanceof types.Planet)) continue;
-				if ( (planet.genData.status === 'Ejected') || (planet.genData.status === 'Merged') ) continue;
+				if (!(planet instanceof types.Planet))
+					continue;
+
+				if ((planet.genData.status === types.migrationStatus.Ejected) ||
+					(planet.genData.status === types.migrationStatus.Merged))
+					continue;
 
 				// 3.1. Compute and Apply Disk Forces
 				applyMigration(settings, planet, currentDiskDensity, TIME_STEP_YEARS, isGrandTackTriggered);
@@ -58,8 +65,12 @@ export function simulateMigration(settings, starsArray) {
 					for (let n = i + 1; n < star.bodies.length; n++) {
 						const candidatePlanet = star.bodies[n];
 
-						if (!(candidatePlanet instanceof types.Planet)) continue;
-						if (candidatePlanet.genData.status === 'Ejected' || candidatePlanet.genData.status === 'Merged') continue;
+						if (!(candidatePlanet instanceof types.Planet))
+							continue;
+
+						if ((candidatePlanet.genData.status === types.migrationStatus.Ejected) ||
+							(candidatePlanet.genData.status === types.migrationStatus.Merged))
+							continue;
 
 						validNextPlanet = candidatePlanet;
 						break;
@@ -71,14 +82,14 @@ export function simulateMigration(settings, starsArray) {
 					}
 				}
 				
-				// 3.3. Track active gas giants
-				if ( (planet.genData.status === '') && (planet.type === 'Gas Giant') ) {
+				// 3.3. Track active giant planets (>= 60 Earth masses)
+				if ( (planet.genData.status === types.migrationStatus.Still) && (planet.mass.value >= GIANT_MASS) ) {
 					activeGiantsCount++;
 				}
 			}
 
 			// 3.4. Evaluate Grand Tack Resonance Constraints
-			if (settings.planet_migration_grand_tack_enabled && !isGrandTackTriggered) {
+			if (canActivateGrandTack && !isGrandTackTriggered) {
 				if (activeGiantsCount >= 2 && step >= (totalDiscreteSteps / 2)) {
 					isGrandTackTriggered = true;
 				}
@@ -97,9 +108,10 @@ export function simulateMigration(settings, starsArray) {
 	starsArray.forEach(star => {
 		// 4.1. Purge Discarded/Ejected Bodies from Arrays
 		for (let i = star.bodies.length - 1; i >= 0; i--) {
-			if (!(star.bodies[i] instanceof types.Planet)) continue;
+			if (!(star.bodies[i] instanceof types.Planet))
+				continue;
 
-			if (star.bodies[i].genData.status !== '') {
+			if (star.bodies[i].genData.status !== types.migrationStatus.Still) {
 				star.bodies.splice(i, 1);
 				continue;
 			}
@@ -113,7 +125,8 @@ export function simulateMigration(settings, starsArray) {
 
 		// 4.2. Recalculate Relative Orbital Neighbors
 		for (let i = 0; i < star.bodies.length; i++) {
-			if (!(star.bodies[i] instanceof types.Planet)) continue;
+			if (!(star.bodies[i] instanceof types.Planet))
+				continue;
 
 			star.bodies[i].genData.neighborPrev = i > 0 ? star.bodies[i - 1] : null;
 			star.bodies[i].genData.neighborNext = i < (star.bodies.length - 1) ? star.bodies[i + 1] : null;
@@ -147,7 +160,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 		? -TYPE_2_COEFF * diskDensity * timeStepYears 
 		: 0;
 
-	if (planet.type !== 'Terrestrial' && isGrandTackActive) {
+	if ( (planet.mass.value >= GIANT_MASS) && isGrandTackActive ) {
 		// Outward hydrodynamic resonance movement for gas giants during Grand Tack phase
 		migrationRate = -0.75 * type2Rate;
 	}
@@ -204,9 +217,9 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 		const massRatio = planet.mass.getValueAs(types.units.Mass.M_Earth) / nextPlanet.mass.getValueAs(types.units.Mass.M_Earth);
 		
 		const outcomeRoll = prng();
-		const OUTCOME_MERGE = 'merge';
-		const OUTCOME_EJECT = 'eject';
-		const OUTCOME_SHIFT = 'shift';
+		const OUTCOME_MERGE = 'Merge';
+		const OUTCOME_EJECT = 'Eject';
+		const OUTCOME_SHIFT = 'Shift';
 		let determinedOutcome = OUTCOME_SHIFT;
 
 		if (!isFinalStep) {
@@ -233,7 +246,7 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 					else {
 						nextPlanet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
 					}
-					planet.genData.status = 'Ejected';
+					planet.genData.status = types.migrationStatus.Ejected;
 					planet.sma = new types.Value(Infinity, types.units.Dist.AU);
 						
 				} else {
@@ -244,7 +257,7 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 					else {
 						planet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
 					}
-					nextPlanet.genData.status = 'Ejected';
+					nextPlanet.genData.status = types.migrationStatus.Ejected;
 					nextPlanet.sma = new types.Value(Infinity, types.units.Dist.AU);
 				}
 				break;
@@ -335,19 +348,23 @@ function mergePlanets(recipient, donor) {
 
 	// --- Planet Taxonomy Taxonomy Re-evaluation ---
 	if (recipient.envelope.mass.value === 0) {
-		recipient.type = 'Terrestrial';
+		recipient.type = types.planetTypes.Terrestrial;
 	}
 	else {
-		if (recipient.envelope.composition.gas > 0.8) {
-			recipient.type = 'Gas Giant';
+		if (recipient.envelope.composition.gas >= 0.8) {
+			recipient.type = recipient.mass.value < 3900
+				? recipient.type = types.planetTypes.GasGiant
+				: recipient.type = types.planetTypes.BrownDwarf;
 		}
 		else {
-			recipient.type = recipient.mass.value < 15.0 ? 'Mini-Neptune' : 'Ice Giant';
+			recipient.type = recipient.mass.value < 15.0
+				? types.planetTypes.MiniNeptune
+				: types.planetTypes.IceGiant;
 		}
 	}
 
 	// --- Purge Donor Status ---
-	donor.genData.status = 'Merged';
+	donor.genData.status = types.migrationStatus.Merged;
 	donor.sma = new types.Value(Infinity, types.units.Dist.AU);
 }
 

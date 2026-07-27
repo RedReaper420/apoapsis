@@ -32,8 +32,9 @@ export function generateMoons(settings, planet) {
 	const moonSmaMax_REarth = hillSphere_REarth * 0.3; // Maximal stable orbit's SMA for a moon around its parent body.
 
 	// Minimal SMA values are rough approximations of Roche limits.
-	const binarySmaMin_REarth = 2.5 * (1 + 1) * planetRadius_REarth;
-	const moonSmaMin_REarth = 2.5 * (1 + 1/3) * planetRadius_REarth;
+	const safetyFactor = 2.0;
+	const binarySmaMin_REarth = 2.5 * (1 + 1) * planetRadius_REarth * safetyFactor;
+	const moonSmaMin_REarth = 2.5 * (1 + 1/3) * planetRadius_REarth * safetyFactor;
 
 	// Preventing generation beforehand if there's no room for stable orbits.
 	if (moonSmaMax_REarth < moonSmaMin_REarth)
@@ -206,7 +207,7 @@ function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REar
 			isMoon: true,
 			mass: companionMass,
 			retrograde: false,
-			type: 'binary',
+			type: types.moonTypes.Binary,
 		}
 	);
 	
@@ -341,7 +342,7 @@ function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartO
 				isMoon: true,
 				mass: moonMass,
 				retrograde: moonIsRetrograde,
-				type: 'regular',
+				type: types.moonTypes.Regular,
 			}
 		);
 		planet.bodies.push(moon);
@@ -404,7 +405,7 @@ function generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REar
 				isMoon: true,
 				mass: moonMass,
 				retrograde: false,
-				type: 'impact',
+				type: types.moonTypes.Impact,
 			}
 		);
 		
