@@ -200,7 +200,7 @@ function getPlanetsNumberToGenerate(star, amountMult) {
 	const temperature = star.temperature.getValueAs(types.units.Temp.K);
 
 	const minNumber = 0.5;
-	const maxNumber = 13;
+	const maxNumber = 11;
 	const temperatureBorder = 5500;
 	const softSlopeParam = 200;
 	const component_1 = temperature < temperatureBorder
@@ -260,6 +260,6 @@ export function tryToSkipOrbit(sma) {
  * @returns {number} New SMA value (AU).
  */
 export function getNextOrbit(smaCurrent) {
-	const newPeriod = prng.range(1.4, 2.2);
+	const newPeriod = prng.range(1.5, 2.4);
 	return smaCurrent * ((newPeriod**2)**(1/3)); // Simplified Kepler's 3rd law
 }

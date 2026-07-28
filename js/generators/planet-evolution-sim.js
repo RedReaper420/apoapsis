@@ -21,22 +21,22 @@ export class PlanetEvolution {
 	}
 
 	doTheEvolution() {
-		let counter = 0;
-		let T = 0;
+		let dT = 1e4;
+		let T = dT;
 		const T_target = this.planet.age.getValueAs(types.units.Time.y);
-		let dT = 1e5;
 
 		while (T < T_target) {
 			this.rotationManager.setRotationTime(T);
 			this.solarManager.calculateSolarActivity(T);
 			this.magnetManager.setMagneticField(T);
-			if (this.planet.type === types.planetTypes.Terrestrial)
-				this.dissipationManager.dissipateAtmosphere(dT, T);
-
+			this.dissipationManager.dissipateAtmosphere(dT, T);
+			
+			dT *= 1.075;
+			dT = Math.round(dT);
 			T += dT;
-			dT *= 1.05;
-			counter++;
 		}
+
+		this.dissipationManager.applyStripping();
 	}
 }
 
@@ -128,17 +128,7 @@ function getTidalLockTime(planet, parent) {
 	const I = I_factor * m_s * (R**2); // Satellite's moment of inertia
 
 	const Q = calculateTidalQ(planet); // Satellite's dissipation function value
-
-	const rho = planet.density * 1000; // Satellite's density, kg/m^3
-	const g = consts.PHY_G * m_s / (R**2); // Satellite's surface gravity
-
-	const totalMass = m_s;
-	const coreIce = planet.core.composition.ice * planet.core.mass.getValueAs(types.units.Mass.kg);
-	const envIce = planet.envelope.composition.ice * planet.envelope.mass.getValueAs(types.units.Mass.kg);
-	const totalIceFraction = (coreIce + envIce) / totalMass;
-
-	const mu = 3e10 * (1 - totalIceFraction) + 4e9 * totalIceFraction; // Linear interpolation of satellite's rigidity ("rocky" and "icy" regimes)
-	const k2 = 1.5 / (1 + ((19 * mu) / (2 * rho * g * R))); // Satellite's tidal Love number 
+	const k2 = calculateLoveNumber(planet); // Satellite's tidal Love number 
 
 	const t = (w * (a**6) * I * Q) / (3 * consts.PHY_G * (m_p**2) * k2 * (R**5)); // Approximate satellite's tidal locking time
 	return new types.Value(t, types.units.Time.s);
@@ -179,7 +169,7 @@ function calculateMomentOfInertiaFactor(planet) {
  * 
  * @returns {number} Q value (\~50...\~100,000).
  */
-function calculateTidalQ(planet) {
+export function calculateTidalQ(planet) {
 	const m_core = planet.core.mass.getValueAs(types.units.Mass.kg);
 	const m_env = planet.envelope.mass.getValueAs(types.units.Mass.kg);
 	const m_total = m_core + m_env;
@@ -217,6 +207,30 @@ function calculateTidalQ(planet) {
 		// Expected Q values for ice giants are ~30,000, for gas giants - ~100,000
 		return baseGiantQ * (1 - envIceFraction * 0.7); 
 	}
+}
+
+/**
+ * Calculates planet's approximate Love number (k2).
+ * 
+ * @param {types.Planet} planet - Current planet
+ * 
+ * @returns {number} k2 value (<< 1).
+ */
+export function calculateLoveNumber(planet) {
+	const totalMass = planet.mass.getValueAs(types.units.Mass.kg);
+	const R = planet.radius.getValueAs(types.units.Dist.m); // Planets's radius
+
+	const rho = planet.density * 1000; // Planets's density, kg/m^3
+	const g = consts.PHY_G * totalMass / (R**2); // Planets's surface gravity
+
+	const coreIce = planet.core.composition.ice * planet.core.mass.getValueAs(types.units.Mass.kg);
+	const envIce = planet.envelope.composition.ice * planet.envelope.mass.getValueAs(types.units.Mass.kg);
+	const totalIceFraction = (coreIce + envIce) / totalMass;
+	const mu = 3e10 * (1 - totalIceFraction) + 4e9 * totalIceFraction; // Linear interpolation of satellite's rigidity ("rocky" and "icy" regimes)
+	
+	const k2 = 1.5 / (1 + ((19 * mu) / (2 * rho * g * R))); // Planets's tidal Love number 
+
+	return k2;
 }
 
 /**
@@ -427,34 +441,40 @@ class DissipationManager {
 		this.evo = evo;
 
 		this.planet = evo.planet;
+		
+		if (this.planet.type !== types.planetTypes.Terrestrial)
+			return;
+		
+		this.planetMass_ME = this.planet.mass.getValueAs(types.units.Mass.M_Earth);
+		this.planetMass_kg = this.planet.mass.getValueAs(types.units.Mass.kg);
+		this.planetRadius_RE = this.planet.radius.getValueAs(types.units.Dist.R_Earth);
+		this.planetRadius_m = this.planet.radius.getValueAs(types.units.Dist.m);
+		
+		this.v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(this.planetMass_ME / this.planetRadius_RE);
 
-		const coreMass = this.planet.core.mass.getValueAs(types.units.Mass.M_Earth);
-		this.coreRadius = this.planet.radius.getValueAs(types.units.Dist.R_Earth);
-		this.v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(coreMass / this.coreRadius);
+		const atmosphereMass_MEarthAtm = (this.planet.atmosphere.pressure) * (this.planetRadius_RE ** 4) / this.planetMass_ME;
+		this.atmosphereMass_kg = new types.Value(atmosphereMass_MEarthAtm, types.units.Mass.M_Earth_atm).getValueAs(types.units.Mass.kg);
+		this.atmosphereMass_init_kg = this.atmosphereMass_kg;
+
+		this.atmosphere = {};
+		for (const gas in this.planet.atmosphere.composition)
+			this.atmosphere[gas] = this.planet.atmosphere.composition[gas] * this.atmosphereMass_init_kg;
 
 		this.distance_AU = this.planet.genData.sma_norm * Math.sqrt(this.planet.genData.parentStar.luminosity);
 		this.distance_m = new types.Value(this.distance_AU, types.units.Dist.AU).getValueAs(types.units.Dist.m);
 	}
 
 	dissipateAtmosphere(dT, T) {
-		const temp_ex = this.planet.temperature_eq.getValueAs(types.units.Temp.K) * 5; // Exosphere temperature
-		let M_atm_total = 0;
-		for (const gas in this.planet.atmosphere) {
-			// Calculating escape velocities for various gases
-			this.planet.atmosphere[gas].v_th = Math.sqrt((3 * consts.PHY_R_GAS * (temp_ex * 3)) / this.planet.atmosphere[gas].m_w);
+		if (this.planet.type !== types.planetTypes.Terrestrial)
+			return;
 
-			// Jeans escape
-			const escapeRatio = (this.v_esc / this.planet.atmosphere[gas].v_th);
-			const tau = 0.001 * Math.exp(Math.pow(escapeRatio, 2));
-			this.planet.atmosphere[gas].mass *= Math.exp(-(dT / 1e9) / tau);
+		if (this.atmosphereMass_init_kg === 0)
+			return;
 
-			M_atm_total += this.planet.atmosphere[gas].mass;
-		}
-
-		// Energy-limited escape
+		// Hydrostatic escape
 		const eps = 0.10;
-		const R_p = this.planet.radius.getValueAs(types.units.Dist.m);
-		const M_p = this.planet.mass.getValueAs(types.units.Mass.kg);
+		const R_p = this.planetRadius_m;
+		const M_p = this.planetMass_kg;
 		const M_thermal = (eps * this.evo.solarManager.L_XUV * (R_p**3)) / (4 * consts.PHY_G * M_p * this.distance_m);
 
 		// Solar wind stripping
@@ -463,11 +483,12 @@ class DissipationManager {
 		const M_wind = eta * ((P_sw * Math.PI * (R_p**2)) / (this.v_esc**2));
 
 		let parentMagneticField = 0;
-		if ( (this.planet.parentBody instanceof types.Planet) || (this.planet.parentBody instanceof types.BinaryPlanet) ) {
+		if ((this.planet.parentBody instanceof types.Planet) ||
+			(this.planet.parentBody instanceof types.BinaryPlanet)) {
 			if (this.planet.parentBody instanceof types.BinaryPlanet) {
 				if (this.planet === this.planet.parentBody.primary) {
-					parentMagneticField = 0;
 					//parentMagneticField = this.planet.parentBody.secondary.magnetosphereHistory.get(T).getValueAs(types.units.Dist.m) - this.planet.sma.getValueAs(types.units.Dist.m);
+					parentMagneticField = 0;
 				}
 				else if (this.planet === this.planet.parentBody.secondary) {
 					parentMagneticField = this.planet.parentBody.primary.magnetosphereHistory.get(T).getValueAs(types.units.Dist.m) - this.planet.sma.getValueAs(types.units.Dist.m);
@@ -491,64 +512,40 @@ class DissipationManager {
 		);
 		const f_mag = utils.clamp(Math.exp(-(magnetopauseRatio - 1.2)), 0.01, 1);
 
-		// Applying energy-limited escape and solar wind
+		// Applying hydrostatic escape and solar wind stripping
 		const years_to_seconds = 365.25 * 24 * 60 * 60;
 		const M_loss = (M_thermal + f_mag * M_wind) * dT * years_to_seconds;
-		const f_loss = Math.min(1, M_loss / M_atm_total);
-		for (const gas in this.planet.atmosphere) {
-			this.planet.atmosphere[gas].mass -= this.planet.atmosphere[gas].mass * f_loss
+		this.atmosphereMass_kg -= M_loss;
+	}
+
+	applyStripping() {
+		if (this.planet.type !== types.planetTypes.Terrestrial)
+			return;
+
+		if (this.atmosphereMass_init_kg === 0)
+			return;
+
+		this.atmosphereMass_kg = Math.max(0, this.atmosphereMass_kg);
+
+		if (this.atmosphereMass_kg === 0) {
+			this.planet.atmosphere = {
+				composition: {},
+				pressure: 0,
+				scaleHeight: 0,
+				mu: 0,
+			}
+			this.planet.atmosphere.composition = {};
+			this.planet.temperature = new types.Value(this.planet.temperature_eff.value, this.planet.temperature_eff.unit);
+
+			return;
 		}
-		M_atm_total -= M_loss;
-	}
-}
 
-class TemperatureManager {
-	/**
-	 * 
-	 * @param {PlanetEvolution} evo 
-	 */
-	constructor (evo) {
-		this.evo = evo;
-
-		this.planet = evo.planet;
-
-		this.coreRadius = this.planet.radius.getValueAs(types.units.Dist.R_Earth);
-	}
-
-	getSurfaceTemperature() {
-		// Absolute total atmospheric mass
-		let M_atm_total = 0;
-		for (const gas in this.planet.atmosphere)
-			M_atm_total += this.planet.atmosphere[gas].mass; // in M⊕
-		const atmosphereMass = new types.Value(M_atm_total, types.units.Mass.kg)
-
-		// Atmosphere pressure at the surface
-		const P_surf_atm = (atmosphereMass.getValueAs(types.units.Mass.M_Earth_atm) * this.planet.mass.getValueAs(types.units.Mass.M_Earth)) / (this.coreRadius**4);
-		const P_surf_bar = P_surf_atm * 1.01325;
-
-		this.planet.atmosphere_pressure = P_surf_bar;
-
-		// Gases fractions
-		for (const gas in this.planet.atmosphere)
-			this.planet.atmosphere[gas].f = M_atm_total === 0 ? 0 : this.planet.atmosphere[gas].mass / M_atm_total;
-
-		// Optical depth
-		const tau = Math.pow(P_surf_bar, 1.5) * ( 
-			(this.planet.atmosphere.H2O.f * 0.30) + 
-			(this.planet.atmosphere.CO2.f * 0.03) + 
-			(this.planet.atmosphere.CH4.f * 0.06) + 
-			(this.planet.atmosphere.NH3.f * 0.50) + 
-			(this.planet.atmosphere.SO2.f * 0.13)
-		) + Math.pow(P_surf_bar, 2) * (
-			(this.planet.atmosphere.H2.f * 1e-4) + 
-			(this.planet.atmosphere.He.f * 1e-5) + 
-			(this.planet.atmosphere.N2.f * 1e-5) + 
-			(this.planet.atmosphere.O2.f * 1e-5) 
-		);
-	
-		// Calculating surface temperature using a grey-atmosphere approximation
-		const temp_surf = this.planet.temperature_eq.getValueAs(types.units.Temp.K) * Math.pow(1 + 3/4 * tau, 1/4);
-		const T_surf = new types.Value(temp_surf, types.units.Temp.K);
-		this.planet.temperature = T_surf;
+		const atmosphereMass = new types.Value(this.atmosphereMass_kg, types.units.Mass.kg).getValueAs(types.units.Mass.M_Earth_atm);
+		const P_surf = (atmosphereMass * this.planetMass_ME) / (this.planetRadius_RE**4);
+		this.planet.atmosphere.pressure = P_surf;
+		
+		const T_eff = this.planet.temperature_eff.getValueAs(types.units.Temp.K);
+		const T_surf = T_eff * (1 + 0.4 * Math.log10(1 + P_surf));
+		this.planet.temperature = new types.Value(T_surf, types.units.Temp.K);
 	}
 }

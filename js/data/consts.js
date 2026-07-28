@@ -20,9 +20,26 @@ const consts = Object.freeze({
 
 	PHY_EARTH_DENSITY: 5.51, // g/cm^3
 	PHY_EARTH_ESCAPE_VELOCITY: 11186, // m/s
-	PHY_EARTH_TEMP_EQ: 278.5, // K
+	PHY_EARTH_TEMP_EQ: 255, // K
+	PHY_EARTH_TEMP_SURF: 288, // K
 
-	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon).
+	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon). ("Lagrange Point test")
+
+	PHY_MOLAR_MASSES: Object.freeze({
+		 H2: 2.016,
+		 He: 4.003,
+		CH4: 16.04,
+		NH3: 17.03,
+		H2O: 18.015,
+		 Ne: 20.18,
+		 CO: 28.01,
+		 N2: 28.013,
+		 O2: 31.999,
+		 Ar: 39.948,
+		CO2: 44.01,
+		SO2: 64.06,
+		SiO2: 40.0,
+	}),
 
 	// ---
 
@@ -75,13 +92,13 @@ const consts = Object.freeze({
 
 	UI_PLANET_MIGRATION_TYPE_1_COEFF_LIM_MIN: 0.1,
 	UI_PLANET_MIGRATION_TYPE_1_COEFF_LIM_MAX: 50.0,
-	UI_PLANET_MIGRATION_TYPE_1_COEFF_VAL_DEF: 2.0,
+	UI_PLANET_MIGRATION_TYPE_1_COEFF_VAL_DEF: 1.0,
 
 	UI_PLANET_MIGRATION_TYPE_2_ENABLED_VAL_DEF: true,
 
 	UI_PLANET_MIGRATION_TYPE_2_COEFF_LIM_MIN: 0.1,
 	UI_PLANET_MIGRATION_TYPE_2_COEFF_LIM_MAX: 50.0,
-	UI_PLANET_MIGRATION_TYPE_2_COEFF_VAL_DEF: 12.0,
+	UI_PLANET_MIGRATION_TYPE_2_COEFF_VAL_DEF: 10.0,
 
 	UI_PLANET_MIGRATION_INTERPOLATED_VAL_DEF: true,
 

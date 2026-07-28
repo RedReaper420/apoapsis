@@ -67,6 +67,14 @@ class SystemGenerator {
 
 		// Performing stage 3 generation for all planetary bodies
 		const finishGeneration = (body) => {
+			// Recursive calls
+			if (body instanceof types.Binary) {
+				finishGeneration(body.primary);
+				finishGeneration(body.secondary);
+			}
+
+			// -------
+			
 			if (body instanceof types.Planet) {
 				planetGen.planetGeneration_Stage3(this.settings, body);
 			}
@@ -77,10 +85,6 @@ class SystemGenerator {
 			body.bodies.forEach(child => { 
 				finishGeneration(child) 
 			});
-			if (body instanceof types.Binary) {
-				finishGeneration(body.primary);
-				finishGeneration(body.secondary);
-			}
 		};
 		stars.forEach(star => { finishGeneration(star) });
 		

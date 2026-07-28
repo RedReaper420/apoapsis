@@ -116,9 +116,13 @@ export function planetGeneration_Stage2(settings, planet) {
 		planet.genData.sma_norm = planet.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(planet.parentBody.luminosity);
 	
 	setInitialRotation(planet);
-	setInitialEffectiveTemperature(planet);
-	planet.temperature = planet.temperature_eq;
-	generateInitialAtmosphere(planet);
+
+	const T_eq = consts.PHY_EARTH_TEMP_EQ * Math.pow(1 / (planet.genData.sma_norm ** 2), 1/4);
+	planet.temperature_eq = new types.Value(T_eq, types.units.Temp.K);
+	planet.temperature = new types.Value(T_eq, types.units.Temp.K);
+
+	if (planet.type === types.planetTypes.Terrestrial)
+		generateAtmosphere(planet);
 }
 
 /**
@@ -128,88 +132,33 @@ export function planetGeneration_Stage2(settings, planet) {
 export function planetGeneration_Stage3(settings, planet) {
 	planet.planetEvolution = new planetEvolutionSim.PlanetEvolution(settings, planet);
 	planet.planetEvolution.doTheEvolution();
-
+	
 	if (planet.type === types.planetTypes.Terrestrial) {
-		planet.surface = {
-			H2:  { melt:  13.99,	boil:  20.271,	mass: 0, f: 0 },
-			He:	 { melt:   0,		boil:   4.222,	mass: 0, f: 0 },
-			CH4: { melt:  90.694, 	boil: 111.66,	mass: 0, f: 0 },
-			NH3: { melt: 195.42,	boil: 239.81,	mass: 0, f: 0 },
-			H2O: { melt: 273.15,	boil: 373.13,	mass: 0, f: 0 },
-			N2:  { melt:  63.23,	boil:  77.355,	mass: 0, f: 0 },
-			O2:  { melt:  54.36,	boil:  90.188,	mass: 0, f: 0 },
-			CO2: { melt: 194.685,	boil: 194.685,	mass: 0, f: 0 },
-			SO2: { melt: 201,		boil: 263,		mass: 0, f: 0 },
-		}
-
-		const burnMass = Math.min(planet.atmosphere.CH4.mass, planet.atmosphere.O2.mass / 4);
-		planet.atmosphere.CH4.mass -= burnMass;
-		planet.atmosphere.O2.mass -= burnMass * 4;
-		planet.atmosphere.CO2.mass += burnMass * (44 / 16);
-		planet.atmosphere.H2O.mass += burnMass * (36 / 16);
-		
-		const temp_1 = planet.temperature.getValueAs(types.units.Temp.K);
-		for (const element in planet.atmosphere) {
-			if (temp_1 < planet.surface[element].boil) {
-				planet.surface[element].mass = planet.atmosphere[element].mass;
-				planet.atmosphere[element].mass = 0;
-
-				if (temp_1 < planet.surface[element].melt) {
-					planet.surface[element].mass *= -1;
+		const T_surf = planet.temperature.getValueAs(types.units.Temp.K);
+		const P_surf = planet.atmosphere.pressure;
+		const f_ice = planet.core.composition.ice;
+		if (
+			( (273 <= T_surf) && (T_surf <= 340) ) &&
+			( (0.4 <= P_surf) && (10.0 <= P_surf) ) &&
+			( f_ice >= 0.005 ) &&
+			( (planet.atmosphere.composition["H2"] || 0) === 0 )
+		) { // (K_ret < 2.5)
+			const lifeChance = 1//Math.pow((planet.age.getValueAs(types.units.Time.My) - 2500) / (10000 - 2500), 10);
+			if (prng() < lifeChance) {
+				let compositionNew = {
+					N2: prng.range(0.73, 0.80),
+					O2: prng.range(0.18, 0.24),
+					Ar: prng.range(0.008, 0.012),
+					CO2: prng.range(0.0003, 0.0005),
+					H2O: prng.range(0.005, 0.02),
 				}
+				compositionNew = normalizeComposition(compositionNew);
+				planet.atmosphere.composition = compositionNew;
+
+				planet.hasLife = true;
 			}
 		}
 
-		planet.atmosphere.CH4.mass *= prng.range(0.0001, 0.01);
-		planet.atmosphere.CO2.mass *= 0.2;
-
-		if ( (planet.surface.H2O.mass > 0) && (planet.surface.H2O.mass >= (0.0001 * planet.mass.getValueAs(types.units.Mass.kg))) ) {
-			planet.atmosphere.CO2.mass *= 0.01;
-		}
-
-		planet.atmosphere.N2.mass += planet.atmosphere.NH3.mass * 0.82;
-		planet.atmosphere.NH3.mass *= 0.0001;
-		planet.atmosphere.SO2.mass *= 0.0001;
-		planet.atmosphere.O2.mass *= 0.01;
-
-		// Absolute total atmospheric mass
-		let M_atm_total = 0;
-		for (const gas in planet.atmosphere)
-			M_atm_total += planet.atmosphere[gas].mass; // in M⊕
-		const atmosphereMass = new types.Value(M_atm_total, types.units.Mass.kg)
-
-		// Atmosphere pressure at the surface
-		const P_surf_atm = (atmosphereMass.getValueAs(types.units.Mass.M_Earth_atm) * planet.mass.getValueAs(types.units.Mass.M_Earth)) / (planet.core.radius.getValueAs(types.units.Dist.R_Earth)**4);
-		const P_surf_bar = P_surf_atm * 1.01325;
-
-		planet.atmosphere_pressure = P_surf_bar;
-
-		// Gases fractions
-		for (const gas in planet.atmosphere)
-			planet.atmosphere[gas].f = M_atm_total === 0 ? 0 : planet.atmosphere[gas].mass / M_atm_total;
-
-		// Optical depth
-		const tau = Math.pow(P_surf_bar, 1.5) * ( 
-			(planet.atmosphere.H2O.f * 0.30) + 
-			(planet.atmosphere.CO2.f * 0.03) + 
-			(planet.atmosphere.CH4.f * 0.06) + 
-			(planet.atmosphere.NH3.f * 0.50) + 
-			(planet.atmosphere.SO2.f * 0.13)
-		) + Math.pow(P_surf_bar, 2) * (
-			(planet.atmosphere.H2.f * 1e-4) + 
-			(planet.atmosphere.He.f * 1e-5) + 
-			(planet.atmosphere.N2.f * 1e-5) + 
-			(planet.atmosphere.O2.f * 1e-5) 
-		);
-
-		// Calculating surface temperature using a grey-atmosphere approximation
-		const temp_surf = planet.temperature_eq.getValueAs(types.units.Temp.K) * Math.pow(1 + 3/4 * tau, 1/4);
-		const T_surf = new types.Value(temp_surf, types.units.Temp.K);
-		planet.temperature = T_surf;
-	}
-
-	if (planet.type === types.planetTypes.Terrestrial) {
-		//generateAtmosphere(planet);
 		planet.color = '#867470';
 	}
 	else {
@@ -276,12 +225,11 @@ function samplePlanetCoreMass(genData) {
 	const sma_norm = genData.sma_norm;
 	
 	const starMass = star.mass.getValueAs(types.units.Mass.M_Sun);
-	//const starMassFactor = -0.5 + 4.0 * Math.log10(starMass + 1.5);
-	const starMassFactor = 1 - 0.75 * Math.exp(-5 * starMass);
+	const starMassFactor = -0.35 + 4.0 * Math.log10((starMass ** 2) + 1.5);
 
 	// Defining the curve
-	const curveBaseMass = 2.5;
-	const peakMaxMass = Math.max(curveBaseMass, 25.0 * starMassFactor);
+	const curveBaseMass = 2.5 * starMassFactor;
+	const peakMaxMass = 20.0 * starMassFactor;
 
 	const m = peakMaxMass - curveBaseMass;
 	const x = sma_norm - consts.PHY_DIST_SNOW_LINE;
@@ -310,7 +258,10 @@ function samplePlanetCoreMass(genData) {
 	
 	// Filtering out very small bodies. Those will be automatically removed during the migration simulation.
 	if (coreMass < 0.001)
-		genData.status = types.migrationStatus.Ejected; 
+		genData.status = types.migrationStatus.Ejected;
+
+	if (coreMass > 25)
+		coreMass = 25 + Math.pow(coreMass - 25, 1/3);
 
 	return new types.Value(coreMass, types.units.Mass.M_Earth);
 }
@@ -348,7 +299,7 @@ function sampleCoreIceFraction(genData) {
 	const metallicityFactor = Math.exp(0.1 * starMetallicity);
 	
 	const sma_norm = genData.sma_norm;
-	const maxIceBase = Math.min(0.65, 0.01 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.0000003 * Math.exp(4 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.05 * sma_norm));
+	const maxIceBase = Math.min(0.65, 0.01 + 0.01 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.00000025 * Math.exp(4 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.05 * sma_norm));
 	const maxIce = maxIceBase * metallicityFactor;
 
 	return (utils.randomRangeGaussian(0, maxIce) + prng.range(0, maxIce)) / 2; // Avg. of gaussian random and uniform random
@@ -362,9 +313,9 @@ function makeGasGiant(planet) {
 	const sma_norm = planet.genData.sma_init_norm;
 	const star = planet.genData.parentStar;
 
-	const critBaseMin = 5.5;
-	const critBaseMax = 30.0;
-	const criticalMass = critBaseMin + (critBaseMax - critBaseMin) * Math.exp(-0.6 * Math.sqrt(sma_norm));
+	const critBaseMin = 5.0;
+	const critBaseMax = 25.0;
+	const criticalMass = critBaseMin + (critBaseMax - critBaseMin) * Math.exp(-0.75 * Math.sqrt(sma_norm));
 
 	const coreMass = planet.core.mass.getValueAs(types.units.Mass.M_Earth);
 	const coreToCritRatio = coreMass / criticalMass;
@@ -388,27 +339,39 @@ function makeGasGiant(planet) {
 				}
 			}
 
+			let envelopeMult = 0;
 			if (isIceGiant) {
 				// Ice Giant
-				envelopeMass = coreMass * prng.range(0.5, 2.7);
+				envelopeMult = prng.range(0.5, 1.9);
+				const dampeningThreshold = 0.9;
+				if (envelopeMult > dampeningThreshold) {
+					envelopeMult = dampeningThreshold + (envelopeMult - dampeningThreshold) * (1 - Math.exp(-5 * star.mass.getValueAs(types.units.Mass.M_Sun)));
+				}
+
+				envelopeMass = coreMass * envelopeMult;
+
 				planet.type = (coreMass + envelopeMass) < 15
 					? types.planetTypes.MiniNeptune
 					: types.planetTypes.IceGiant;
 			}
 			else {
 				// True Gas Giant
-				let envelopeMult;
 
 				if (coreToCritRatio > 1.8) // Very massive core - very big chance for a large gas giant
-					envelopeMult = prng.range(16, 62);
+					envelopeMult = prng.range(15, 64);
 				else if (coreToCritRatio > 1.1)
-					envelopeMult = prng.range(7, 24);
+					envelopeMult = prng.range(7, 28);
 				else 
-					envelopeMult = prng.range(3, 11);
+					envelopeMult = prng.range(3, 14);
 
 				// Additional "luck" for enlarged gas giants (enabling super-Jupiters and brown dwarfs)
 				if (prng() < (0.05 + star.metallicity * 0.2))
-					envelopeMult *= prng.range(1.5, 3.0);
+					envelopeMult *= prng.range(1.5, 3.5);
+
+				const dampeningThreshold = 4;
+				if (envelopeMult > dampeningThreshold) {
+					envelopeMult = dampeningThreshold + (envelopeMult - dampeningThreshold) * (1 - Math.exp(-5 * star.mass.getValueAs(types.units.Mass.M_Sun)));
+				}
 
 				envelopeMass = coreMass * envelopeMult * Math.pow(sma_norm / 6, -0.15);
 				planet.type = (coreMass + envelopeMass) < 3900
@@ -449,6 +412,7 @@ function makeGasGiant(planet) {
 		envelopeIceFraction = envelopeIceMass / envelopeMass;
 	}
 	*/
+		
 
 	return new types.Envelope(
 		new types.Value(envelopeMass, types.units.Mass.M_Earth), 
@@ -630,461 +594,6 @@ function assumeAlbedo(planet, T_blackbody) {
 	}
 }
 
-import {temperatureToColor} from "./star-gen.js";
-
-/**
- * 
- * @param {types.Planet} planet 
- */
-function setGasGiantColor(planet) {
-	const temp = planet.temperature.getValueAs(types.units.Temp.K);
-
-	if (temp >= 1400) {
-		return temperatureToColor(planet.temperature);
-	}
-
-	switch (planet.type) {
-		case types.planetTypes.BrownDwarf: {
-			return "#43202b";
-		}
-
-		case types.planetTypes.GasGiant: {
-			// Sudarsky's classification based on temperature
-			if (temp < 150) {
-				return "#D2B48C"; // Type I: Ammonia clouds (high albedo, like Jupiter's)
-			}
-			if (temp >= 150 && temp < 250) {
-				return "#CFECEC"; // Type II: Water clounds (very bright)
-			}
-			if (temp >= 250 && temp < 350) {
-				return "#4682B4"; // Type III: No clouds (pure hydrogen absorbs light, Rayleigh scattering is on)
-			}
-			if (temp >= 350 && temp < 900) {
-				return "#5F9EA0"; // Intermediate zone (semi-transparent atmosphere, salts clouds)
-			}
-			if (temp >= 900 && temp < 1200) {
-				return "#1A1A1A"; // Type IV: Hot Jupiters (alkali metals absorb light; the planet is blacker than coal)
-			}
-			if (temp >= 1200 && temp < 1300) {
-				return "#3A0000"; // // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
-			}
-			// temp >= 1300
-			return "#3A0000"; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
-		}
-
-		case 'Ice Giant':
-		case 'Mini-Neptune': {
-			if (temp < 100) {
-				return "#6ebad5"; // Far and cold (like Uranus and Neptune)
-			}
-			if (temp >= 100 && temp < 300) {
-				return "#3b73a0"; // Temperate ice giants (methane evaporates, atmosphere darkens)
-			}
-
-			// If an ice giant got too close to its star, it turns into a "hot Neptune", similar to Sudarsky's type III/IV gas giant
-			if (temp >= 300 && temp < 900) {
-				return "#7ab0b2";
-			}
-			if (temp >= 900 && temp < 1300) {
-				return "#1B1010";
-			}
-			// temp >= 1300
-			return "#3A0000";
-		}
-	}
-}
-
-
-/**
- * 
- * @param {types.Planet} planet 
- */
-function generateInitialAtmosphere(planet) {
-	planet.atmosphere = {
-		// molecular weight (kg/mol) | gas escape velocity | mass | fraction
-		H2:  { m_w: 0.002,				v_th: 0,			mass: 0, f: 0 },
-		He:	 { m_w: 0.004,				v_th: 0,			mass: 0, f: 0 },
-		CH4: { m_w: 0.016,				v_th: 0,			mass: 0, f: 0 },
-		NH3: { m_w: 0.017,				v_th: 0,			mass: 0, f: 0 },
-		H2O: { m_w: 0.018,				v_th: 0,			mass: 0, f: 0 },
-		N2:  { m_w: 0.028,				v_th: 0,			mass: 0, f: 0 },
-		O2:  { m_w: 0.032,				v_th: 0,			mass: 0, f: 0 },
-		CO2: { m_w: 0.044,				v_th: 0,			mass: 0, f: 0 },
-		SO2: { m_w: 0.064,				v_th: 0,			mass: 0, f: 0 },
-	}
-
-	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
-	const planetMass_kg = planet.mass.getValueAs(types.units.Mass.kg);
-
-	const atmosphereMassFactor = planetMass_MEarth < 1
-		? Math.pow(planetMass_MEarth, 3/4)
-		: Math.pow(planetMass_MEarth, 1/4);
-
-	// Primary atmosphere
-	const primordialGasAmount = 0.001 * Math.exp(-1 * planet.genData.sma_norm) * Math.pow(prng(), 2) * atmosphereMassFactor;
-	const H2_to_He_ratio = utils.randomRangeGaussian(0.8, 0.9) - 0.02;
-	planet.atmosphere.H2.mass = planetMass_kg * primordialGasAmount * H2_to_He_ratio;
-	planet.atmosphere.He.mass = planetMass_kg * primordialGasAmount * (1 - H2_to_He_ratio - 0.02);
-	planet.atmosphere.NH3.mass = planetMass_kg * primordialGasAmount * 0.01;
-	planet.atmosphere.CH4.mass = planetMass_kg * primordialGasAmount * 0.01;
-	
-	// Secondary atmosphere
-	const f_rock = planet.core.composition.rock;
-	const f_ice = planet.core.composition.ice;
-	const Y_rock = 0.001 * f_rock * prng.range(0.5, 1.0) * atmosphereMassFactor;
-	const Y_ice = 0.01 * f_ice * (0.1 + 0.9 * Math.exp(-5 * planet.genData.sma_norm / consts.PHY_DIST_SNOW_LINE)) * atmosphereMassFactor;
-	const outgassingMode = Math.min(0.99, (f_ice / (f_rock + f_ice)) / 0.2);
-
-	planet.atmosphere.H2O.mass += planetMass_kg * Y_ice * 0.60 * utils.randomRangeGaussian(0.5, 1.5) * outgassingMode;
-	planet.atmosphere.CO2.mass += planetMass_kg * Y_ice * 0.20 * utils.randomRangeGaussian(0.5, 1.5) * outgassingMode;
-	planet.atmosphere.CH4.mass += planetMass_kg * Y_ice * 0.10 * utils.randomRangeGaussian(0.5, 1.5) * outgassingMode;
-	planet.atmosphere.NH3.mass += planetMass_kg * Y_ice * 0.10 * utils.randomRangeGaussian(0.5, 1.5) * outgassingMode;
-	
-	planet.atmosphere.CO2.mass += planetMass_kg * Y_rock * 0.60 * utils.randomRangeGaussian(0.5, 1.5) * (1 - outgassingMode);
-	planet.atmosphere.SO2.mass += planetMass_kg * Y_rock * 0.10 * utils.randomRangeGaussian(0.5, 1.5) * (1 - outgassingMode);
-	planet.atmosphere.H2O.mass += planetMass_kg * Y_rock * 0.05 * utils.randomRangeGaussian(0.5, 1.5) * (1 - outgassingMode);
-	planet.atmosphere.N2.mass +=  planetMass_kg * Y_rock * 0.15 * utils.randomRangeGaussian(0.5, 1.5) * (1 - outgassingMode);
-	planet.atmosphere.O2.mass +=  planetMass_kg * Y_rock * 0.10 * utils.randomRangeGaussian(0.5, 1.5) * (1 - outgassingMode);
-
-	let M_atm_total = 0;
-	for (const gas in planet.atmosphere)
-		M_atm_total += planet.atmosphere[gas].mass; // in M⊕
-	const atmosphereMass = new types.Value(M_atm_total, types.units.Mass.kg);
-
-	// Gases fractions
-	for (const gas in planet.atmosphere)
-		planet.atmosphere[gas].f = M_atm_total === 0 ? 0 : planet.atmosphere[gas].mass / M_atm_total;
-
-	const ratioAfterAbsorption = 1//Math.max(0.01, M_atm_total - planetMass_kg * f_rock * 0.0005) / M_atm_total;
-
-	for (const gas in planet.atmosphere) {
-		planet.atmosphere[gas].mass *= ratioAfterAbsorption;
-	}
-}
-
-class PlanetaryOutgassingSimulation {
-	/**
-	 * 
-	 * @param {types.Planet} planet 
-	 */
-	constructor(planet) {
-		// Параметры планеты
-		this.M_p = planet.core.mass.getValueAs(types.units.Mass.kg); // кг
-		this.R_p = planet.core.radius.getValueAs(types.units.Dist.m); // м
-		this.A_planet = 4 * Math.PI * Math.pow(this.R_p, 2); // м^2
-		this.g = (consts.PHY_G * this.M_p) / Math.pow(this.R_p, 2); // м/с^2
-		
-		// Масса мантии (приблизительно 67% от общей массы для железо-каменных планет)
-		this.M_mantle = this.M_p * planet.core.composition.rock; 
-
-		// Геодинамические параметры
-		this.F_int_0 = 0.36; // Вт/м^2 (в 4 раза выше современного земного)
-		this.beta = 0.5; // Индекс затухания конвекции мантии
-		
-		// Начальные запасы летучих веществ в мантии (массовые доли)
-		this.mantleVolatiles = {
-			H2O: 0.001, // 0.1% от массы мантии
-			CO2: 0.0003, // 0.03%
-			N2:  0.000005 // 0.0005%
-		};
-
-		// Текущее состояние атмосферы (массы газов в кг)
-		this.atmosphere = { H2O: 0, CO2: 0, N2: 0 };
-		this.totalAtmosphereMass = 0;
-		this.P_surface = 0; // Паскали (Н/м^2)
-
-		this.v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(this.M_p / this.R_p);
-		this.planet = planet;
-		this.oceanMass = 0;
-		this.dryIceMass = 0;
-	}
-
-	/**
-	 * Расчет шага дегазации за промежуток времени dt
-	 * @param {number} t_Myr - Текущий возраст системы в миллионах лет
-	 * @param {number} dt_Myr - Шаг симуляции в миллионах лет
-	 */
-	runStep(t_Myr, dt_Myr) {
-		const YEAR_IN_SECONDS = 31536000;
-		const dt_seconds = dt_Myr * 1e6 * YEAR_IN_SECONDS;
-		
-		const coolingFactor = Math.pow(this.R_p / 6371e3, -0.5);
-		const t_effective = t_Myr / coolingFactor;
-
-		// 1. Расчет внутреннего теплового потока планеты на момент времени t
-		// За базовую точку t0 берем 100 млн лет (время окончания бурной аккреции)
-		const t0 = 100;
-		const t_current = Math.max(t0, t_effective);
-		const F_int = this.F_int_0 * Math.pow(t_current / t0, -this.beta);
-
-		// Если планета остыла ниже критического значения, вулканизм прекращается
-		if (F_int < 0.04) {
-			console.log('stop at', t_Myr);
-			return this.getAtmosphereState();
-		}
-
-		// 2. Расчет объема генерируемой магмы в секунду (м^3/с)
-		const rho_m = 3300;   // Плотность мантии, кг/м^3
-		const C_p = 1200;     // Удельная теплоемкость, Дж/(кг*К)
-		const DeltaT = 100;   // Перегрев мантии, К
-		const L_f = 4.0e5;    // Теплота плавления, Дж/кг
-		const chi = 0.2;      // Эффективность выноса тепла расплавом
-		
-		const V_magma_dot = (this.A_planet * F_int) / (rho_m * (C_p * DeltaT + L_f)) * chi;
-
-		// Масса плавящейся породы в секунду
-		const M_magma_dot = V_magma_dot * rho_m;
-
-		// 3. Расчет частичного плавления (Melt fraction). Допустим, плавится в среднем 10% плюма
-		const F_m = 0.1; 
-		const f_ext = 0.15; // Только 15% магмы доходит до поверхности (эффузивный вулканизм)
-		
-		let temp_eq = this.planet.temperature_eq.getValueAs(types.units.Temp.K);
-
-		// 4. Расчет дегазации каждого компонента
-		for (let gas in this.mantleVolatiles) {
-			if (this.mantleVolatiles[gas] <= 0) continue;
-
-			// Концентрация газа в жидкой магме (Критерий несовместимых элементов, D ~ 0)
-			const C_magma = this.mantleVolatiles[gas] / F_m;
-
-			// Эффективность выхода газа из лавы на поверхности
-			let epsilon_degas = 0.95; // Для CO2 и N2 выход почти полный
-
-			if (this.P_surface > 100 * 100000) { // Если давление > 100 бар
-				// Атмосфера настолько плотная, что газам тяжело покидать магму
-				epsilon_degas *= Math.max(0.01, 100 / (this.P_surface / 100000));
-			}
-			/*
-			if (gas === 'H2O') {
-				// Закон Генри для воды: сильное атмосферное давление удерживает воду в лаве
-				// 100000 Па = 1 бар. При давлении > 100 бар дегазация воды падает почти до нуля
-				const P_bar = this.P_surface / 100000;
-				epsilon_degas = Math.max(0.01, 1.0 / (1.0 + 0.1 * Math.sqrt(P_bar)));
-			}
-			*/
-
-			// Масса выделенного газа за секунду (кг/с)
-			let M_gas_dot = M_magma_dot * C_magma * epsilon_degas * f_ext;
-			let pressureFactor = Math.max(0.01, 1.0 - (this.P_surface / 50000000)); // затухание к 500 барам
-			M_gas_dot *= pressureFactor;
-
-			// Всего выделилось за шаг dt
-			let total_gas_outgassed = M_gas_dot * dt_seconds;
-
-			// Проверяем, чтобы не выжать из мантии больше, чем там есть
-			const max_available = this.mantleVolatiles[gas] * this.M_mantle;
-			if (total_gas_outgassed > max_available) {
-				total_gas_outgassed = max_available;
-			}
-
-			// Обновляем состояние
-			this.atmosphere[gas] += total_gas_outgassed;
-			this.mantleVolatiles[gas] -= (total_gas_outgassed / this.M_mantle);
-
-			// Calculating escape velocity for the planet
-			const planetAge_y = this.planet.age.getValueAs(types.units.Time.y);
-
-			/*
-			const magnetopauseRatio = planet.magnetosphereRadius.getValueAs(types.units.Dist.R_Earth) / coreRadius;
-			if (magnetopauseRatio < 2.5) {
-				// The closer magnetosphere is, the stronger stellar wind heats up exosphere
-				const exposureFactor = Math.max(1, 4 - magnetopauseRatio); 
-				temp_ex *= exposureFactor; 
-			}
-			*/
-			let temp_ex = temp_eq * 3.5; // Exosphere temperature
-			let m_w;
-			switch (gas) {
-				case 'H2O': m_w = 0.018; break;
-				case 'CO2': m_w = 0.044; break;
-				case  'N2': m_w = 0.028; break
-			}
-			let v_th = Math.sqrt( (3 * consts.PHY_R_GAS * (temp_ex * 3)) / m_w );
-			const escapeRatio = (this.v_esc / v_th);
-			const tau = 0.001 * Math.exp(Math.pow(escapeRatio, 2));
-			this.atmosphere[gas] *= Math.exp(-(dt_Myr*1e6) / tau);
-		}
-
-		if (temp_eq < 470) {
-			let water_f = temp_eq > 370 ? 0.95 : 1.0;
-			this.oceanMass += this.atmosphere['H2O'] * water_f;
-			this.atmosphere['H2O'] *= (1.0 - water_f);
-		}
-
-		if (temp_eq < 195) {
-			this.dryIceMass += this.atmosphere['CO2'] * 0.95;
-			this.atmosphere['CO2'] *= 0.05;
-		}
-
-		// 5. Пересчет глобального атмосферного давления
-		this.updateAtmosphericPressure();
-		
-		return this.getAtmosphereState();
-	}
-
-	updateAtmosphericPressure() {
-		this.totalAtmosphereMass = this.atmosphere.H2O + this.atmosphere.CO2 + this.atmosphere.N2;
-		// P = (M * g) / A
-		this.P_surface = (this.totalAtmosphereMass * this.g) / this.A_planet;
-	}
-
-	getAtmosphereState() {
-		return {
-			pressureBar: this.P_surface / 100000,
-			totalMassKg: this.totalAtmosphereMass,
-			composition: {
-				H2O: this.atmosphere.H2O / this.totalAtmosphereMass,
-				CO2: this.atmosphere.CO2 / this.totalAtmosphereMass,
-				N2:  this.atmosphere.N2 / this.totalAtmosphereMass
-			},
-			mantleRemaining: { ...this.mantleVolatiles },
-			oceanMass: this.oceanMass,
-			dryIceMass: this.dryIceMass,
-		};
-	}
-}
-
-/**
- * 
- * @param {types.Planet} planet 
- */
-function generateAtmosphere(planet) {
-	const sim = new PlanetaryOutgassingSimulation(planet);
-
-	console.log('-------------------');
-	console.log(planet.name, planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(3));
-
-	// Эволюционный цикл от 100 млн лет до 4.5 млрд лет с шагом 100 млн лет
-	const currentAge_My = planet.age.getValueAs(types.units.Time.My);
-	for (let age = 100; age <= currentAge_My; age += 100) {
-		sim.runStep(age, 100);
-	}
-
-	console.log(`--- РЕЗУЛЬТАТ ЧЕРЕЗ ${(currentAge_My/1000).toFixed(2)} МЛРД ЛЕТ ---`);
-	console.log(sim.getAtmosphereState());
-}
-
-/**
- * 
- * @param {types.Planet} planet 
- */
-function generateAtmosphere1(planet) {
-	const sma_norm = planet.genData.sma_norm;
-	const coreMass = planet.core.mass.getValueAs(types.units.Mass.M_Earth);
-	const atmosphere = {
-		// molecular weight (kg/mol) | gas escape velocity | mass | fraction
-		H2:  { m_w: 0.002,				v_th: 0,			mass: 0, f: 0 },
-		H2O: { m_w: 0.018,				v_th: 0,			mass: 0, f: 0 },
-		N2:  { m_w: 0.028,				v_th: 0,			mass: 0, f: 0 },
-		CO2: { m_w: 0.044,				v_th: 0,			mass: 0, f: 0 },
-		CH4: { m_w: 0.016,				v_th: 0,			mass: 0, f: 0 },
-		NH3: { m_w: 0.017,				v_th: 0,			mass: 0, f: 0 },
-		O2:  { m_w: 0.032,				v_th: 0,			mass: 0, f: 0 },
-		Ar:  { m_w: 0.040,				v_th: 0,			mass: 0, f: 0 }
-	}
-
-	// Sources fractions
-	const f_rock = planet.core.composition.rock;
-	const f_ice = planet.core.composition.ice;
-
-	// Scaling factors
-	//const phi_volcanic = 10**prng.range(-2.0, 2.0) * prng.range(0.5, 1.5); // Some worlds are dead, some are hyper-active
-	const phi_volcanic = 1;
-	const phi_sublime = (sma_norm < 0.5 ? 0.01 : 0.01 * Math.min(2.0, 1 + f_ice * 5)) * prng.range(0.5, 1.5);
-	
-	// Yielding factors
-	const Y_rock = 0*0.000002 * phi_volcanic * Math.pow(coreMass, 1/3);
-	const Y_ice = 0.0002 * phi_sublime * Math.pow(coreMass, 1/3);
-
-	// Asssigning primordial gases from volcanic outgassing and volatile vaporization
-	atmosphere.H2.mass =  coreMass * ( (f_rock * Y_rock * 0.01) + (f_ice * Y_ice * 0.06) );
-	atmosphere.H2O.mass = coreMass * ( (f_rock * Y_rock * 0.05) + (f_ice * Y_ice * 0.70) );
-	atmosphere.N2.mass =  coreMass * ( (f_rock * Y_rock * 0.25) + (f_ice * Y_ice * 0.08) );
-	atmosphere.CO2.mass = coreMass * ( (f_rock * Y_rock * 0.65) + (f_ice * Y_ice * 0.15) );
-	atmosphere.O2.mass =  coreMass * ( (f_rock * Y_rock * 0.03) + (f_ice * Y_ice * 0.01) );
-	atmosphere.Ar.mass =  coreMass * ( (f_rock * Y_rock * 0.01) + (f_ice * Y_ice * 0.00) );
-
-	const temp_eq = planet.temperature_eq.getValueAs(types.units.Temp.K);
-
-	if (temp_eq < 150 && f_ice > 0.01) {
-		// Cold Reducing Atmosphere (Titan / Pluto archetype)
-		// Convert portions of CO2 and N2 into CH4 and NH3
-		const conversionFactor = prng.range(0.5, 0.9);
-
-		atmosphere.CH4.mass = atmosphere.CO2.mass * conversionFactor;
-		atmosphere.CO2.mass *= (1 - conversionFactor);
-
-		atmosphere.NH3.mass = atmosphere.N2.mass * conversionFactor * 0.5;
-		atmosphere.N2.mass *= (1 - conversionFactor * 0.5);
-	}
-	/*
-	// !!! TODO: in the future move this part to a section that will be calculating life-related stuff
-
-	else if (temp_eq > 273 && temp_eq < 340 && prng() < 0.15) {
-		// Optional Life Check: Convert CO2 to O2 if inside HZ
-		atmosphere.O2.mass = atmosphere.CO2.mass * 0.21;
-		atmosphere.CO2.mass *= 0.79;
-	}
-	*/
-
-	// Calculating escape velocity for the planet
-	const coreRadius = planet.radius.getValueAs(types.units.Dist.R_Earth);
-	const v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(coreMass / coreRadius);
-	const planetAge_y = planet.age.getValueAs(types.units.Time.y);
-	
-	let temp_ex = temp_eq * 3.5; // Exosphere temperature
-	const magnetopauseRatio = planet.magnetosphereRadius.getValueAs(types.units.Dist.R_Earth) / coreRadius;
-	if (magnetopauseRatio < 2.5) {
-		// The closer magnetosphere is, the stronger stellar wind heats up exosphere
-		const exposureFactor = Math.max(1, 4 - magnetopauseRatio); 
-		temp_ex *= exposureFactor; 
-	}
-	for (const gas in atmosphere) {
-		// Calculating escape velocities for various gases
-		atmosphere[gas].v_th = Math.sqrt((3 * consts.PHY_R_GAS * (temp_eq * 3)) / atmosphere[gas].m_w);
-
-		// Jeans dissipation
-		const escapeRatio = (v_esc / atmosphere[gas].v_th);
-		const tau = 0.001 * Math.exp(Math.pow(escapeRatio, 2));
-		atmosphere[gas].mass *= Math.exp(-planetAge_Gy / tau);
-	}
-
-	// Absolute total atmospheric mass
-	let M_atm_total = 0;
-	for (const gas in atmosphere) M_atm_total += atmosphere[gas].mass; // in M⊕
-	const atmosphereMass = new types.Value(M_atm_total, types.units.Mass.M_Earth).convertUnitTo(types.units.Mass.M_Earth_atm);
-
-	// Atmosphere pressure at the surface
-	const P_surf = atmosphereMass.getValueAs(types.units.Mass.M_Earth_atm) / (coreRadius**4); // in atm.
-
-	// Gases fractions
-	for (const gas in atmosphere) atmosphere[gas].f = M_atm_total === 0 ? 0 : atmosphere[gas].mass / M_atm_total;
-
-	// Optical depth
-	const tau = Math.pow(P_surf, 1.2) * ( 
-		(atmosphere.H2O.f * 2.50) + // Water vapor is a very potent greenhouse gas
-		(atmosphere.CO2.f * 0.15) + // CO2 is a moderate greenhouse gas
-		(atmosphere.CH4.f * 0.80) + // Methane is a potent greenhouse gas
-		(atmosphere.NH3.f * 1.20) + // Ammonia is a potent greenhouse gas
-		(atmosphere.N2.f  * 0.01)   // Nitrogen's influence is very low
-	);
-
-	// Calculating surface temperature using a grey-atmosphere approximation
-	const temp_surf = temp_eq * Math.pow(1 + 3/4 * tau, 1/4);
-	const T_surf = new types.Value(temp_surf, types.units.Temp.K);
-
-	planet.temperature = T_surf;
-	planet.atmosphere = {
-		mass: atmosphereMass,
-		pressure: P_surf,
-		composition: { },
-	};
-	for (const gas in atmosphere) planet.atmosphere.composition[gas] = atmosphere[gas].f;
-
-	console.log(planet.mass.getValueAs(types.units.Mass.M_Earth).toFixed(3), planet.atmosphere.pressure.toFixed(3), planet.age.getValueAs(types.units.Time.Gy).toFixed(2));
-}
-
 /**
  * Sets the initial rotation period for a planet.
  * 
@@ -1147,5 +656,286 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 		// Current rotation speed passed the limit, setting the slightly slowed down limit value.
 		const surfOrbitPeriod_h = new types.Value(surfOrbitPeriod_s, types.units.Time.s).getValueAs(types.units.Time.h);
 		return surfOrbitPeriod_h * prng.range(1.2, 2.4);
+	}
+}
+
+function generateAtmosphere(planet) {
+	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
+	const planetRadius_REarth = planet.radius.getValueAs(types.units.Dist.R_Earth);
+
+	const T_eq = planet.temperature_eq.getValueAs(types.units.Temp.K);
+
+	const star = planet.genData.parentStar;
+	const sma_star = new types.Value(planet.genData.sma_norm * Math.sqrt(planet.genData.parentStar.luminosity), types.units.Dist.AU);
+	const F_tidal_star = calculateTidalHeating(planet, star, sma_star);
+
+	let host = planet.parentBody;
+	if (planet.parentBody instanceof types.BinaryPlanet) {
+		if (planet.parentBody.primary === planet) {
+			host = planet.parentBody.secondary;
+		}
+		else if (planet.parentBody.secondary === planet) {
+			host = planet.parentBody.primary;
+		}
+	}
+	const F_tidal_host = host instanceof types.Star ? 0 : calculateTidalHeating(planet, host, planet.sma);
+
+	const F_tidal = F_tidal_star + F_tidal_host;
+
+	const T_eff = Math.pow( (T_eq ** 4) + (F_tidal / consts.PHY_SIGMA) , 1/4);
+	planet.temperature_eff = new types.Value(T_eff, types.units.Temp.K);
+
+	/*
+	K_ret < 0.2: Planet can't hold even heavy gases
+	0.2 <= K_ret < 0.6: Thin atmosphere
+	0.6 <= K_ret < 2.5: Thick atmosphere
+	K_ret >= 2.5: Planet can hold hydrogen and helium
+	*/
+	const K_ret = (planetMass_MEarth / planetRadius_REarth) / ((T_eff / consts.PHY_EARTH_TEMP_SURF) ** 1.5);
+
+	if (K_ret < 0.2) {
+		planet.atmosphere = {
+			pressure: 0,
+			scaleHeight: 0,
+			mu: 0,
+			composition: {},
+		}
+		planet.hasLife = false;
+		planet.temperature = new types.Value(planet.temperature_eff.value, planet.temperature_eff.unit);
+		
+		return;
+	}
+
+	const f_ice = planet.core.composition.ice;
+	const f_rock = planet.core.composition.rock;
+	const f_iron = planet.core.composition.iron;
+
+	const P_base = (f_ice * 10.0) + (f_rock * 0.1) + (f_iron * 0.01);
+	const f_ret = utils.clamp( (K_ret - 0.20) / 0.70 , 0.0, 10.0) ** 2;
+	const g_Earth = planetMass_MEarth / (planetRadius_REarth ** 2);
+	const tidalOutgassing = 1.0 + Math.min(F_tidal / 0.1, 50.0);
+	const M_press = Math.pow(10, utils.clamp( utils.gaussianRandom(0, 0.5) , -2, 2));
+
+	const P_surf = P_base * f_ret * g_Earth * tidalOutgassing * M_press;
+
+	const T_surf = T_eff * (1 + 0.4 * Math.log10(1 + P_surf));
+	planet.temperature = new types.Value(T_surf, types.units.Temp.K);
+	
+	let compositionRaw = {};
+
+	if (T_surf > 1500) {
+		compositionRaw = {
+			SiO2: prng.range(0.50, 0.70),
+			 SO2: prng.range(0.10, 0.30),
+			  CO: prng.range(0.05, 0.20),
+		};
+	}
+	else if (T_surf > 600) {
+		if (f_ice < 0.05) {
+			compositionRaw = {
+				CO2: prng.range(0.85, 0.95),
+				SO2: prng.range(0.01, 0.05),
+				 N2: prng.range(0.02, 0.08),
+			};
+		}
+		else {
+			compositionRaw = {
+				H2O: prng.range(0.70, 0.90),
+				CO2: prng.range(0.10, 0.25),
+				 N2: prng.range(0.01, 0.05),
+			};
+		}
+	}
+	else if (T_surf > 250) {
+		if (f_ice < 0.01) {
+			compositionRaw = {
+				CO2: prng.range(0.90, 0.97),
+				 N2: prng.range(0.02, 0.07),
+				 Ar: prng.range(0.005, 0.02),
+			};
+		}
+		else if (f_ice < 0.2) {
+			compositionRaw = {
+				CO2: prng.range(0.75, 0.90),
+				 N2: prng.range(0.08, 0.20),
+				H2O: prng.range(0.01, 0.05),
+			};
+		}
+		else {
+			compositionRaw = {
+				H2O: prng.range(0.50, 0.80),
+				CO2: prng.range(0.15, 0.40),
+				 N2: prng.range(0.02, 0.10)
+			};
+		}
+	}
+	else if (T_surf > 100) {
+		if (f_ice < 0.1) {
+			compositionRaw = {
+				CO2: prng.range(0.80, 0.95),
+				 N2: prng.range(0.05, 0.15),
+				 Ar: prng.range(0.01, 0.03),
+			};
+		}
+		else {
+			compositionRaw = {
+				 N2: prng.range(0.75, 0.90),
+				CH4: prng.range(0.05, 0.15),
+				 CO: prng.range(0.01, 0.05),
+			};
+		}
+	}
+	else {
+		compositionRaw = {
+			 N2: prng.range(0.80, 0.95),
+			CH4: prng.range(0.01, 0.10),
+			 Ne: prng.range(0.01, 0.05),
+		};
+	}
+
+	if (K_ret >= 2.5) {
+		const envelope = {
+			 H2: prng.range(0.70, 0.80),
+			 He: prng.range(0.15, 0.25),
+			CH4: prng.range(0.01, 0.04),
+		};
+		const envelopeWeight = prng.range(0.65, 0.95);
+
+		const compositionMixed = {};
+		for (const gas in envelope)
+			compositionMixed[gas] = (compositionMixed[gas] || 0) + envelope[gas] * envelopeWeight;
+		for (const gas in compositionRaw)
+			compositionMixed[gas] = (compositionMixed[gas] || 0) + compositionRaw[gas] * (1 - envelopeWeight);
+		
+		compositionRaw = compositionMixed;
+	}
+	
+	const compositionFinal = normalizeComposition(compositionRaw);
+	const mu = calculateMeanMolarMass(compositionFinal);
+
+	const H_Earth = 8.5; // km
+	const H = (T_surf / (g_Earth * mu)) * H_Earth;
+
+	planet.atmosphere = {
+		pressure: P_surf,
+		scaleHeight: H,
+		composition: compositionFinal,
+		mu: mu,
+	}
+	planet.hasLife = false;
+}
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ * @param {types.Planet|types.Star} host 
+ * @param {types.Value} sma 
+ */
+function calculateTidalHeating(planet, host, sma) {
+	const M_p = planet.mass.getValueAs(types.units.Mass.kg);
+	const R_p = planet.radius.getValueAs(types.units.Dist.m);
+	const M_host = host.mass.getValueAs(types.units.Mass.kg);
+	const R_host = host.radius.getValueAs(types.units.Dist.m);
+	const a = sma.getValueAs(types.units.Dist.m);
+
+	const R_roche = 2.44 * R_host * Math.pow(host.density / planet.density, 1/3);
+	const x = a / R_roche;
+	const e = 0.2 * prng.range(0.5, 1.5) * (1 - Math.exp(-5 * (x / 2000))); // Simulated excentricity value
+
+	const k2 = planetEvolutionSim.calculateLoveNumber(planet);
+	const Q = planetEvolutionSim.calculateTidalQ(planet);
+
+	const E_tidal = (21/2) * (k2 / Q) * ( (consts.PHY_G * (M_host ** 2) * (R_p ** 5) * (e ** 2)) / (a ** 6) );
+	const F_tidal = E_tidal / (4 * Math.PI * (R_p ** 2));
+
+	return F_tidal;
+}
+
+function normalizeComposition(composition) {
+	let sum = 0;
+	for (const gas in composition)
+		sum += composition[gas];
+
+	if (sum === 0)
+		return composition;
+
+	for (const gas in composition)
+		composition[gas] = composition[gas] / sum;
+	return composition;
+}
+
+function calculateMeanMolarMass(composition) {
+	const items = Object.keys(composition).length;
+	if (items === 0)
+		return 0;
+
+	let sum = 0;
+	for (const gas in composition)
+		sum += composition[gas] * consts.PHY_MOLAR_MASSES[gas];
+	
+	return sum / items;
+}
+
+import {temperatureToColor} from "./star-gen.js";
+
+/**
+ * 
+ * @param {types.Planet} planet 
+ */
+function setGasGiantColor(planet) {
+	const temp = planet.temperature.getValueAs(types.units.Temp.K);
+
+	if (temp >= 1400) {
+		return temperatureToColor(planet.temperature);
+	}
+
+	switch (planet.type) {
+		case types.planetTypes.BrownDwarf: {
+			return "#43202b";
+		}
+
+		case types.planetTypes.GasGiant: {
+			// Sudarsky's classification based on temperature
+			if (temp < 150) {
+				return "#D2B48C"; // Type I: Ammonia clouds (high albedo, like Jupiter's)
+			}
+			if (temp >= 150 && temp < 250) {
+				return "#CFECEC"; // Type II: Water clounds (very bright)
+			}
+			if (temp >= 250 && temp < 350) {
+				return "#4682B4"; // Type III: No clouds (pure hydrogen absorbs light, Rayleigh scattering is on)
+			}
+			if (temp >= 350 && temp < 900) {
+				return "#258285"; // Intermediate zone (semi-transparent atmosphere, salts clouds)
+			}
+			if (temp >= 900 && temp < 1200) {
+				return "#1A1A1A"; // Type IV: Hot Jupiters (alkali metals absorb light; the planet is blacker than coal)
+			}
+			if (temp >= 1200 && temp < 1300) {
+				return "#3A0000"; // // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
+			}
+			// temp >= 1300
+			return "#3A0000"; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
+		}
+
+		case 'Ice Giant':
+		case 'Mini-Neptune': {
+			if (temp < 100) {
+				return "#6ebad5"; // Far and cold (like Uranus and Neptune)
+			}
+			if (temp >= 100 && temp < 300) {
+				return "#3b73a0"; // Temperate ice giants (methane evaporates, atmosphere darkens)
+			}
+
+			// If an ice giant got too close to its star, it turns into a "hot Neptune", similar to Sudarsky's type III/IV gas giant
+			if (temp >= 300 && temp < 900) {
+				return "#7ab0b2";
+			}
+			if (temp >= 900 && temp < 1300) {
+				return "#1B1010";
+			}
+			// temp >= 1300
+			return "#3A0000";
+		}
 	}
 }

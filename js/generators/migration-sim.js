@@ -147,7 +147,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 	// Scaled migration constants
 	const TYPE_1_COEFF = settings.planet_migration_type_1_coeff * 0.00000001;
 	const TYPE_2_COEFF = settings.planet_migration_type_2_coeff * 0.00000001;
-	const INNER_DISK_EDGE_AU = 0.04; // Inside boundary normalized to Solar units (AU☉)
+	const INNER_DISK_EDGE_AU = 0.05; // Inside boundary normalized to Solar units (AU☉)
 	
 	let migrationRate = 0;
 
@@ -187,8 +187,8 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 	
 	// Apply random physical perturbation and scale with stellar luminosity factor
 	const stellarLuminosityFactor = Math.sqrt(planet.parentBody.luminosity);
-	migrationRate *= prng.range(0.8, 1.2); 
-	migrationRate *= stellarLuminosityFactor;
+	const distanceFactor = 1 - Math.exp(-5 * planet.sma.value / stellarLuminosityFactor);
+	migrationRate *= prng.range(0.8, 1.2) * stellarLuminosityFactor * distanceFactor;
 	
 	planet.sma.value += migrationRate;
 	

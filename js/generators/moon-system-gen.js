@@ -33,8 +33,8 @@ export function generateMoons(settings, planet) {
 
 	// Minimal SMA values are rough approximations of Roche limits.
 	const safetyFactor = 2.0;
-	const binarySmaMin_REarth = 2.5 * (1 + 1) * planetRadius_REarth * safetyFactor;
-	const moonSmaMin_REarth = 2.5 * (1 + 1/3) * planetRadius_REarth * safetyFactor;
+	const binarySmaMin_REarth = 3.0 * (1 + 1) * planetRadius_REarth * safetyFactor;
+	const moonSmaMin_REarth = 3.0 * (1 + 2/5) * planetRadius_REarth * safetyFactor;
 
 	// Preventing generation beforehand if there's no room for stable orbits.
 	if (moonSmaMax_REarth < moonSmaMin_REarth)
@@ -266,9 +266,6 @@ function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REar
 	const moonSmaMax_secondary = planetSystemGen.getMaximalSTypeOrbit(binary.secondary.mass, binary.primary.mass, binary.primary.sma);
 	const moonSmaMax_secondary_REarth = moonSmaMax_secondary.getValueAs(types.units.Dist.R_Earth);
 	generateRegularMoons(settings, binary.secondary, moonSmaMax_secondary_REarth);
-
-	//if (planet.mass.getValueAs(types.units.Mass.M_Jupiter) > 8)
-		eventBus.emit('shtap');
 }
 
 /**
