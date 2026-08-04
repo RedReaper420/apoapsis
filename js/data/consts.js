@@ -24,6 +24,8 @@ const consts = Object.freeze({
 	PHY_EARTH_TEMP_SURF: 288, // K
 
 	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon). ("Lagrange Point test")
+	DEF_SUB_NEPTUNE_MASS_THRESHOLD: 15, // Below 15 M⊕ a gas planet is classified as Mini-Neptune or Gas Dwarf.
+	DEF_BROWN_DWARF_MASS_THRESHOLD: 4100, // Equal and above 4100 M⊕ a gas giant is classified as Brown Dwarf.
 
 	PHY_MOLAR_MASSES: Object.freeze({
 		 H2: 2.016,

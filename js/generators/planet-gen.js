@@ -121,8 +121,11 @@ export function planetGeneration_Stage2(settings, planet) {
 	planet.temperature_eq = new types.Value(T_eq, types.units.Temp.K);
 	planet.temperature = new types.Value(T_eq, types.units.Temp.K);
 
-	if (planet.type === types.planetTypes.Terrestrial)
-		generateAtmosphere(planet);
+	setEccentricity(planet);
+	if (planet.genData.isMoon) {
+		if (planet.genData.retrograde)
+			planet.eccentricity *= prng.range(5, 10);
+	}
 }
 
 /**
@@ -130,6 +133,18 @@ export function planetGeneration_Stage2(settings, planet) {
  * @param {types.Planet} planet 
  */
 export function planetGeneration_Stage3(settings, planet) {
+
+	if (planet.type === types.planetTypes.Terrestrial)
+		generateAtmosphere(planet);
+	else {
+		planet.atmosphere = {
+			scaleHeight: planet.radius.getValueAs(types.units.Dist.km) * 0.1,
+			pressure: 0.5,
+			cloudCover: 0.95,
+			composition: { }
+		}
+	}
+
 	planet.planetEvolution = new planetEvolutionSim.PlanetEvolution(settings, planet);
 	planet.planetEvolution.doTheEvolution();
 	
@@ -143,7 +158,7 @@ export function planetGeneration_Stage3(settings, planet) {
 			( f_ice >= 0.005 ) &&
 			( (planet.atmosphere.composition["H2"] || 0) === 0 )
 		) { // (K_ret < 2.5)
-			const lifeChance = 1//Math.pow((planet.age.getValueAs(types.units.Time.My) - 2500) / (10000 - 2500), 10);
+			const lifeChance = Math.pow((planet.age.getValueAs(types.units.Time.My) - 2500) / (10000 - 2500), 10);
 			if (prng() < lifeChance) {
 				let compositionNew = {
 					N2: prng.range(0.73, 0.80),
@@ -159,11 +174,17 @@ export function planetGeneration_Stage3(settings, planet) {
 			}
 		}
 
-		planet.color = '#867470';
+		const metallicity = planet.core.composition.iron / (1 - planet.core.composition.ice);
+		const red = Math.floor(75 + 90 * (1 - metallicity));
+		const green = Math.floor(65 + 80 * (1 - metallicity));
+		const blue = Math.floor(55 + 70 * (1 - metallicity));
+		const toHex = (colorVal) => colorVal.toString(16).padStart(2, '0');
+		planet.color = `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
 	}
 	else {
 		planet.color = setGasGiantColor(planet);
 	}
+	planet.atmosphere.cloudCover = calculateCloudCover(planet);
 }
 
 /**
@@ -299,7 +320,7 @@ function sampleCoreIceFraction(genData) {
 	const metallicityFactor = Math.exp(0.1 * starMetallicity);
 	
 	const sma_norm = genData.sma_norm;
-	const maxIceBase = Math.min(0.65, 0.01 + 0.01 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.00000025 * Math.exp(4 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.05 * sma_norm));
+	const maxIceBase = Math.min(0.65, 0.001 + 0.01 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.00000025 * Math.exp(3.75 * Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) + 0.05 * sma_norm));
 	const maxIce = maxIceBase * metallicityFactor;
 
 	return (utils.randomRangeGaussian(0, maxIce) + prng.range(0, maxIce)) / 2; // Avg. of gaussian random and uniform random
@@ -314,7 +335,7 @@ function makeGasGiant(planet) {
 	const star = planet.genData.parentStar;
 
 	const critBaseMin = 5.0;
-	const critBaseMax = 25.0;
+	const critBaseMax = 20.0;
 	const criticalMass = critBaseMin + (critBaseMax - critBaseMin) * Math.exp(-0.75 * Math.sqrt(sma_norm));
 
 	const coreMass = planet.core.mass.getValueAs(types.units.Mass.M_Earth);
@@ -328,13 +349,13 @@ function makeGasGiant(planet) {
 	let giantProbability = critRatioFactor * distanceFactor * metallicityFactor;
 	
 	const iceGiantProbability = Math.pow(1 + Math.pow(0.3 * sma_norm, -2), -4);
-	let isIceGiant = false;
+	let isIceGiant = (prng() < iceGiantProbability) && (sma_norm > consts.PHY_DIST_SNOW_LINE);
 	
 	if (coreToCritRatio > 0.5) {
 		if (prng() < giantProbability) {
-			isIceGiant = (sma_norm > consts.PHY_DIST_SNOW_LINE) && (prng() < iceGiantProbability);
 			if (planet.genData.isMoon) {
 				if (isIceGiant !== (planet.parentBody.type === types.planetTypes.IceGiant)) {
+					// Converting a binary companion to the same giant type as the host with a 50% chance.
 					if (prng() < 0.5) isIceGiant = !isIceGiant;
 				}
 			}
@@ -349,10 +370,6 @@ function makeGasGiant(planet) {
 				}
 
 				envelopeMass = coreMass * envelopeMult;
-
-				planet.type = (coreMass + envelopeMass) < 15
-					? types.planetTypes.MiniNeptune
-					: types.planetTypes.IceGiant;
 			}
 			else {
 				// True Gas Giant
@@ -374,24 +391,45 @@ function makeGasGiant(planet) {
 				}
 
 				envelopeMass = coreMass * envelopeMult * Math.pow(sma_norm / 6, -0.15);
-				planet.type = (coreMass + envelopeMass) < 3900
-					? types.planetTypes.GasGiant
-					: types.planetTypes.BrownDwarf;
 			}
 		}
 		else if (prng() < 0.5) {
-			// Mini-Neptune / puffed super-Earth
-			isIceGiant = true;
-			envelopeMass = coreMass * prng.range(0.05, 0.5);
-			planet.type = (coreMass + envelopeMass) < 15
-				? types.planetTypes.MiniNeptune
-				: types.planetTypes.IceGiant;
+			if (isIceGiant) {
+				// Mini-Neptune
+				envelopeMass = coreMass * prng.range(0.05, 0.5);
+			}
+			else {
+				// Gas Dwarf
+				let gasDwarfAllowanceChance = 1 / (1 + Math.exp(-5 * (sma_norm - consts.PHY_DIST_SNOW_LINE * 0.7)));
+				if (sma_norm < consts.PHY_DIST_SNOW_LINE * 0.25)
+					gasDwarfAllowanceChance = 0;
+
+				if (prng() < gasDwarfAllowanceChance) {
+					envelopeMass = coreMass * prng.range(0.05, Math.max(0.05, 1.0 * gasDwarfAllowanceChance));
+				}
+			}
 		}
 	}
 	
 	let envelopeIceFraction = isIceGiant
 		? prng.range(0.65, 0.85)
 		: prng.range(0.05, 0.15);
+	
+	if (envelopeMass > 0) {
+		if ((coreMass + envelopeMass) >= consts.DEF_BROWN_DWARF_MASS_THRESHOLD) {
+			planet.type = types.planetTypes.BrownDwarf;
+		}
+		else if ((coreMass + envelopeMass) < consts.DEF_SUB_NEPTUNE_MASS_THRESHOLD) {
+			planet.type = isIceGiant
+				? types.planetTypes.MiniNeptune
+				: types.planetTypes.GasDwarf;
+		}
+		else {
+			planet.type = isIceGiant
+				? types.planetTypes.IceGiant
+				: types.planetTypes.GasGiant;
+		}
+	}
 	
 	/*
 	// Transfering ices from the core to the envelope
@@ -412,7 +450,6 @@ function makeGasGiant(planet) {
 		envelopeIceFraction = envelopeIceMass / envelopeMass;
 	}
 	*/
-		
 
 	return new types.Envelope(
 		new types.Value(envelopeMass, types.units.Mass.M_Earth), 
@@ -552,7 +589,8 @@ function assumeAlbedo(planet, T_blackbody) {
 			return 0.4;
 		}
 
-		case types.planetTypes.GasGiant: {
+		case types.planetTypes.GasGiant:
+		case types.planetTypes.GasDwarf: {
 			// Sudarsky's classification based on temperature
 			if (temp < 150) {
 				return 0.57; // Type I: Ammonia clouds (high albedo, like Jupiter's)
@@ -659,6 +697,27 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 	}
 }
 
+export function setEccentricity(planet) {
+	let host = planet.parentBody;
+	if (planet.parentBody instanceof types.BinaryPlanet) {
+		if (planet.parentBody.primary === planet) {
+			host = planet.parentBody.secondary;
+		}
+		else if (planet.parentBody.secondary === planet) {
+			host = planet.parentBody.primary;
+		}
+	}
+	
+	const R_host = host.radius.getValueAs(types.units.Dist.m);
+	const a = planet.sma.getValueAs(types.units.Dist.m);
+	const R_roche = 2.44 * R_host * Math.pow(host.density / planet.density, 1/3);
+	const x = a / R_roche;
+	const exp = Math.exp(-5 * (x / 3500));
+	const e = 0.15 * (1 - exp) * utils.randomRangeGaussian(1 - 0.25 * exp, 1 + 0.25 * exp);
+
+	planet.eccentricity = e;
+}
+
 function generateAtmosphere(planet) {
 	const planetMass_MEarth = planet.mass.getValueAs(types.units.Mass.M_Earth);
 	const planetRadius_REarth = planet.radius.getValueAs(types.units.Dist.R_Earth);
@@ -667,7 +726,7 @@ function generateAtmosphere(planet) {
 
 	const star = planet.genData.parentStar;
 	const sma_star = new types.Value(planet.genData.sma_norm * Math.sqrt(planet.genData.parentStar.luminosity), types.units.Dist.AU);
-	const F_tidal_star = calculateTidalHeating(planet, star, sma_star);
+	const F_tidal_star = calculateTidalHeating(planet, star, sma_star, planet.eccentricity);
 
 	let host = planet.parentBody;
 	if (planet.parentBody instanceof types.BinaryPlanet) {
@@ -678,9 +737,16 @@ function generateAtmosphere(planet) {
 			host = planet.parentBody.primary;
 		}
 	}
-	const F_tidal_host = host instanceof types.Star ? 0 : calculateTidalHeating(planet, host, planet.sma);
+	const F_tidal_host = host instanceof types.Star ? 0 : calculateTidalHeating(planet, host, planet.sma, planet.eccentricity);
+	const F_tidal_sat = planet.bodies.length > 0 ? calculateTidalHeating(planet, planet.bodies[0], planet.bodies[0].sma, planet.bodies[0].eccentricity) : 0;
 
-	const F_tidal = F_tidal_star + F_tidal_host;
+	const F_tidal = F_tidal_star + F_tidal_host + F_tidal_sat;
+	planet.F_tidal = {
+		star: F_tidal_star,
+		host: F_tidal_host,
+		sat: F_tidal_sat,
+		total: F_tidal
+	}
 
 	const T_eff = Math.pow( (T_eq ** 4) + (F_tidal / consts.PHY_SIGMA) , 1/4);
 	planet.temperature_eff = new types.Value(T_eff, types.units.Temp.K);
@@ -698,9 +764,9 @@ function generateAtmosphere(planet) {
 			pressure: 0,
 			scaleHeight: 0,
 			mu: 0,
+			cloudCover: 0,
 			composition: {},
 		}
-		planet.hasLife = false;
 		planet.temperature = new types.Value(planet.temperature_eff.value, planet.temperature_eff.unit);
 		
 		return;
@@ -710,20 +776,35 @@ function generateAtmosphere(planet) {
 	const f_rock = planet.core.composition.rock;
 	const f_iron = planet.core.composition.iron;
 
-	const P_base = (f_ice * 10.0) + (f_rock * 0.1) + (f_iron * 0.01);
+	const P_base = (f_ice * 1.0) + (f_rock * 0.1) + (f_iron * 0.01);
 	const f_ret = utils.clamp( (K_ret - 0.20) / 0.70 , 0.0, 10.0) ** 2;
 	const g_Earth = planetMass_MEarth / (planetRadius_REarth ** 2);
 	const tidalOutgassing = 1.0 + Math.min(F_tidal / 0.1, 50.0);
 	const M_press = Math.pow(10, utils.clamp( utils.gaussianRandom(0, 0.5) , -2, 2));
 
-	const P_surf = P_base * f_ret * g_Earth * tidalOutgassing * M_press;
+	const P_surf_raw = P_base * f_ret * g_Earth * tidalOutgassing * M_press;
+
+	const dampeningThreshold = 200 * Math.exp(-5 * planetMass_MEarth);
+	const P_dampened = P_surf_raw >= dampeningThreshold
+		? dampeningThreshold + Math.pow(P_surf_raw - dampeningThreshold, 0.75)
+		: P_surf_raw;
+	const dampeningFactor = Math.min(1, (planetMass_MEarth / 10) ** 3);
+
+	const P_surf = P_surf_raw * dampeningFactor + P_dampened * (1 - dampeningFactor);
 
 	const T_surf = T_eff * (1 + 0.4 * Math.log10(1 + P_surf));
 	planet.temperature = new types.Value(T_surf, types.units.Temp.K);
 	
 	let compositionRaw = {};
-
-	if (T_surf > 1500) {
+	/*
+	if ((F_tidal > 5.0) && (f_ice < 0.05)) {
+		compositionRaw = {
+			SO2: prng.range(0.60, 0.85),
+			CO2: prng.range(0.10, 0.30),
+			H2O: prng.range(0.01, 0.05),
+		}
+	}
+	else*/if (T_surf > 1500) {
 		compositionRaw = {
 			SiO2: prng.range(0.50, 0.70),
 			 SO2: prng.range(0.10, 0.30),
@@ -793,13 +874,13 @@ function generateAtmosphere(planet) {
 		};
 	}
 
-	if (K_ret >= 2.5) {
+	if ( ((K_ret >= 2.5) && (prng() < 0.5)) || (K_ret >= 3.5) ) {
 		const envelope = {
 			 H2: prng.range(0.70, 0.80),
 			 He: prng.range(0.15, 0.25),
 			CH4: prng.range(0.01, 0.04),
 		};
-		const envelopeWeight = prng.range(0.65, 0.95);
+		const envelopeWeight = prng.range(0.75, 0.95);
 
 		const compositionMixed = {};
 		for (const gas in envelope)
@@ -821,8 +902,8 @@ function generateAtmosphere(planet) {
 		scaleHeight: H,
 		composition: compositionFinal,
 		mu: mu,
+		cloudCover: 0,
 	}
-	planet.hasLife = false;
 }
 
 /**
@@ -830,21 +911,18 @@ function generateAtmosphere(planet) {
  * @param {types.Planet} planet 
  * @param {types.Planet|types.Star} host 
  * @param {types.Value} sma 
+ * @param {number} eccentricity 
  */
-function calculateTidalHeating(planet, host, sma) {
-	const M_p = planet.mass.getValueAs(types.units.Mass.kg);
+function calculateTidalHeating(planet, host, sma, eccentricity) {
 	const R_p = planet.radius.getValueAs(types.units.Dist.m);
 	const M_host = host.mass.getValueAs(types.units.Mass.kg);
-	const R_host = host.radius.getValueAs(types.units.Dist.m);
-	const a = sma.getValueAs(types.units.Dist.m);
-
-	const R_roche = 2.44 * R_host * Math.pow(host.density / planet.density, 1/3);
-	const x = a / R_roche;
-	const e = 0.2 * prng.range(0.5, 1.5) * (1 - Math.exp(-5 * (x / 2000))); // Simulated excentricity value
+	const a = planet.sma.getValueAs(types.units.Dist.m);
+	const e = planet.eccentricity;
 
 	const k2 = planetEvolutionSim.calculateLoveNumber(planet);
 	const Q = planetEvolutionSim.calculateTidalQ(planet);
 
+	// Peale-Cassen equation
 	const E_tidal = (21/2) * (k2 / Q) * ( (consts.PHY_G * (M_host ** 2) * (R_p ** 5) * (e ** 2)) / (a ** 6) );
 	const F_tidal = E_tidal / (4 * Math.PI * (R_p ** 2));
 
@@ -865,15 +943,36 @@ function normalizeComposition(composition) {
 }
 
 function calculateMeanMolarMass(composition) {
-	const items = Object.keys(composition).length;
-	if (items === 0)
-		return 0;
-
 	let sum = 0;
-	for (const gas in composition)
+	for (const gas in composition) {
 		sum += composition[gas] * consts.PHY_MOLAR_MASSES[gas];
+	}
+	return sum;
+}
+
+function calculateCloudCover(planet) {
+	const { pressure, composition } = planet.atmosphere;
+	const temp = planet.temperature.getValueAs(types.units.Temp.K);
+
+	if (pressure < 0.01) return 0;
 	
-	return sum / items;
+	let condensableShare = (composition.H2O || 0) + (composition.CH4 || 0) + 
+							(composition.NH3 || 0) + (composition.SO2 || 0);
+
+	if (condensableShare === 0) return 0;
+	
+	const pressureFactor = Math.min(1.0, Math.log10(1 + pressure * 2));
+	
+	let tempFactor = 1.0;
+	if (composition.H2O > 0) {
+		if (temp < 220) tempFactor = 0.2; // All water is frozen
+		else if (temp > 373) tempFactor = 0.1; // All water is vaporized
+		else tempFactor = Math.sin(((temp - 220) / (373 - 220)) * Math.PI);
+	}
+	
+	const cloudCover = Math.min(0.98, condensableShare * 3.0 * pressureFactor * tempFactor);
+	
+	return Math.max(0, cloudCover);
 }
 
 import {temperatureToColor} from "./star-gen.js";
@@ -885,16 +984,73 @@ import {temperatureToColor} from "./star-gen.js";
 function setGasGiantColor(planet) {
 	const temp = planet.temperature.getValueAs(types.units.Temp.K);
 
-	if (temp >= 1400) {
-		return temperatureToColor(planet.temperature);
+	if (planet.type === types.planetTypes.BrownDwarf) {
+		planet.atmosphere.composition = {
+			H2: 0.95,
+			He: 0.05,
+		};
+		if (temp >= 1400) return temperatureToColor(planet.temperature);
 	}
-
+	else {
+		if (temp >= 1400) {
+			planet.atmosphere.composition = {
+				SiO2: 0.70,
+				CO: 0.20,
+				H2O: 0.10,
+			};
+			planet.atmosphere.cloudCover = 0.5;
+			planet.atmosphere.scaleHeight *= 2;
+			return temperatureToColor(planet.temperature);
+		}
+		else if (temp >= 900) {
+			planet.atmosphere.composition = {
+				NaK: 0.80,
+				CO: 0.10,
+				H2O: 0.10,
+			};
+			planet.atmosphere.cloudCover = 0.1;
+			planet.atmosphere.scaleHeight *= 1.5;
+			eventBus.emit('shtap');
+		}
+		else if (temp >= 350) {
+			planet.atmosphere.composition = {
+				NaK: 0.30,
+				H2O: 0.60,
+				CH4: 0.10,
+			};
+		}
+		else if (temp >= 250) {
+			planet.atmosphere.pressure *= 0.5;
+			planet.atmosphere.composition = {
+				H2O: 0.85,
+				CH4: 0.10,
+				NH3: 0.05,
+			};
+			planet.atmosphere.cloudCover = 0.1;
+		}
+		else if (temp >= 150) {
+			planet.atmosphere.composition = {
+				H2O: 0.85,
+				CH4: 0.10,
+				NH3: 0.05,
+			};
+		}
+		else {
+			planet.atmosphere.composition = {
+				NH3: 0.65,
+				H2O: 0.25,
+				CH4: 0.10,
+			};
+		}
+	}
+	
 	switch (planet.type) {
 		case types.planetTypes.BrownDwarf: {
 			return "#43202b";
 		}
 
-		case types.planetTypes.GasGiant: {
+		case types.planetTypes.GasGiant:
+		case types.planetTypes.GasDwarf: {
 			// Sudarsky's classification based on temperature
 			if (temp < 150) {
 				return "#D2B48C"; // Type I: Ammonia clouds (high albedo, like Jupiter's)
@@ -912,14 +1068,14 @@ function setGasGiantColor(planet) {
 				return "#1A1A1A"; // Type IV: Hot Jupiters (alkali metals absorb light; the planet is blacker than coal)
 			}
 			if (temp >= 1200 && temp < 1300) {
-				return "#3A0000"; // // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
+				return "#6A0000"; // // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
 			}
 			// temp >= 1300
-			return "#3A0000"; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
+			return "#6A0000"; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
 		}
 
-		case 'Ice Giant':
-		case 'Mini-Neptune': {
+		case types.planetTypes.IceGiant:
+		case types.planetTypes.MiniNeptune: {
 			if (temp < 100) {
 				return "#6ebad5"; // Far and cold (like Uranus and Neptune)
 			}
@@ -932,10 +1088,10 @@ function setGasGiantColor(planet) {
 				return "#7ab0b2";
 			}
 			if (temp >= 900 && temp < 1300) {
-				return "#1B1010";
+				return "#6B1010";
 			}
 			// temp >= 1300
-			return "#3A0000";
+			return "#6A0000";
 		}
 	}
 }

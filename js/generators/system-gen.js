@@ -67,6 +67,9 @@ class SystemGenerator {
 
 		// Performing stage 3 generation for all planetary bodies
 		const finishGeneration = (body) => {
+			// Generation order "Binary components -> Children" is deliberate.
+			// Reason: children are taking magnetosphere values of their parents.
+
 			// Recursive calls
 			if (body instanceof types.Binary) {
 				finishGeneration(body.primary);
@@ -74,9 +77,46 @@ class SystemGenerator {
 			}
 
 			// -------
+
+			body.orbit.a = body.sma.getValueAs(types.units.Dist.m);
+			body.orbit.calculateMeanMotion(body);
+			body.orbit.w = 2 * Math.PI * prng();
+			body.orbit.M0 = 2 * Math.PI * prng();
 			
 			if (body instanceof types.Planet) {
 				planetGen.planetGeneration_Stage3(this.settings, body);
+
+				body.orbit.e = body.eccentricity;
+				if (body.genData.retrograde === true) {
+					body.orbit.i = (body.orbit.i + Math.PI) % (2 * Math.PI);
+				}
+			}
+
+			if (body instanceof types.Binary) {
+				// Setting correct distances for binary components from its barycenter.
+				// For other bodies that detail is ignored.
+				let mass1 = body.primary.mass.getValueAs(types.units.Mass.kg);
+				let mass2 = body.secondary.mass.getValueAs(types.units.Mass.kg);
+				const primary = mass1 >= mass2 ? body.primary : body.secondary;
+				const secondary = mass1 < mass2 ? body.primary : body.secondary;
+				
+				const r1 = primary.orbit.a / (1 + mass1 / mass2);
+				const r2 = secondary.orbit.a - r1;
+
+				primary.orbit.a = r1;
+				secondary.orbit.a = r2;
+
+				// Setting the correct orbits for binary components.
+				secondary.orbit.w = (primary.orbit.w + Math.PI) % (2 * Math.PI);
+				secondary.orbit.M0 = primary.orbit.M0;
+
+				// Setting some random eccentricity for binary star components
+				if (body instanceof types.BinaryStar) {
+					const rand_e = 0.10 * prng();
+					primary.orbit.e = rand_e;
+					secondary.orbit.e = rand_e;
+					console.log(rand_e);
+				}
 			}
 
 			// -------
@@ -86,19 +126,16 @@ class SystemGenerator {
 				finishGeneration(child) 
 			});
 		};
-		stars.forEach(star => { finishGeneration(star) });
+		this.system.bodies.forEach(body => { finishGeneration(body) });
 		
 		console.log(this.system);
 		console.log('--------------------')
-
-		eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
 	}
 
 	// -------------------------------------------------
 
 	#subscribe() {
-		eventBus.on(events.Generator.Generation.Start, () => { 
-			///*
+		eventBus.on(events.Generator.Generation.Start, () => {
 			let gen = true;
 			let attempts = 0+999*1;
 			eventBus.on('shtap', () => { gen = false });
@@ -108,8 +145,8 @@ class SystemGenerator {
 				attempts++;
 			}
 			console.log(attempts);
-			//*/
-			//this.generate();
+
+			eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
 		});
 
 		// Settings change subscriptions

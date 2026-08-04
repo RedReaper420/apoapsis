@@ -74,14 +74,19 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	star.absMag = getAbsMagnitude(star.luminosity);
 	star.bv = getBV(star.temperature);
 	star.color = temperatureToColor(star.temperature);
+
+	// Rotational period
+	star.rotationPeriod = getRotation(star.radius, star.mass);
 	
 	// --- 5. Lifespan & Age Progression ---
-	star.lifespan = getLifespan(star.mass, star.luminosity);
+	star.lifespan = getLifespan(star.mass, star.luminosity, star.radius, star.rotationPeriod);
 	if (constraint === null) {
-		const randomAgeFraction = prng.range(0.2, 0.5);
-		const fractionAgeGy = star.lifespan.getValueAs(types.units.Time.Gy) * randomAgeFraction;
-		const flatAgeGy = prng.range(1.5, 15.0);
-		star.age = new types.Value(Math.min(fractionAgeGy, flatAgeGy), types.units.Time.Gy);
+		const randomAgeFraction = prng.range(0.2, 0.6);
+		const fractionAge_Gy = star.lifespan.getValueAs(types.units.Time.Gy) * randomAgeFraction;
+		
+		const flatAge_Gy = prng.range(1.5, 15.0);
+
+		star.age = new types.Value(Math.min(fractionAge_Gy, flatAge_Gy), types.units.Time.Gy);
 	} else {
 		star.age = constraint.age;
 	}
@@ -267,24 +272,24 @@ const starTypeChart = [
 ];
 
 /**
- * Determines the 2-character spectral type (e.g., "G2", "K8", "O0") from temperature.
+ * Determines the 2-character spectral type (e.g., "G5", "K8", "O2") from temperature.
  * 
  * @param {types.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
- * @returns {string} A 2-character string from "O0" to "M9".
+ * @returns {string} A 2-character string from "O2" to "M9".
  */
 function getType(starTemperature) {
 	const temperature = starTemperature.getValueAs(types.units.Temp.K);
 
 	// Very hot stars
 	if (temperature >= starTypeChart[0].max)
-		return 'O0';
+		return 'O2';
 
 	for (const { type, max, min } of starTypeChart) {
 		if (temperature > min) {
 			const fraction = (max - temperature) / (max - min);
-			const subtype = Math.round(fraction * 9);
-			const clampedSubtype = utils.clamp(subtype, 0, 9);
+			const subtype = Math.round(fraction * (9 - (type === 'O' ? 2 : 0)));
+			const clampedSubtype = utils.clamp(subtype, type === 'O' ? 2 : 0, 9);
 
 			return type + clampedSubtype;
 		}
@@ -379,21 +384,65 @@ export function temperatureToColor(starTemperature) {
 }
 
 /**
- * Calculates a star's lifespan based on its mass and luminosity.
+ * Calculates a star's rotational period based on its radius and mass.
  * 
- * @param {types.Value} starMass  - The mass of the star (unit: `Mass`).
+ * @param {types.Value} starRadius - The radius of the star (unit: `Dist`).
+ * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
+ * @returns {types.Value} The rotational period of the star (unit: `Time`).
+ */
+function getRotation(starRadius, starMass) {
+	const R_Sun = starRadius.getValueAs(types.units.Dist.R_Sun);
+	const R_m = starRadius.getValueAs(types.units.Dist.m);
+	const M_m = starMass.getValueAs(types.units.Mass.kg);
+
+	// Rotational velocity approximation (km/s)
+	// Logistic function centered around the Kraft Break (R = 1.3 R☉)
+	const v_base = 2.5 + (190 / (1 + Math.exp(-9 * (R_Sun - 1.3))));
+	const randomFactor = Math.exp( utils.clamp(utils.gaussianRandom(), -3, 3) );
+
+	// Calculating critical rotational velocity while accounting flattening (Roche model)
+	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_m) / R_m); 
+
+	// Rotational velocity can't exceed 90% of critical value
+	const v_e = Math.min(v_base, v_crit * 0.9); 
+
+	// Calculating rotation period.
+	// v = W * R = 2piR / P
+	const P = (2 * Math.PI * R_m) / (v_e * 1000);
+
+	return new types.Value(P, types.units.Time.s);
+}
+
+/**
+ * Calculates a star's lifespan based on its mass, luminosity, radius, and rotational period.
+ * 
+ * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
  * @param {number} starLuminosity - The luminosity of the star in solar units (L☉).
+ * @param {types.Value} starRadius - The radius of the star (unit: `Dist`).
+ * @param {types.Value} starRotation - The rotational period of the star (unit: `Time`).
  * 
  * @returns {types.Value} The total lifespan of the star (unit: `Time`).
  */
-function getLifespan(starMass, starLuminosity) {
-	const mass = starMass.getValueAs(types.units.Mass.M_Sun);
+function getLifespan(starMass, starLuminosity, starRadius, starRotation) {
+	const M_Sun = starMass.getValueAs(types.units.Mass.M_Sun);
+	const M_m = starMass.getValueAs(types.units.Mass.kg);
+	const R_m = starRadius.getValueAs(types.units.Dist.m);
+	const P = starRotation.getValueAs(types.units.Time.s);
+
 	/*
 	// Mass-only version
-	const pow = mass <= 50.0 ? -2.5 : -3.5;
-	const lifespan = consts.PHY_SUN_LIFESPAN * Math.pow(mass, pow);
+	const a = M_Sun <= 50.0 ? -2.5 : -3.5;
+	const lifespan = consts.PHY_SUN_LIFESPAN * Math.pow(M_Sun, a);
 	return new types.Value(lifespan, types.units.Time.Gy);
 	*/
-	const lifespanGyr = consts.PHY_SUN_LIFESPAN * (mass / starLuminosity);
-	return new types.Value(lifespanGyr, types.units.Time.Gy);
+
+	const lifespan_base = consts.PHY_SUN_LIFESPAN * (M_Sun / starLuminosity);
+
+	const v = (2 * Math.PI * R_m) / P;
+	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_m) / R_m); 
+	const rotationFactor = 1 + 0.2 * Math.pow(v / v_crit, 2);
+
+	const lifespan = lifespan_base * rotationFactor;
+
+	return new types.Value(lifespan, types.units.Time.Gy);
 }

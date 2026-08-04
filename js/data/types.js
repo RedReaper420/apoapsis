@@ -274,11 +274,52 @@ export class Body {
 
 		this.bodies = [];
 		this.sma = new Value(1.26, units.Dist.AU);
+		this.eccentricity = -1;
+		this.orbit = new Orbit();
 
 		this.mass = new Value(1.0, units.Mass.kg);
 		this.radius = new Value(1.0, units.Dist.m);
 		this.density = 1.0;
 		this.temperature = new Value(2.73, units.Temp.K);
+	}
+}
+
+export class Orbit {
+	constructor() {
+		this.a = 0;
+		this.e = 0;
+		this.i = 0;
+		this.Omega = 0;
+		this.w = 0;
+		this.M0 = 0;
+		this.n = 0;
+	}
+
+	/**
+	 * Calculates and sets mean motion value for the body.
+	 * 
+	 * @param {Star|BinaryStar|Planet|BinaryPlanet} body 
+	 * 
+	 * @returns {number} mean motion `n`. (rad/s)
+	 */
+	calculateMeanMotion(body) {
+		if (body.parentBody === null) {
+			this.n = 0;
+			return 0;
+		}
+		
+		let host = body.parentBody;
+		if (body.parentBody instanceof Binary) {
+			if (body.parentBody.primary === body)
+				host = body.parentBody.secondary;
+			else if (body.parentBody.secondary === body)
+				host = body.parentBody.primary;
+		}
+		const bodyMass = body.mass.getValueAs(units.Mass.kg);
+		const hostMass = host.mass.getValueAs(units.Mass.kg);
+
+		this.n = Math.sqrt((consts.PHY_G * (hostMass + bodyMass)) / (this.a ** 3));
+		return this.n;
 	}
 }
 
@@ -304,9 +345,13 @@ export class Star extends Body {
 
 export const planetTypes = Object.freeze({
 	Terrestrial: 'Terrestrial',
+
 	MiniNeptune: 'Mini-Neptune',
+	GasDwarf: 'Gas Dwarf',
+
 	IceGiant: 'Ice Giant',
 	GasGiant: 'Gas Giant',
+	
 	BrownDwarf: 'Brown Dwarf',
 });
 
@@ -337,6 +382,7 @@ export class Planet extends Body {
 		this.type = planetTypes.Terrestrial;
 		this.rings = [];
 		this.genData = {};
+		this.hasLife = false;
 	}
 }
 

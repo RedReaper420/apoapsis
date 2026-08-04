@@ -320,7 +320,7 @@ class MagnetManager {
 		c			- Calibrating coefficient
 		*/
 		switch (this.planet.type) {
-			case types.planetTypes.Terrestrial:
+			case types.planetTypes.Terrestrial: {
 				const coreMass_MEarth = this.planet.core.mass.getValueAs(types.units.Mass.M_Earth);
 				const r_core_iron_REarth = getMaterialRadius(coreMass_MEarth * this.planet.core.composition.iron, 'iron');
 				this.r_core = new types.Value(r_core_iron_REarth, types.units.Dist.R_Earth).getValueAs(types.units.Dist.m);
@@ -332,8 +332,10 @@ class MagnetManager {
 				this.f_ad = 0.04;
 				this.c = 20;
 				break;
+			}
 			case types.planetTypes.MiniNeptune:
 			case types.planetTypes.IceGiant:
+			case types.planetTypes.GasDwarf: {
 				// Rocky core radius to entire planet radius ratio is around 0.6 
 				this.r_core = this.planet.core.radius.getValueAs(types.units.Dist.m);
 				this.rho_core = 3500;
@@ -345,8 +347,9 @@ class MagnetManager {
 				this.f_ad = 0.05;
 				this.c = 25;
 				break;
+			}
 			case types.planetTypes.GasGiant:
-			case types.planetTypes.BrownDwarf:
+			case types.planetTypes.BrownDwarf: {
 				this.r_core = this.radius_m * Math.min(0.9, 0.7 + 0.15 * Math.log10(3 * this.mass_MJupiter + 1));
 				this.rho_core = 4500;
 
@@ -358,6 +361,7 @@ class MagnetManager {
 				this.f_ad = 0.6;
 				this.c = 30;
 				break;
+			}
 		}
 
 		// Distance from the star
@@ -379,10 +383,13 @@ class MagnetManager {
 	calculatePlanetMagneticField(t) {
 		const planetAge_Gy = new types.Value(t, types.units.Time.y).getValueAs(types.units.Time.Gy);
 
-		let q_total; // Total thermal output of the planet
-		if (this.mass_MJupiter < 0.15) // Earth-like heat (scaled from 4.6*10^13 Wt)
+		let q_total = 0; // Total thermal output of the planet
+		if (this.mass_MEarth < 15) // Earth-like heat (scaled from 4.6*10^13 Wt)
 			q_total = 4.6e13 * this.mass_MEarth * Math.pow(4.5 / planetAge_Gy, 0.5);
-		else if (this.mass_MJupiter < 13) // Gas giant-like heat (Jupiter's is 4*10^17 Wt)
+		else if (this.mass_MEarth < 45)
+			q_total = ((4.6e13 * this.mass_MEarth * Math.pow(4.5 / planetAge_Gy, 0.5)) + 
+					   (4.0e17 * Math.pow(this.mass_MJupiter, 1.5) * Math.pow(4.5 / planetAge_Gy, 0.5))) / 2;
+		else if (this.mass_MEarth < consts.DEF_BROWN_DWARF_MASS_THRESHOLD) // Gas giant-like heat (Jupiter's is 4*10^17 Wt)
 			q_total = 4.0e17 * Math.pow(this.mass_MJupiter, 1.5) * Math.pow(4.5 / planetAge_Gy, 0.5);
 		else // Great primordial heat + deuterium fusion
 			q_total = 4.0e17 * Math.pow(this.mass_MJupiter, 2.5) * Math.pow(1.0 / planetAge_Gy, 0.4);

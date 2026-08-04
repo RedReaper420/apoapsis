@@ -351,15 +351,18 @@ function mergePlanets(recipient, donor) {
 		recipient.type = types.planetTypes.Terrestrial;
 	}
 	else {
-		if (recipient.envelope.composition.gas >= 0.8) {
-			recipient.type = recipient.mass.value < 3900
-				? recipient.type = types.planetTypes.GasGiant
-				: recipient.type = types.planetTypes.BrownDwarf;
+		if (recipient.mass.value >= consts.DEF_BROWN_DWARF_MASS_THRESHOLD) {
+			recipient.type = types.planetTypes.BrownDwarf;
+		}
+		else if (recipient.mass.value < consts.DEF_SUB_NEPTUNE_MASS_THRESHOLD) {
+			recipient.type = (recipient.envelope.composition.gas < 0.75)
+				? types.planetTypes.MiniNeptune
+				: types.planetTypes.GasDwarf;
 		}
 		else {
-			recipient.type = recipient.mass.value < 15.0
-				? types.planetTypes.MiniNeptune
-				: types.planetTypes.IceGiant;
+			recipient.type = (recipient.envelope.composition.gas < 0.75)
+				? types.planetTypes.IceGiant
+				: types.planetTypes.GasGiant;
 		}
 	}
 

@@ -28,6 +28,8 @@ class EventBus {
 	}
 }
 
+//-----------------------------------------------------------
+
 export const eventBus = new EventBus();
 
 export const events = Object.freeze({

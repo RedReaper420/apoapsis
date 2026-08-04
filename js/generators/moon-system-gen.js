@@ -48,9 +48,11 @@ export function generateMoons(settings, planet) {
 	const maxCompanionMass_MEarth = Math.min(maxSafeMass_MEarth, planetMass_MEarth);
 	const availableMassRatio = Math.min(0.99, maxCompanionMass_MEarth / planetMass_MEarth);
 	
-	// Chance to add an impact to the planet's stats, even if there were no impact during migration simulation.
-	const bonusImpactChance = 0.1 * Math.exp(-0.5 * planetMass_MEarth); 
-	if (prng() < bonusImpactChance) planet.genData.impacts += 1;
+	// Chance to add impacts to the planet's stats, even if there were no legit impact during migration simulation.
+	const bonusImpactChance = 0.10 * Math.exp(-0.05 * planetMass_MEarth); 
+	for (let i = 0; i < 3; i++)
+		if (prng() < bonusImpactChance)
+			planet.genData.impacts += 1;
 	
 	let regularMoonsOverrideChance = 0; // If the planet didn't have giant impacts, it won't have an impact moon.
 	let isBinary = false; // If the planet didn't have giant impacts, it won't have a binary companion.
@@ -232,6 +234,11 @@ function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REar
 	// Setting values for binary
 	binary.sma = binarySma;
 	binary.parentBody = binaryParent;
+	planetGen.setEccentricity(binary);
+
+	const e_min = Math.min(binary.primary.eccentricity, binary.secondary.eccentricity);
+	binary.primary.eccentricity = e_min;
+	binary.secondary.eccentricity = e_min;
 
 	binaryParent.bodies.push(binary); // Adding the binary to the star's body list
 
@@ -332,7 +339,7 @@ function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartO
 		const moonMass = new types.Value(moonMass_MMoon, types.units.Mass.M_Moon);
 
 		// 20% chance to make a retrograde moon if SMA passed half of the limit
-		const moonIsRetrograde = sma >= moonSmaMax_AU * 0.5 ? prng() < 0.2 : false;
+		const moonIsRetrograde = sma >= moonSmaMax_AU / 2 ? prng() < 0.3 : false;
 
 		const moon = planetGen.generatePlanet(settings, planet, moonSma, 
 			{ 
@@ -358,7 +365,7 @@ function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartO
 		if (moonSma_km <= rocheLimit_km) {
 			if (planet instanceof types.BinaryPlanet === false) {
 				planet.rings.push(new types.RingSystem(
-					new types.Value(planet.radius.value * 1.5, planet.radius.unit), 
+					new types.Value(planet.radius.value * 1.2, planet.radius.unit), 
 					rocheLimit, 
 					moon.mass, 
 					moon.core.composition.ice
@@ -390,11 +397,11 @@ function generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REar
 	}
 	else {
 		// Moon stays.
-		sma = moonSmaMin_REarth + (moonSmaMax_REarth - moonSmaMin_REarth) * Math.pow(prng(), 2);
+		sma = moonSmaMin_REarth + (moonSmaMax_REarth - moonSmaMin_REarth) * utils.randomRangeGaussian(0, 1);
 	}
 
 	if (sma !== Infinity) {
-		const moonMass_MEarth = planetMass_MEarth / prng.range(50.0, 100.0);
+		const moonMass_MEarth = planetMass_MEarth / prng.range(50.0, 150.0);
 		const moonMass = new types.Value(moonMass_MEarth, types.units.Mass.M_Earth);
 		const moonSma = new types.Value(sma, types.units.Dist.R_Earth);
 		const moon = planetGen.generatePlanet(settings, planet, moonSma, 

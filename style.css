@@ -122,6 +122,7 @@ body::before {
 /* ---====== GENERAL ======--- */
 
 footer {
+	display: none;
     text-align: center;
 }
 
@@ -147,6 +148,8 @@ a {
 	overflow: hidden;
 	border: 1px solid #ccc;
 	background-color: var(--col-background);
+	position: absolute;
+	top: 0;
 }
 
 
@@ -302,4 +305,18 @@ input:checked + .slider::before {
 	font-family: 'Courier New', Courier, monospace;
 	color: var(--col-text-alt);
 	background-color: var(--col-background);
+}
+
+.control-group {
+	position: absolute;
+	top: 4em;
+}
+
+#stats {
+	position: absolute;
+	top: 6em;
+}
+
+#warpSlider {
+	width: 30em;
 }
