@@ -50,6 +50,18 @@ class SystemGenerator {
 			}
 		});
 
+		// Assigning system type
+		let starsCount = 0;
+		stars.forEach(star => {
+			starsCount += star instanceof types.Star ? 1 : 0;
+		})
+		switch (starsCount) {
+			case 1: this.system.type = types.systemTypes.Single; break;
+			case 2: this.system.type = types.systemTypes.Binary; break;
+			case 3: this.system.type = types.systemTypes.Triple; break;
+			case 4: this.system.type = types.systemTypes.Quadruple; break;
+		}
+
 		// Migration simulation
 		migrationSim.simulateMigration(this.settings, stars);
 
@@ -63,6 +75,15 @@ class SystemGenerator {
 				planetGen.planetGeneration_Stage2(this.settings, body);
 				moonSystemGen.generateMoons(this.settings, body);
 			}
+		});
+
+		// 3.5. Resort bodies after adding binary planets
+		stars.forEach(star => {
+			star.bodies.sort((bodyA, bodyB) => {
+				const distanceA = bodyA.sma.getValueAs(types.units.Dist.m);
+				const distanceB = bodyB.sma.getValueAs(types.units.Dist.m);
+				return distanceA - distanceB;
+			}); 
 		});
 
 		// Performing stage 3 generation for all planetary bodies
@@ -85,12 +106,17 @@ class SystemGenerator {
 			
 			if (body instanceof types.Planet) {
 				planetGen.planetGeneration_Stage3(this.settings, body);
-
-				body.orbit.e = body.eccentricity;
+				
 				if (body.genData.retrograde === true) {
 					body.orbit.i = (body.orbit.i + Math.PI) % (2 * Math.PI);
 				}
 			}
+
+			if ((body instanceof types.Star) || (body instanceof types.BinaryStar)) {
+				planetGen.setEccentricity(body);
+			}
+
+			body.orbit.e = body.eccentricity;
 
 			if (body instanceof types.Binary) {
 				// Setting correct distances for binary components from its barycenter.
@@ -112,10 +138,13 @@ class SystemGenerator {
 
 				// Setting some random eccentricity for binary star components
 				if (body instanceof types.BinaryStar) {
-					const rand_e = 0.10 * prng();
+					const rand_e = 0.15 * prng();
+
 					primary.orbit.e = rand_e;
+					primary.eccentricity = rand_e;
+
 					secondary.orbit.e = rand_e;
-					console.log(rand_e);
+					secondary.eccentricity = rand_e;
 				}
 			}
 
@@ -127,6 +156,38 @@ class SystemGenerator {
 			});
 		};
 		this.system.bodies.forEach(body => { finishGeneration(body) });
+
+		const calculateOrbitalPeriodAndSpeed = (body) => {
+			if (body.parentBody !== null) {
+				let host = body.parentBody;
+				if (body.parentBody instanceof types.Binary) {
+					if (body.parentBody.primary === body)
+						host = body.parentBody.secondary;
+					else if (body.parentBody.secondary === body)
+						host = body.parentBody.primary;
+				}
+
+				const a = body.sma.getValueAs(types.units.Dist.m);
+				const M = body.parentBody === host
+					? host.mass.getValueAs(types.units.Mass.kg) // Small body orbiting a central body case
+					: body.parentBody.mass.getValueAs(types.units.Mass.kg); // Two bodies orbiting each other case
+				
+				const orbitalPeriod = 2 * Math.PI * Math.sqrt( (a ** 3) / (consts.PHY_G * M) );
+				body.orbitalPeriod = new types.Value(orbitalPeriod, types.units.Time.s);
+
+				const orbitalSpeed = (2 * Math.PI * a) / orbitalPeriod;
+				body.orbitalSpeed = new types.Value(orbitalSpeed, types.units.Spd.m_s);
+			}
+
+			if (body instanceof types.Binary) {
+				calculateOrbitalPeriodAndSpeed(body.primary);
+				calculateOrbitalPeriodAndSpeed(body.secondary);
+			}
+			body.bodies.forEach(child => { 
+				calculateOrbitalPeriodAndSpeed(child) 
+			});
+		}
+		this.system.bodies.forEach(body => { calculateOrbitalPeriodAndSpeed(body) });
 		
 		console.log(this.system);
 		console.log('--------------------')

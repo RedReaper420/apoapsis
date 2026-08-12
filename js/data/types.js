@@ -1,5 +1,6 @@
 
 import consts from "./consts.js";
+import * as utils from "../utils/utils.js";
 
 // =================================================
 // Units
@@ -80,7 +81,7 @@ const unitValues = new Map([
 	[units.Mass.M_Moon,      7.346e22],
 	[units.Mass.M_Earth_atm, 5.15e18],
 
-	// Time,
+	// Time
 	[units.Time.s,  1],
 	[units.Time.h,  1*60*60],
 	[units.Time.d,  1*60*60*24],
@@ -94,6 +95,45 @@ const unitValues = new Map([
 	[units.Spd.km_s, 1000],
 	[units.Spd.km_h, 1/3.6],
 	[units.Spd.c,    299792458],
+]);
+
+export const unitNames = new Map([
+	// Distance
+	[units.Dist.m,         'm'],
+	[units.Dist.km,        'km'],
+	[units.Dist.AU,        'AU'],
+	[units.Dist.ly,        'ly'],
+	[units.Dist.R_Sun,     'R☉'],
+	[units.Dist.R_Jupiter, 'R♃'],
+	[units.Dist.R_Earth,   'R⊕'],
+	[units.Dist.R_Moon,    'R☾'],
+
+	// Mass
+	[units.Mass.kg,          'kg'],
+	[units.Mass.M_Sun,       'M☉'],
+	[units.Mass.M_Jupiter,   'M♃'],
+	[units.Mass.M_Earth,     'M⊕'],
+	[units.Mass.M_Moon,      'M☾'],
+	[units.Mass.M_Earth_atm, 'Matm⊕'],
+
+	// Time
+	[units.Time.s,  's'],
+	[units.Time.h,  'h'],
+	[units.Time.d,  'd'],
+	[units.Time.mo, 'mo'],
+	[units.Time.y,  'y'],
+	[units.Time.My, 'My'],
+	[units.Time.Gy, 'Gy'],
+
+	// Speed
+	[units.Spd.m_s,  'm/s'],
+	[units.Spd.km_s, 'km/s'],
+	[units.Spd.km_h, 'km/h'],
+	[units.Spd.c,    'c'],
+
+	// Temperature
+	[units.Temp.K,  'K'],
+	[units.Temp.C,  '°C'],
 ]);
 
 export class Value {
@@ -256,8 +296,16 @@ export class System {
 	) {
 		this.settings = settings;
 		this.bodies = [];
+		this.type = systemTypes.Single;
 	}
 }
+
+export const systemTypes = Object.freeze({
+	Single: 'Single',
+	Binary: 'Binary',
+	Triple: 'Triple',
+	Quadruple: 'Quadruple',
+});
 
 // -------------------------------------------------
 
@@ -410,6 +458,8 @@ export class Binary extends Body {
 		this.secondary = secondary;
 		this.secondary.parentBody = this;
 		this.secondary.sma = sma;
+
+		this.color = '#ffffff';
 	}
 }
 
@@ -425,16 +475,37 @@ export class BinaryStar extends Binary {
 	}
 	
 	combineProperties() {
+		// Combined value
 		this.mass = new Value(
 			this.primary.mass.getValueAs(units.Mass.M_Sun) + this.secondary.mass.getValueAs(units.Mass.M_Sun), 
-			units.Mass.M_Sun); // Combined value
+			units.Mass.M_Sun);
+
+		// Max value
 		this.temperature = new Value(Math.max(
 			this.primary.temperature.getValueAs(units.Temp.K),
 			this.secondary.temperature.getValueAs(units.Temp.K)
-		), units.Temp.K); // Max value
-		this.age = this.primary.age; // Equal values, first taken
-		this.metallicity = (this.primary.metallicity + this.secondary.metallicity) / 2; // Mean value
-		this.luminosity = this.primary.luminosity + this.secondary.luminosity; // Combined value
+		), units.Temp.K);
+
+		// Equal values, first taken
+		this.age = this.primary.age;
+
+		// Average value
+		this.metallicity = (this.primary.metallicity + this.secondary.metallicity) / 2;
+
+		// Combined value
+		this.luminosity = this.primary.luminosity + this.secondary.luminosity;
+		
+		// Weighted average value
+		const color_p = utils.parseColor(this.primary.color);
+		const color_s = utils.parseColor(this.secondary.color);
+		const lumRatio = this.primary.luminosity / this.luminosity;
+
+		const red =   utils.clamp( Math.floor( color_p.r * lumRatio + color_s.r * (1 - lumRatio) ) , 0, 255);
+		const green = utils.clamp( Math.floor( color_p.g * lumRatio + color_s.g * (1 - lumRatio) ) , 0, 255);
+		const blue =  utils.clamp( Math.floor( color_p.b * lumRatio + color_s.b * (1 - lumRatio) ) , 0, 255);
+
+		const toHex = (colorVal) => colorVal.toString(16).padStart(2, '0');
+		this.color = `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
 	}
 }
 

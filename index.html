@@ -10,178 +10,573 @@
 </head>
 
 <body>
-	<header>
-		<div class="tab">
-			<button class="tablinks btn" data-tab="btn" id="btn-generate">Generate system</button>
-			<button class="tablinks" data-tab="tab_generator">Generator settings</button>
-			<button class="tablinks btn" data-tab="btn" id="btn-download-system">Download SOLAR file</button>
-			<button class="tablinks btn" data-tab="btn" id="btn-upload-system">Upload SOLAR file</button>
-			<button class="tablinks" data-tab="tab_editor">JSON Editor</button>
+<main>
+	<div class="ui bar top left small">
+		<div class="group">
+			<button name="generate">♻️ Generate</button>
+			<button class="toggle" name="settings">⚙️</button>
+			<button>📄</button>
+			<button>💾</button>
+			<button>📂</button>
 		</div>
-		<div class="tabcontent" id="tab_generator">
-			<p>
-				<label  for="gen_seed">Seed:</label>
-				<input name="gen_seed" type="text" 
-						 id="gen_seed" autocomplete="off">
-			</p>
-
+	</div>
+	<div class="ui bar top right small">
+		
+		<div class="group">
+			<button>❓</button>
+			<button>🏠</button>
+		</div>
+	</div>
+	
+	<div class="ui sidePanel left">
+		<button name="navigation" class="sidePanelButton toggle on">💫</button>
+		<div class="panelContent" id="navigation">
+			<table>
+				<tr>
+					<th>System Type</th>
+					<td><span id="systemType">-</span></td>
+				</tr>
+				<tr>
+					<th>System Radius</th>
+					<td><span id="systemMaxRadius">0</span> AU</td>
+				</tr>
+				<tr>
+					<th>System age</th>
+					<td><span id="systemAgeValue">-</span> <span id="systemAgeUnit">Gy</span></td>
+				</tr>
+				<tr>
+					<th>Total Bodies</th>
+					<td><span id="systemTotalBodies">0</span></td>
+				</tr>
+			</table>
 			<hr>
+			<ul id="bodyList" class="tree"></ul>
+		</div>
+	</div>
 
-			<p>
-				<label  for="gen_star_binary_chance">Binary star chance:</label>
-				<input name="gen_star_binary_chance" type="number" 
-						 id="gen_star_binary_chance" step="0.1">
-			</p>
+	<div class="ui sidePanel right">
+		<button name="inspector" class="sidePanelButton toggle on">🌐</button>
+		<div class="panelContent" id="inspector"></div>
+
+		<template id="template_binary">
+			<details open><summary>General</summary>
+				<table>
+					<tr>
+						<th>Body type</th>
+						<td>♋ Binary barycenter</td>
+					</tr>
+					<tr>
+						<th>Body 1</th>
+						<td><span id="body1"></span></td>
+					</tr>
+					<tr>
+						<th>Body 2</th>
+						<td><span id="body2"></span></td>
+					</tr>
+					<tr>
+						<th>Total mass</th>
+						<td><span id="bodyMassValue"></span> <span id="bodyMassUnit"></span> (<span id="bodyMassKg"></span> kg)</td>
+					</tr>
+					<tr>
+						<th>Binary mass ratio</th>
+						<td><span id="binaryMassRatio"></span></td>
+					</tr>
+				</table>
+			</details>
+
+			<div id="orbitPlaceholder"></div>
+		</template>
+
+		<template id="template_star">
+			<details open><summary>General</summary>
+				<table>
+					<tr>
+						<th>Name</th>
+						<td><span id="bodyName"></span></td>
+					</tr>
+					<tr>
+						<th>Body type</th>
+						<td><span id="bodyType"></span></td>
+					</tr>
+					<tr>
+						<th>Spectral class</th>
+						<td><span id="spectralClass"></span></td>
+					</tr>
+				</table>
+			</details>
+
+			<details open><summary>Physical</summary>
+				<table>
+					<tr>
+						<th>Mass</th>
+						<td><span id="bodyMassMSun"></span> M☉ (<span id="bodyMassKg"></span> kg)</td>
+					</tr>
+					<tr id="binaryMassFractionRow">
+						<th>Binary mass fraction</th>
+						<td><span id="binaryMassFraction"></span></td>
+					</tr>
+					<tr>
+						<th>Radius</th>
+						<td><span id="bodyRadiusRSun"></span> R☉ (<span id="bodyRadiusKm"></span> km)</td>
+					</tr>
+					<tr>
+						<th>Density</th>
+						<td><span id="density"></span> g/cm³</td>
+					</tr>
+					<tr>
+						<th>Rotation period</th>
+						<td><span id="rotationPeriodValue"></span> <span id="rotationPeriodUnit"></span></td>
+					</tr>
+				</table>
+			</details>
+
+			<div id="orbitPlaceholder"></div>
+
+			<details open><summary>Radiation</summary>
+				<table>
+					<tr>
+						<th>Surf. temperature</th>
+						<td><span id="surfaceTemperature"></span> K</td>
+					</tr>
+					<tr>
+						<th>Luminosity</th>
+						<td><span id="luminosity"></span> L☉</td>
+					</tr>
+					<tr>
+						<th>Abs. magnitude</th>
+						<td><span id="absMagnitude"></span></td>
+					</tr>
+					<tr>
+						<th>Light color</th>
+						<td><span id="lightColorBlock">█</span> <span id="lightColorValue"></span></td>
+					</tr>
+					<tr>
+						<th>B-V index</th>
+						<td><span id="bvIndex"></span></td>
+					</tr>
+				</table>
+			</details>
+
+			<details open><summary>Evolution</summary>
+				<table>
+					<tr>
+						<th>Age</th>
+						<td><span id="ageValue"></span> <span id="ageUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Lifespan</th>
+						<td><span id="lifespanValue"></span> <span id="lifespanUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Lived fraction</th>
+						<td><span id="livedFraction"></span>%</td>
+					</tr>
+					<tr>
+						<th>Metallicity</th>
+						<td><span id="metallicity"></span> [Fe/H]</td>
+					</tr>
+				</table>
+			</details>
+		</template>
+
+		<template id="template_planet">
+			<details open><summary>General</summary>
+				<table>
+					<tr>
+						<th>Name</th>
+						<td><span id="bodyName"></span></td>
+					</tr>
+					<tr>
+						<th>Body type</th>
+						<td><span id="bodyType"></span></td>
+					</tr>
+				</table>
+			</details>
+
+			<details open><summary>Physical</summary>
+				<table>
+					<tr>
+						<th>Mass</th>
+						<td><span id="bodyMassValue"></span> <span id="bodyMassUnit"></span> (<span id="bodyMassKg"></span> kg)</td>
+					</tr>
+					<tr id="binaryMassFractionRow">
+						<th>Binary mass fraction</th>
+						<td><span id="binaryMassFraction"></span></td>
+					</tr>
+					<tr id="parentMassFractionRow">
+						<th>Parent mass fraction</th>
+						<td><span id="parentMassFraction"></span></td>
+					</tr>
+					<tr>
+						<th>Radius</th>
+						<td><span id="bodyRadiusValue"></span> <span id="bodyRadiusUnit"></span> (<span id="bodyRadiusKm"></span> km)</td>
+					</tr>
+					<tr>
+						<th>Density</th>
+						<td><span id="density"></span> g/cm³</td>
+					</tr>
+				</table>
+			</details>
+
+			<details open><summary>Rotation</summary>
+				<table>
+					<tr>
+						<th>Rotation period</th>
+						<td><span id="rotationPeriodValue"></span> <span id="rotationPeriodUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Retrograde rotation</th>
+						<td><span id="rotationRetrograde"></span></td>
+					</tr>
+					<tr>
+						<th>Tidally locked</th>
+						<td><span id="rotationTidalLock"></span></td>
+					</tr>
+					<tr>
+						<th>Tidal lock in</th>
+						<td><span id="rotationTidalLockTimeValue"></span> <span id="rotationTidalLockTimeUnit"></span></td>
+					</tr>
+				</table>
+			</details>
 			
-			<p>
-				<label  for="gen_star_mass_min">Minimum star mass:</label>
-				<input name="gen_star_mass_min" type="number" 
-						 id="gen_star_mass_min" step="0.1">
-			</p>
+			<div id="orbitPlaceholder"></div>
 
-			<p>
-				<label  for="gen_star_mass_max">Maximum star mass:</label>
-				<input name="gen_star_mass_max" type="number" 
-						 id="gen_star_mass_max" step="0.1">
-			</p>
+			<details open>
+				<summary>Composition</summary>
+				<table>
+					<tbody>
+						<tr>
+							<th colspan="2">Core</th>
+						</tr>
+						<tr>
+							<th>Iron</th>
+							<td><span id="compositionCoreIron"></span></td>
+						</tr>
+						<tr>
+							<th>Silicates</th>
+							<td><span id="compositionCoreRock"></span></td>
+						</tr>
+						<tr>
+							<th>Ices</th>
+							<td><span id="compositionCoreIce"></span></td>
+						</tr>
+					</tbody>
 
-			<p>
-				<label  for="gen_star_mass_use_imf">Use IMF:</label>
-				<input name="gen_star_mass_use_imf" type="checkbox" 
-						 id="gen_star_mass_use_imf">
-			</p>
+					<tbody id="compositionEnvelope">
+						<tr>
+							<th colspan="2">Gas Envelope</th>
+						</tr>
+						<tr>
+							<th>Gases</th>
+							<td><span id="compositionEnvelopeGas"></span></td>
+						</tr>
+						<tr>
+							<th>Ices</th>
+							<td><span id="compositionEnvelopeIce"></span></td>
+						</tr>
+						<tr>
+							<th>Thickness</th>
+							<td><span id="envelopeThickness"></span></td>
+						</tr>
+					</tbody>
 
-			<p>
-				<label  for="gen_star_metallicity_min">Minimum star metallicity:</label>
-				<input name="gen_star_metallicity_min" type="number" 
-						 id="gen_star_metallicity_min" step="0.1">
-			</p>
+					<tbody id="compositionAtmosphere"></tbody>
+				</table>
 
-			<p>
-				<label  for="gen_star_metallicity_max">Maximum star metallicity:</label>
-				<input name="gen_star_metallicity_max" type="number" 
-						 id="gen_star_metallicity_max" step="0.1">
-			</p>
+				
 
-			<p>
-				<label  for="gen_star_metallicity_use_gaussian">Use gaussian distribution:</label>
-				<input name="gen_star_metallicity_use_gaussian" type="checkbox" 
-						 id="gen_star_metallicity_use_gaussian">
-			</p>
+				<table>
+					<tr>
+						<th>Age</th>
+						<td><span id="ageValue"></span> <span id="ageUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Giant impacts</th>
+						<td><span id="giantImpacts"></span></td>
+					</tr>
+				</table>
 
-			<p>
-				<label  for="gen_star_metallicity_mean">Mean star metallicity:</label>
-				<input name="gen_star_metallicity_mean" type="number" 
-						 id="gen_star_metallicity_mean" step="0.05">
-			</p>
+				<table>
+					<tr>
+						<th>Distance to a star</th>
+						<td><span id="starDistance"></span> AU</td>
+					</tr>
+					<tr>
+						<th>Effective distance to a star</th>
+						<td><span id="starDistanceEff"></span> AU☉</td>
+					</tr>
+					<tr>
+						<th>Light intensity</th>
+						<td><span id="lightIntensity"></span></td>
+					</tr>
+					<tr>
+						<th>Albedo</th>
+						<td><span id="albedo"></span></td>
+					</tr>
+				</table>
 
-			<p>
-				<label  for="gen_star_metallicity_std">Standard deviation for star metallicity:</label>
-				<input name="gen_star_metallicity_std" type="number" 
-						 id="gen_star_metallicity_std" step="0.05">
-			</p>
+				<details open>
+					<summary>Temperature</summary>
+					<table>
+						<tr>
+							<th>Surface</th>
+							<td><span id="tempSurf"></span></td>
+						</tr>
+						<tr>
+							<th>Greenhouse effect</th>
+							<td><span id="greenhouse"></span></td>
+						</tr>
+						<tr>
+							<th>Effective</th>
+							<td><span id="tempEff"></span></td>
+						</tr>
+						<tr>
+							<th>Equilibrium</th>
+							<td><span id="tempEq"></span></td>
+						</tr>
+					</table>
+				</details>
+			</details>
+		</template>
 
-			<hr>
+		<template id="template_orbit">
+			<details open>
+				<summary>Orbit</summary>
+				<table>
+					<tr>
+						<th id="parentBodyLabel">Parent body</th>
+						<td id="parentBody"></td>
+					</tr>
+					<tr id="binaryMassRatioRow">
+						<th>Binary mass ratio</th>
+						<td><span id="binaryMassRatio"></span></td>
+					</tr>
+					<tr>
+						<th>Orbital period</th>
+						<td><span id="orbitalPeriodValue"></span> <span id="orbitalPeriodUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Mean orbital speed</th>
+						<td><span id="orbitalSpeed"></span> km/s</td>
+					</tr>
+					<tr>
+						<th>Semi-major axis</th>
+						<td><span id="smaValue"></span> <span id="smaUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Periapsis</th>
+						<td><span id="periapsisValue"></span> <span id="periapsisUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Apoapsis</th>
+						<td><span id="apoapsisValue"></span> <span id="apoapsisUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Eccentricity</th>
+						<td><span id="eccentricity"></span></td>
+					</tr>
+					<!--
+					<tr>
+						<th>Inclination</th>
+						<td><span id="inclination"></span>°</td>
+					</tr>
+					-->
+					<tr>
+						<th>Retrograde orbit</th>
+						<td><span id="retrogradeOrbit">No</span></td>
+					</tr>
+					<tr>
+						<th>Arg. of periapsis</th>
+						<td><span id="argOfPeriapsis"></span>°</td>
+					</tr>
+					<!--
+					<tr>
+						<th>Longitude of the ascending node</th>
+						<td><span id="longAscNode"></span>°</td>
+					</tr>
+					-->
+				</table>
+			</details>
+		</template>
+	</div>
 
-			<p>
-				<label  for="gen_planet_amount_multiplier">Planet amount multiplier:</label>
-				<input name="gen_planet_amount_multiplier" type="number" 
-						 id="gen_planet_amount_multiplier" step="0.1">
-			</p>
-
-			<p>
-				<label  for="gen_planet_s_type_safety_factor">S-type orbits safety factor:</label>
-				<input name="gen_planet_s_type_safety_factor" type="number" 
-						 id="gen_planet_s_type_safety_factor" step="0.1">
-			</p>
-
-			<p>
-				<label  for="gen_planet_p_type_enabled">Enable P-type orbits:</label>
-				<input name="gen_planet_p_type_enabled" type="checkbox" 
-						 id="gen_planet_p_type_enabled">
-			</p>
-
-			<p>
-				<label  for="gen_planet_p_type_safety_factor">P-type orbits safety factor:</label>
-				<input name="gen_planet_p_type_safety_factor" type="number" 
-						 id="gen_planet_p_type_safety_factor" step="0.1">
-			</p>
-
-			<p>
-				<label  for="gen_planet_migration_type_1_enabled">Enable Type I migration:</label>
-				<input name="gen_planet_migration_type_1_enabled" type="checkbox" 
-						 id="gen_planet_migration_type_1_enabled">
-			</p>
-			<p>
-				<label  for="gen_planet_migration_type_1_coeff">Type I migration coefficient:</label>
-				<input name="gen_planet_migration_type_1_coeff" type="number" 
-						 id="gen_planet_migration_type_1_coeff" step="0.1">
-			</p>
-
-			<p>
-				<label  for="gen_planet_migration_type_2_enabled">Enable Type II migration:</label>
-				<input name="gen_planet_migration_type_2_enabled" type="checkbox" 
-						 id="gen_planet_migration_type_2_enabled">
-			</p>
-
-			<p>
-				<label  for="gen_planet_migration_type_2_coeff">Type II migration coefficient:</label>
-				<input name="gen_planet_migration_type_2_coeff" type="number" 
-						 id="gen_planet_migration_type_2_coeff" step="0.1">
-			</p>
-
-			<p>
-				<label  for="gen_planet_migration_interpolated">Interpolate migration regimes:</label>
-				<input name="gen_planet_migration_interpolated" type="checkbox" 
-						 id="gen_planet_migration_interpolated">
-			</p>
-
-			<p>
-				<label  for="gen_planet_migration_grand_tack_chance">Grand Tack activation chance:</label>
-				<input name="gen_planet_migration_grand_tack_chance" type="number" 
-						 id="gen_planet_migration_grand_tack_chance" step="0.1">
-			</p>
-
-			<p>
-				<label  for="gen_planet_migration_hill_safety_factor">Hill orbit safety factor:</label>
-				<input name="gen_planet_migration_hill_safety_factor" type="number" 
-						 id="gen_planet_migration_hill_safety_factor" step="0.1">
-			</p>
+	<div class="ui bar bottom">
+		<div class="group">
+			<button class="toggle" name="pause">⏸️</button>
+			<label for="warpSlider">Time Warp:</label>
+			<input type="range" id="warpSlider" min="0" max="10" step="0.05" value="4.5">
+			<span id="warpDisplay" class="val">1 day/sec</span>
+			<span>|</span>
+			<span>1 cell (100 px) = <span id="cellScale">0</span> <span id="cellUnit">m</span></span>
 		</div>
-		<div class="tabcontent" id="tab_editor">
-			<p>
-				<textarea class="json-editor" cols="60" rows="30"></textarea>
-			</p>
-			<p>
-				<button>Update system</button>
-			</p>
+		<div class="group">
+			<button class="toggle on" name="setting_enableLighting">🌗</button>
+			<button class="toggle on" name="setting_applyHDR">💡</button>
+			<button class="toggle on" name="setting_showMagnetospheres">🧲</button>
+			<button class="toggle on" name="setting_showAtmospheres">☁️</button>
+			<button class="toggle on" name="setting_showOceans">💧</button>
+			<button class="toggle" name="setting_showGrid">🌐</button>
+			<button class="toggle" name="setting_showHabitableZone">🌱</button>
+			<button class="toggle on" name="setting_showStarsCorona">🔆</button>
+			<button class="toggle on" name="setting_trueStarsRotation">☀️</button>
+			<button class="toggle on" name="setting_applyScaling">📶</button>
+			<button class="toggle on" name="setting_showMarkers">🏷️</button>
+			<button class="multitoggle" data-current-setting="0" data-settings="3" name="setting_drawTrails">💫</button>
+			<button class="toggle on" name="setting_keepUIVisibile">👁️</button>
 		</div>
-	</header>
+	</div>
 
-	<main>
-		<div class="system-info"></div>
-		<div class="system-display">
-			<div id="ui-panel">
-				<div class="control-group">
-					<label for="warpSlider">Time Acceleration (Warp Factor)</label>
-					<input type="range" id="warpSlider" min="0" max="10" step="0.05" value="4.5">
-					<div style="font-size: 11px; text-align: right; color: #888;">
-						Speed: <span id="warpDisplay" class="val">1 day/sec</span>
-					</div>
+	<div id="generatorSettings">
+		<div id="settingsContent">
+			<div class="tabsBar">
+				<div>
+					<label  for="gen_seed">Seed:</label>
+					<input name="gen_seed" type="text" 
+							id="gen_seed" autocomplete="off">
 				</div>
-				<div id="stats">
-					<div>Star: <span id="starNameDisplay" class="val">-</span> (<span id="starMassDisplay" class="val">1.0</span> M☉)</div>
-					<div>Total Bodies: <span id="totalCountDisplay" class="val">0</span></div>
-					<div>System Radius: <span id="maxRadiusDisplay" class="val">0</span> AU</div>
-					<div id="instructions">Click a body to track/zoom. Click empty space to reset view.</div>
+				<button class="tabButton" name="tab_Stars">Stars</button>
+				<button class="tabButton" name="tab_PlanetsOrbits">Planets Orbits</button>
+				<button class="tabButton" name="tab_Filter">Filter</button>
+			</div>
+
+			<div class="tabContent" id="tab_Stars">
+				<div>
+					<label  for="gen_star_binary_chance">Binary star chance:</label>
+					<input name="gen_star_binary_chance" type="number" 
+							id="gen_star_binary_chance" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_star_mass_min">Minimum star mass:</label>
+					<input name="gen_star_mass_min" type="number" 
+							id="gen_star_mass_min" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_star_mass_max">Maximum star mass:</label>
+					<input name="gen_star_mass_max" type="number" 
+							id="gen_star_mass_max" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_star_mass_use_imf">Use IMF:</label>
+					<input name="gen_star_mass_use_imf" type="checkbox" 
+							id="gen_star_mass_use_imf">
+				</div>
+
+				<div>
+					<label  for="gen_star_metallicity_min">Minimum star metallicity:</label>
+					<input name="gen_star_metallicity_min" type="number" 
+							id="gen_star_metallicity_min" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_star_metallicity_max">Maximum star metallicity:</label>
+					<input name="gen_star_metallicity_max" type="number" 
+							id="gen_star_metallicity_max" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_star_metallicity_use_gaussian">Use gaussian distribution:</label>
+					<input name="gen_star_metallicity_use_gaussian" type="checkbox" 
+							id="gen_star_metallicity_use_gaussian">
+				</div>
+
+				<div>
+					<label  for="gen_star_metallicity_mean">Mean star metallicity:</label>
+					<input name="gen_star_metallicity_mean" type="number" 
+							id="gen_star_metallicity_mean" step="0.05">
+				</div>
+
+				<div>
+					<label  for="gen_star_metallicity_std">Standard deviation for star metallicity:</label>
+					<input name="gen_star_metallicity_std" type="number" 
+							id="gen_star_metallicity_std" step="0.05">
 				</div>
 			</div>
-			<canvas id="simCanvas"></canvas>
-		</div>
-	</main>
 
-	<footer>
+			<div class="tabContent" id="tab_PlanetsOrbits">
+				<div>
+					<label  for="gen_planet_amount_multiplier">Planet amount multiplier:</label>
+					<input name="gen_planet_amount_multiplier" type="number" 
+							id="gen_planet_amount_multiplier" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_planet_s_type_safety_factor">S-type orbits safety factor:</label>
+					<input name="gen_planet_s_type_safety_factor" type="number" 
+							id="gen_planet_s_type_safety_factor" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_planet_p_type_enabled">Enable P-type orbits:</label>
+					<input name="gen_planet_p_type_enabled" type="checkbox" 
+							id="gen_planet_p_type_enabled">
+				</div>
+
+				<div>
+					<label  for="gen_planet_p_type_safety_factor">P-type orbits safety factor:</label>
+					<input name="gen_planet_p_type_safety_factor" type="number" 
+							id="gen_planet_p_type_safety_factor" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_planet_migration_type_1_enabled">Enable Type I migration:</label>
+					<input name="gen_planet_migration_type_1_enabled" type="checkbox" 
+							id="gen_planet_migration_type_1_enabled">
+				</div>
+				<div>
+					<label  for="gen_planet_migration_type_1_coeff">Type I migration coefficient:</label>
+					<input name="gen_planet_migration_type_1_coeff" type="number" 
+							id="gen_planet_migration_type_1_coeff" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_planet_migration_type_2_enabled">Enable Type II migration:</label>
+					<input name="gen_planet_migration_type_2_enabled" type="checkbox" 
+							id="gen_planet_migration_type_2_enabled">
+				</div>
+
+				<div>
+					<label  for="gen_planet_migration_type_2_coeff">Type II migration coefficient:</label>
+					<input name="gen_planet_migration_type_2_coeff" type="number" 
+							id="gen_planet_migration_type_2_coeff" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_planet_migration_interpolated">Interpolate migration regimes:</label>
+					<input name="gen_planet_migration_interpolated" type="checkbox" 
+							id="gen_planet_migration_interpolated">
+				</div>
+
+				<div>
+					<label  for="gen_planet_migration_grand_tack_chance">Grand Tack activation chance:</label>
+					<input name="gen_planet_migration_grand_tack_chance" type="number" 
+							id="gen_planet_migration_grand_tack_chance" step="0.1">
+				</div>
+
+				<div>
+					<label  for="gen_planet_migration_hill_safety_factor">Hill orbit safety factor:</label>
+					<input name="gen_planet_migration_hill_safety_factor" type="number" 
+							id="gen_planet_migration_hill_safety_factor" step="0.1">
+				</div>
+			</div>
+
+			<div class="tabContent" id="tab_Filter">
+
+			</div>
+		</div>
+	</div>
+
+	<dialog id="about">
 		<span><b><a target="_blank" href="https://github.com/RedReaper420/apoapsis">Apoapsis</a></b> by RedReaper420 is inspired with <b><a target="_blank" href="https://github.com/Vector-Graphics/periapsis">Periapsis</a></b> by Vector-Graphics.</span>
-	</footer>
+	</dialog>
+
+	<dialog id="exit">
+		<button>Proceed</button>
+	</dialog>
+	
+	<canvas id="simCanvas"></canvas>
+</main>
 </body>
 </html>

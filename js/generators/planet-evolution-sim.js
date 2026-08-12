@@ -61,6 +61,8 @@ class RotationManager {
 		this.tidalLockTime_s = getTidalLockTime(this.planet, parent).getValueAs(types.units.Time.s);
 		this.targetRotationPeriod_s = getTidalLockRotationPeriod(this.planet, parent).getValueAs(types.units.Time.s);
 		this.targetOmega = 2 * Math.PI / this.targetRotationPeriod_s;
+
+		this.planet.tidalLockIn = new types.Value(0, types.units.Time.s);
 	}
 
 	/**
@@ -105,6 +107,8 @@ class RotationManager {
 				*/
 			}
 		}
+
+		this.planet.tidalLockIn.value = this.tidalLockTime_s * (1 - ageToTLRatio);
 	}
 }
 

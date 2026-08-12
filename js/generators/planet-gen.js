@@ -115,6 +115,10 @@ export function planetGeneration_Stage2(settings, planet) {
 	if (planet.genData.isMoon === false)
 		planet.genData.sma_norm = planet.sma.getValueAs(types.units.Dist.AU) / Math.sqrt(planet.parentBody.luminosity);
 	
+	if (planet.genData.impacts > 0) {
+		setPlanetRadius(planet);
+	}
+
 	setInitialRotation(planet);
 
 	const T_eq = consts.PHY_EARTH_TEMP_EQ * Math.pow(1 / (planet.genData.sma_norm ** 2), 1/4);
@@ -138,11 +142,12 @@ export function planetGeneration_Stage3(settings, planet) {
 		generateAtmosphere(planet);
 	else {
 		planet.atmosphere = {
-			scaleHeight: planet.radius.getValueAs(types.units.Dist.km) * 0.1,
+			scaleHeight: planet.radius.getValueAs(types.units.Dist.km) * 0.05,
 			pressure: 0.5,
 			cloudCover: 0.95,
 			composition: { }
 		}
+		planet.temperature_eff = new types.Value(planet.temperature.value, planet.temperature.unit);
 	}
 
 	planet.planetEvolution = new planetEvolutionSim.PlanetEvolution(settings, planet);
@@ -210,10 +215,10 @@ function generatePlanetCore(planet) {
 		// Generating a moon
 		const parentBody = planet.parentBody;
 		switch (planet.genData.type) {
-			case types.moonTypes.Impact:
-				const f_iron = parentBody.core.composition.iron**2; // Not much of heavy iron leaves the parent planet
+			case types.moonTypes.Impact: {
+				const f_iron = parentBody.core.composition.iron ** 2; // Not much of heavy iron leaves the parent planet
 				const f_rock = parentBody.core.composition.rock;
-				const f_ice = parentBody.core.composition.ice**2; // Portion of ices evaporates and escapes into space
+				const f_ice  = parentBody.core.composition.ice ** 2; // Portion of ices evaporates and escapes into space
 				const f_total = f_iron + f_rock + f_ice;
 				
 				return new types.Core(
@@ -222,15 +227,29 @@ function generatePlanetCore(planet) {
 					f_rock / f_total,
 					f_ice / f_total
 				);
-			default:
-				const likeness = utils.clamp(utils.randomRangeGaussian(0.0, 0.7*2), 0.35, 0.95);
+			}
+			default: {
+				const likeness_min = 0.25;
+				const likeness_max = 0.75;
+				const likeness = prng.range(likeness_min, likeness_max);
+
+				let f_iron = parentBody.core.composition.iron * likeness + coreIronFraction * (1 - likeness);
+				let f_rock = parentBody.core.composition.rock * likeness + coreRockFraction * (1 - likeness);
+				let f_ice  = parentBody.core.composition.ice  * likeness + coreIceFraction  * (1 - likeness);
+
+				f_iron = f_iron ** prng.range(1.0, 1.3);
+				f_rock = f_rock ** prng.range(0.9, 1.1);
+				f_ice  = f_ice  ** prng.range(0.7, 1.0);
+
+				const f_total = f_iron + f_rock + f_ice;
 				
 				return new types.Core(
 					planet.genData.mass,
-					parentBody.core.composition.iron * likeness + coreIronFraction * (1 - likeness),
-					parentBody.core.composition.rock * likeness + coreRockFraction * (1 - likeness),
-					parentBody.core.composition.ice * likeness + coreIceFraction * (1 - likeness)
+					f_iron / f_total,
+					f_rock / f_total,
+					f_ice / f_total
 				);
+			}
 		}
 	}
 }
@@ -687,17 +706,20 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 	// Orbital period at the planet's surface
 	const surfOrbitPeriod_s = 2 * Math.PI * R_m * Math.sqrt(R_m / (consts.PHY_G * M_kg));
 
-	if (currentRotationPeriod_s > surfOrbitPeriod_s)
+	if (currentRotationPeriod_s > surfOrbitPeriod_s * 1.2)
 		// Current rotation speed is slower than critical limit, leaving the value as is.
 		return currentRotationPeriod_h;
 	else {
 		// Current rotation speed passed the limit, setting the slightly slowed down limit value.
 		const surfOrbitPeriod_h = new types.Value(surfOrbitPeriod_s, types.units.Time.s).getValueAs(types.units.Time.h);
-		return surfOrbitPeriod_h * prng.range(1.2, 2.4);
+		return surfOrbitPeriod_h * 1.2 * prng.range(1.0, 2.0);
 	}
 }
 
 export function setEccentricity(planet) {
+	if (planet.parentBody === null)
+		return 0;
+	
 	let host = planet.parentBody;
 	if (planet.parentBody instanceof types.BinaryPlanet) {
 		if (planet.parentBody.primary === planet) {
@@ -713,7 +735,7 @@ export function setEccentricity(planet) {
 	const R_roche = 2.44 * R_host * Math.pow(host.density / planet.density, 1/3);
 	const x = a / R_roche;
 	const exp = Math.exp(-5 * (x / 3500));
-	const e = 0.15 * (1 - exp) * utils.randomRangeGaussian(1 - 0.25 * exp, 1 + 0.25 * exp);
+	const e = 0.001 + 0.125 * (1 - exp) * utils.randomRangeGaussian(1 - 0.20 * exp, 1 + 0.20 * exp);
 
 	planet.eccentricity = e;
 }
@@ -875,12 +897,14 @@ function generateAtmosphere(planet) {
 	}
 
 	if ( ((K_ret >= 2.5) && (prng() < 0.5)) || (K_ret >= 3.5) ) {
+		const impacts = planet.genData.isMoon ? planet.parentBody.genData.impacts : planet.genData.impacts;
+
 		const envelope = {
 			 H2: prng.range(0.70, 0.80),
 			 He: prng.range(0.15, 0.25),
 			CH4: prng.range(0.01, 0.04),
 		};
-		const envelopeWeight = prng.range(0.75, 0.95);
+		const envelopeWeight = prng.range(0.75, 0.95) / ((impacts + 1) ** 2);
 
 		const compositionMixed = {};
 		for (const gas in envelope)
@@ -915,15 +939,17 @@ function generateAtmosphere(planet) {
  */
 function calculateTidalHeating(planet, host, sma, eccentricity) {
 	const R_p = planet.radius.getValueAs(types.units.Dist.m);
+	const M_p = planet.mass.getValueAs(types.units.Mass.kg);
 	const M_host = host.mass.getValueAs(types.units.Mass.kg);
-	const a = planet.sma.getValueAs(types.units.Dist.m);
+	const a = sma.getValueAs(types.units.Dist.m);
+	const n = Math.sqrt((consts.PHY_G * (M_host + M_p)) / (a ** 3));
 	const e = planet.eccentricity;
 
 	const k2 = planetEvolutionSim.calculateLoveNumber(planet);
 	const Q = planetEvolutionSim.calculateTidalQ(planet);
 
 	// Peale-Cassen equation
-	const E_tidal = (21/2) * (k2 / Q) * ( (consts.PHY_G * (M_host ** 2) * (R_p ** 5) * (e ** 2)) / (a ** 6) );
+	const E_tidal = (21/2) * (k2 / Q) * ( (consts.PHY_G * (M_host ** 2) * (R_p ** 5) * n) / (a ** 6) ) * (e ** 2);
 	const F_tidal = E_tidal / (4 * Math.PI * (R_p ** 2));
 
 	return F_tidal;

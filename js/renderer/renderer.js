@@ -4,6 +4,7 @@ import { events, eventBus } from "../utils/eventbus.js";
 import * as types from "../data/types.js";
 import { getKeplerianPosition } from "./kepler.js";
 import { setDrawFunctions } from "./body-drawers.js";
+import * as inspector from "../ui/inspector.js";
 
 class Renderer {
 	constructor () {
@@ -19,6 +20,7 @@ class Renderer {
 		// --- Simulation Variables ---
 		this.simTimeSeconds = 0;
 		this.timeMultiplier = 86400;
+		this.pause = false;
 		this.currentSystem = null;
 		this.bodyList = [];
 		this.systemMaxRadius = 0;
@@ -34,6 +36,26 @@ class Renderer {
 		this.hoverThreshold = 30;
 		this.cursorX = Infinity;
 		this.cursorY = Infinity;
+
+		this.setting_enableLighting = true;
+		this.setting_applyHDR = true;
+		this.setting_showMagnetospheres = true;
+		this.setting_showAtmospheres = true;
+		this.setting_showOceans = true;
+		this.setting_showHabitableZone = false;
+		this.setting_showStarsCorona = true;
+		this.setting_trueStarsRotation = true;
+		this.setting_showGrid = false;
+		this.setting_applyScaling = true;
+		this.setting_showMarkers = true;
+
+		this.setting_drawTrails = 0;
+
+		this.setting_keepUIVisibile = true;
+		this.idle = 0;
+		this.idleMax = 1.0;
+
+		this.uiElements = Array.from(document.getElementsByClassName('ui'));
 
 		// --- System Generation ---
 		eventBus.on(events.Generator.Generation.Completed, (cb) => {
@@ -61,7 +83,27 @@ class Renderer {
 		// Start sequence
 		this.updateWarpSpeed();
 		requestAnimationFrame((timestamp) => this.loop(timestamp));
+
+		eventBus.on('UI:SettingToggle', (cb) => { 
+			this[cb.setting] = cb.value; 
+		});
+
+		this.bodyListElement = document.getElementById('bodyList');
+		this.bodyListElement.addEventListener('click', (e) => {
+			const target = e.target.closest('[data-id]');
+			if (!target) return;
+
+			const bodyId = Number(target.dataset.id);
+			const body = this.bodyList[bodyId];
+
+			this.cameraPositionTransition = 0;
+			this.focusOnBody(body, true);
+
+		});
+		this.trackedBodyElement = null;
 	}
+
+
 
 	// --- System Generation ---
 	generateSystem(system) {
@@ -69,6 +111,10 @@ class Renderer {
 		this.currentSystem = system;
 		this.bodyList.length = 0;
 		this.trackedBody = null;
+		this.trackedBodyElement = null;
+
+		const inspectorEl = document.getElementById('inspector');
+		inspectorEl.innerHTML = '';
 
 		const scan = (body) => {
 			let sma_max = 0;
@@ -97,11 +143,14 @@ class Renderer {
 		this.systemMaxRadius = Math.max(minRadius, scan(this.currentSystem.bodies[0]));
 
 		const minScreenDimension = Math.min(this.canvas.width, this.canvas.height);
+		let bodyCount = 0;
 		this.systemBroadViewScale = (this.systemMaxRadius * 2 * 1.25) / minScreenDimension;
 		this.targetMetersPerPixel = this.systemBroadViewScale;
 		this.metersPerPixel = this.systemBroadViewScale;
 
+		let bodyIdCount = 0;
 		const initBodies = (body) => {
+
 			body.position = {
 				local: { x: 0, y: 0, z: 0 },
 				absolute: { x: 0, y: 0, z: 0 },
@@ -124,27 +173,69 @@ class Renderer {
 			}
 			setDrawFunctions(body, this);
 
-			if (body instanceof types.Binary) {
-				body.sim.radius = 500 * 1000;
-				body.sim.isSystem = true;
+			const listItem = document.createElement('li');
 
-				initBodies(body.primary);
-				initBodies(body.secondary);
-			}
-			else {
-				if (body.bodies.length > 0) {
+			const bodyMark = document.createElement('span');
+			bodyMark.classList.add('body', body instanceof types.Binary
+				? 'binary'
+				: body instanceof types.Star
+					? 'star'
+					: body.type !== types.planetTypes.Terrestrial
+						? 'giant'
+						: 'planet'
+			);
+			bodyMark.innerText = `${body.name}`;
+			listItem.appendChild(bodyMark);
+
+			if ((body instanceof types.Binary) || (body.bodies.length > 0)) {
+				const listHolder = document.createElement('ul');
+				listItem.appendChild(listHolder);
+				
+				if (body instanceof types.Binary) {
+					body.sim.radius = 500 * 1000;
 					body.sim.isSystem = true;
+
+					listHolder.appendChild(initBodies(body.primary));
+					listHolder.appendChild(initBodies(body.secondary));
 				}
+				else {
+					if (body.bodies.length > 0) {
+						body.sim.isSystem = true;
+					}
+				}
+				
+				body.bodies.forEach(child => listHolder.appendChild(initBodies(child)));
 			}
+			
+			if (!(body instanceof types.Binary))
+				bodyCount++;
 
 			this.bodyList.push(body);
 
-			body.bodies.forEach(child => initBodies(child));
-		}
-		initBodies(this.currentSystem.bodies[0]);
+			bodyMark.dataset.id = String(bodyIdCount);
+			bodyIdCount++;
+			body.sim.navMark = bodyMark;
 
-		document.getElementById('totalCountDisplay').innerText = this.bodyList.length;
-		document.getElementById('maxRadiusDisplay').innerText = new types.Value(this.systemMaxRadius, types.units.Dist.m).getValueAs(types.units.Dist.AU).toFixed(1);
+			body.sim.profile = inspector.generateProfile(body);
+
+			return listItem;
+		}
+
+		this.bodyListElement.innerHTML = '';
+		this.bodyListElement.appendChild(initBodies(this.currentSystem.bodies[0]));
+
+		document.getElementById('systemType').innerText = system.type;
+		document.getElementById('systemTotalBodies').innerText = bodyCount;
+		document.getElementById('systemMaxRadius').innerText = new types.Value(this.systemMaxRadius, types.units.Dist.m).getValueAs(types.units.Dist.AU).toFixed(1);
+
+		const systemAgeFit = utils.getFittingValue(
+			this.bodyList[0].age,
+			types.units.Time.s,
+			[types.units.Time.y, types.units.Time.My, types.units.Time.Gy],
+			0.5
+		);
+		document.getElementById('systemAgeValue').innerText = systemAgeFit.value.toFixed(2);
+		document.getElementById('systemAgeUnit').innerText = systemAgeFit.unit;
 	}
 	
 	updateAbsolutePositions() {
@@ -241,11 +332,13 @@ class Renderer {
 	 */
 	handleClick(e) {
 		// Check if clicked element was inside UI panel bounding rect
+		/*
 		const uiPanel = document.getElementById('ui-panel');
 		const rect = uiPanel.getBoundingClientRect();
 		if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
 			return; 
 		}
+		*/
 
 		let clickedBody = null;
 		let closestDist = this.hoverThreshold; // Click selection radius in pixels
@@ -262,16 +355,43 @@ class Renderer {
 		this.cameraPositionTransition = 0;
 		if (clickedBody) {
 			// Dynamically adjust zoom
-			if (this.trackedBody === null) {
-				this.targetMetersPerPixel = (2 * clickedBody.radius.getValueAs(types.units.Dist.m)) / Math.min(this.canvas.width, this.canvas.height) * 25;
-			}
-			this.trackedBody = clickedBody;
+			this.focusOnBody(clickedBody);
 		}
 		else {
 			// Space clicked: restore system view
+			if (this.trackedBody !== null)
+				this.trackedBody.sim.navMark.classList.remove('active');
+			this.trackedBodyElement = null;
+
 			this.trackedBody = null;
+			
 			this.targetMetersPerPixel = this.systemBroadViewScale;
+
+			const inspectorEl = document.getElementById('inspector');
+			inspectorEl.innerHTML = '';
 		}
+	}
+
+	focusOnBody(body, refocus = false) {
+		if (this.trackedBodyElement !== null)
+			this.trackedBodyElement.classList.remove('active');
+		this.trackedBodyElement = body.sim.navMark;
+		this.trackedBodyElement.classList.add('active');
+
+		if ((this.trackedBody === null) || refocus) {
+			const radius = body instanceof types.Binary
+				? body.primary.sma.getValueAs(types.units.Dist.m)
+				: body.radius.getValueAs(types.units.Dist.m);
+			const broadScale = body instanceof types.Binary
+				? 1.25
+				: 25;
+			this.targetMetersPerPixel = (2 * radius) / Math.min(this.canvas.width, this.canvas.height) * broadScale;
+		}
+		this.trackedBody = body;
+		
+		const inspectorEl = document.getElementById('inspector');
+		inspectorEl.innerHTML = '';
+		inspectorEl.appendChild(body.sim.profile);
 	}
 
 	/**
@@ -281,6 +401,7 @@ class Renderer {
 	onMouseMove(e) {
 		this.cursorX = e.clientX;
 		this.cursorY = e.clientY;
+		this.idle = 0;
 	}
 
 	/**
@@ -332,7 +453,15 @@ class Renderer {
 
 		if (realDt > 0.1) realDt = 0.1; 
 		const simDt = realDt * this.timeMultiplier;
-		this.simTimeSeconds += simDt;
+		this.simTimeSeconds += simDt * (!this.pause);
+
+		if (this.setting_keepUIVisibile) this.idle = 0;
+		else this.idle = Math.min(this.idleMax, this.idle + realDt);
+
+		if (this.idle === this.idleMax)
+			this.uiElements.forEach(el => { el.classList.add('hidden'); });
+		else
+			this.uiElements.forEach(el => { el.classList.remove('hidden'); });
 
 		this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 		
@@ -363,7 +492,50 @@ class Renderer {
 			body.drawBody();
 		});
 
+		if (this.setting_showGrid)
+			this.drawGrid();
+
+		const fittingCellScale = utils.getFittingValue(
+			new types.Value(this.metersPerPixel, types.units.Dist.m),
+			types.units.Dist.m,
+			[types.units.Dist.m, types.units.Dist.km, types.units.Dist.AU, types.units.Dist.ly],
+			(1/100) * 0.1
+		);
+
+		const cellScale = document.getElementById('cellScale');
+		cellScale.innerText = (fittingCellScale.value * 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+		const cellUnit = document.getElementById('cellUnit');
+		cellUnit.innerText = fittingCellScale.unit;
+		
 		requestAnimationFrame((timestamp) => this.loop(timestamp));
+	}
+
+	drawGrid() {
+		this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+		const cellSize = 100;
+		const cam_x = (-this.cameraPosition.x / this.metersPerPixel) % cellSize;
+		const cam_y = (this.cameraPosition.y / this.metersPerPixel) % cellSize;
+		
+		for (let i = -Math.ceil(this.canvas.width / cellSize / 2); i <= Math.ceil(this.canvas.width / cellSize / 2); i++) {
+			this.ctx.beginPath();
+			const pos_x = this.canvas.width / 2 + i * cellSize + cam_x;
+			const pos_y1 = -this.canvas.height / 2 + -cellSize + cam_y;
+			const pos_y2 = this.canvas.height + cellSize + cam_y;
+			this.ctx.moveTo(pos_x, pos_y1);
+			this.ctx.lineTo(pos_x, pos_y2);
+			this.ctx.stroke();
+		}
+		
+		for (let j = -Math.ceil(this.canvas.height / cellSize / 2); j <= Math.ceil(this.canvas.height / cellSize / 2); j++) {
+			this.ctx.beginPath();
+			const pos_x1 = -this.canvas.width / 2 + -cellSize + cam_x;
+			const pos_x2 = this.canvas.width + cellSize + cam_x;
+			const pos_y = this.canvas.height / 2 + j * cellSize + cam_y;
+			this.ctx.moveTo(pos_x1, pos_y);
+			this.ctx.lineTo(pos_x2, pos_y);
+			this.ctx.stroke();
+		}
 	}
 }
 

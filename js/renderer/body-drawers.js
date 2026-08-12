@@ -1,6 +1,7 @@
 
 import consts from "../data/consts.js";
 import * as types from "../data/types.js";
+import * as utils from "../utils/utils.js";
 
 /**
  * 
@@ -11,12 +12,14 @@ export function setDrawFunctions(body, renderer) {
 
 	body.drawBody = drawBody;
 	body.drawTrail = drawTrail;
+	body.drawOrbit = drawOrbit;
 	body.drawRings = drawRings;
 	body.drawMagneticField = drawMagneticField;
 	body.drawAtmosphereGlow = drawAtmosphereGlow;
 	body.drawShadow = drawShadow;
 	body.drawStar = drawStar;
 	body.drawHint = drawHint;
+	body.drawHabitableZone = drawHabitableZone;
 }
 
 function drawBody() {
@@ -29,15 +32,31 @@ function drawBody() {
 	this.sim.system_vis = this.systemRadius / rend.metersPerPixel;
 	this.sim.radius_vis_scaled = Math.log10(1.0 + (this.sim.radius / 1000) * 0.1);
 
-	// Trail
-	this.drawTrail();
+	if (!rend.setting_showAtmospheres)
+		this.sim.radius_atm_vis = (this.sim.radius + 1) / rend.metersPerPixel;
+
+	if (!rend.setting_applyScaling)
+		this.sim.radius_vis_scaled = this.sim.radius_vis;
+
+	switch (rend.setting_drawTrails) {
+		case 0:
+			// Orbit
+			this.drawOrbit();
+			break;
+		case 1:
+			// Trail
+			this.drawTrail();
+			break;
+		case 2: break;
+	}
 
 	// Culling
 	if (Math.hypot(coords.x, coords.y) > Math.max(rend.canvas.width, rend.canvas.height) * 50)
 		return;
 
 	// Magnetosphere
-	this.drawMagneticField();
+	if (rend.setting_showMagnetospheres)
+		this.drawMagneticField();
 
 	// Body
 	const visualRadius = Math.max(this.sim.radius_vis, this.sim.radius_vis_scaled);
@@ -55,7 +74,8 @@ function drawBody() {
 	}
 
 	// Atmosphere
-	this.drawAtmosphereGlow();
+	if (rend.setting_showAtmospheres)
+		this.drawAtmosphereGlow();
 
 	// Light & shadow
 	this.drawShadow();
@@ -65,9 +85,12 @@ function drawBody() {
 		this.drawRings();
 	}
 
-	// performance.now() / 1000
+	if (rend.setting_showHabitableZone)
+		this.drawHabitableZone();
+	
 	this.drawStar(rend.simTimeSeconds);
 
+	/*
 	// System outline
 	if (this.sim.isSystem) {
 		const opacity = 0.1 + 0.4 * Math.min(1, rend.metersPerPixel / (rend.systemBroadViewScale * 2));
@@ -78,6 +101,7 @@ function drawBody() {
 		ctx.closePath();
 		ctx.stroke();
 	}
+	*/
 
 	// Highlight if tracked
 	ctx.save();
@@ -96,7 +120,6 @@ function drawBody() {
 }
 
 function drawHint() {
-
 	const coords = this.position.screen;
 	const rend = this.renderer;
 	const canvas = rend.canvas;
@@ -109,7 +132,7 @@ function drawHint() {
 	ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
 	ctx.lineWidth = 1;
 	
-	const hintX = coords.x + this.sim.radius_vis_scaled + 30;
+	const hintX = coords.x + Math.max(this.sim.radius_vis_scaled, this.sim.radius_vis) + 30;
 	const hintY = coords.y - 30;
 	const width = 160;
 	const height = 62;
@@ -179,10 +202,83 @@ function drawTrail() {
 			canvas.height / 2 - (p.y - rend.cameraPosition.y) / rend.metersPerPixel
 		);
 	}
-		
-	ctx.strokeStyle = this.color + '4f';
+	
+	const color = utils.parseColor(this.color);
+	ctx.strokeStyle = `rgba(${Math.max(30, color.r)}, ${Math.max(20, color.g)}, ${Math.max(10, color.b)}, 0.5)`;
 	ctx.lineWidth = 1;
 	ctx.stroke();
+}
+
+function drawOrbit() {
+	if (this.parentBody === null)
+		return;
+
+	const coords = this.position.screen;
+	const rend = this.renderer;
+	const ctx = rend.ctx;
+
+	const a_px = this.orbit.a / rend.metersPerPixel;
+
+    // Не рисуем слишком мелкие орбиты
+    if (a_px < 0.5) return;
+
+	const color = utils.parseColor(this.color);
+	ctx.strokeStyle = `rgba(${Math.max(30, color.r)}, ${Math.max(20, color.g)}, ${Math.max(10, color.b)}, 0.5)`;
+	ctx.lineWidth = 1;
+
+	ctx.beginPath();
+	const segments = Math.min(1440, Math.max(36, Math.ceil(Math.PI * Math.sqrt(a_px))));
+	const parent = this.parentBody;
+	for (let i = 0; i <= segments; i++) {
+		const nu = (i / segments) * 2 * Math.PI;
+		const pos = getPositionAtTrueAnomaly(nu, this.orbit);
+
+		const screenX = parent.position.screen.x + pos.x / rend.metersPerPixel;
+		const screenY = parent.position.screen.y - pos.y / rend.metersPerPixel; // Для Canvas Y направлен вниз
+
+		if (i === 0) {
+			ctx.moveTo(screenX, screenY);
+		} else {
+			ctx.lineTo(screenX, screenY);
+		}
+	}
+
+	ctx.stroke();
+}
+
+/**
+ * 
+ * @param {number} nu 
+ * @param {types.Orbit} orbit 
+ * @returns 
+ */
+function getPositionAtTrueAnomaly(nu, orbit) {
+	// 1. Расстояние от фокуса до тела
+	const r = (orbit.a * (1 - orbit.e ** 2)) / (1 + orbit.e * Math.cos(nu));
+
+	// 2. Координаты в орбитальной плоскости (периапсис вдоль оси X')
+	const xOrb = r * Math.cos(nu);
+	const yOrb = r * Math.sin(nu);
+
+	// 3. Переход в перифокальную систему с учетом w, i, Omega
+	const cosW = Math.cos(orbit.w), sinW = Math.sin(orbit.w);
+	const cosI = Math.cos(orbit.i), sinI = Math.sin(orbit.i);
+	const cosO = Math.cos(orbit.Omega), sinO = Math.sin(orbit.Omega);
+
+	// Матрица поворота Rz(Omega) * Rx(i) * Rz(w)
+	const Px = cosW * cosO - sinW * cosI * sinO;
+	const Py = cosW * sinO + sinW * cosI * cosO;
+	const Pz = sinW * sinI;
+
+	const Qx = -sinW * cosO - cosW * cosI * sinO;
+	const Qy = -sinW * sinO + cosW * cosI * cosO;
+	const Qz = cosW * sinI;
+
+	return {
+		x: xOrb * Px + yOrb * Qx,
+		y: xOrb * Py + yOrb * Qy,
+		z: xOrb * Pz + yOrb * Qz
+	};
 }
 
 function drawRings() {
@@ -211,7 +307,7 @@ function drawRings() {
 
 		ctx.beginPath();
 			ctx.arc(coords.x, coords.y, outerRadius, 0, Math.PI * 2, false);
-			ctx.arc(coords.x, coords.y, innerRadius, 0, Math.PI * 2, true); // Drawing counter-clockwise cuts a hole in the middle
+			ctx.arc(coords.x, coords.y, innerRadius, 0, Math.PI * 2, true); // Drawing counter-clockwise is cutting a hole in the middle
 		ctx.closePath();
 		
 		ctx.save();
@@ -220,6 +316,44 @@ function drawRings() {
 			ctx.fill();
 		ctx.restore();
 	}
+}
+
+function drawHabitableZone() {
+	if (!(this instanceof types.Star))
+		return;
+
+	const coords = this.position.screen;
+	const rend = this.renderer;
+	const ctx = rend.ctx;
+	
+	const hz_inner_opt = new types.Value(0.84, types.units.Dist.AU).getValueAs(types.units.Dist.m) * Math.sqrt(this.luminosity);
+	const hz_inner_cons = new types.Value(0.95, types.units.Dist.AU).getValueAs(types.units.Dist.m) * Math.sqrt(this.luminosity);
+	const hz_outer_cons = new types.Value(1.37, types.units.Dist.AU).getValueAs(types.units.Dist.m) * Math.sqrt(this.luminosity);
+	const hz_outer_opt = new types.Value(1.67, types.units.Dist.AU).getValueAs(types.units.Dist.m) * Math.sqrt(this.luminosity);
+
+	const innerRadius = hz_inner_opt / rend.metersPerPixel;
+	const outerRadius = hz_outer_opt / rend.metersPerPixel;
+	const hotColor = `rgb(220, 70, 0)`;
+	const tempColor = `rgb(70, 220, 0)`;
+	const coldColor =`rgb(0, 70, 220)`;
+
+	const gradient = ctx.createRadialGradient(coords.x, coords.y, innerRadius, coords.x, coords.y, outerRadius);
+
+	gradient.addColorStop(0, `${hotColor.replace(')', ', 0)')}`);
+	gradient.addColorStop((hz_inner_cons - hz_inner_opt) / (hz_outer_opt - hz_inner_opt), `${tempColor.replace(')', ', 0.15)')}`);
+	gradient.addColorStop((hz_outer_cons - hz_inner_opt) / (hz_outer_opt - hz_inner_opt), `${tempColor.replace(')', ', 0.15)')}`);
+	gradient.addColorStop(1, `${coldColor.replace(')', ', 0)')}`);
+
+	ctx.beginPath();
+		ctx.arc(coords.x, coords.y, outerRadius, 0, Math.PI * 2, false);
+		ctx.arc(coords.x, coords.y, innerRadius, 0, Math.PI * 2, true); // Drawing counter-clockwise is cutting a hole in the middle
+	ctx.closePath();
+	
+	ctx.save();
+		ctx.globalCompositeOperation = 'lighter';
+		ctx.fillStyle = gradient;
+		ctx.fill();
+	ctx.restore();
 }
 
 function drawMagneticField() {
@@ -452,46 +586,49 @@ function drawShadow() {
 		shdctx.arc(coords.x, coords.y, Math.max(this.sim.radius_vis_scaled, this.sim.radius_vis), 0, Math.PI * 2);
 	shdctx.closePath();
 	if (this instanceof types.Binary) {
-		shdctx.strokeStyle = 'rgba(15, 10, 5, 0.9)';
+		shdctx.strokeStyle = 'white';
 		shdctx.lineWidth = 5;
 		shdctx.stroke();
 	}
 	else {
-		shdctx.fillStyle = 'rgba(15, 10, 5, 0.9)';
+		shdctx.fillStyle = rend.setting_enableLighting
+			? 'rgba(15, 10, 5, 0.9)'
+			: 'white';
 		shdctx.fill();
 	}
 
 	litctx.clearRect(0, 0, litctx.canvas.width, litctx.canvas.height);
 
-	litctx.beginPath();
-		litctx.arc(coords.x, coords.y, Math.max(this.sim.radius_vis_scaled, this.sim.radius_atm_vis), 0, Math.PI * 2);
-		if (this instanceof types.Binary) {
-			litctx.strokeStyle = 'black';
-			litctx.lineWidth = 5;
-			litctx.stroke();
-		}
-		else {
-			const grad = ctx.createRadialGradient(
-				coords.x, coords.y, 0,
-				coords.x, coords.y, this.sim.radius_atm_vis
-			);
+	if (rend.drawLighting) {
+		litctx.beginPath();
+			litctx.arc(coords.x, coords.y, Math.max(this.sim.radius_vis_scaled, this.sim.radius_atm_vis), 0, Math.PI * 2);
+			if (this instanceof types.Binary) {
+				litctx.strokeStyle = 'black';
+				litctx.lineWidth = 5;
+				litctx.stroke();
+			}
+			else {
+				const grad = ctx.createRadialGradient(
+					coords.x, coords.y, 0,
+					coords.x, coords.y, this.sim.radius_atm_vis
+				);
 
-			grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-			grad.addColorStop((this.sim.radius_vis / this.sim.radius_atm_vis + 1.0) / 2, 'rgba(0, 0, 0, 0.25)');
-			grad.addColorStop(this.sim.radius_vis / this.sim.radius_atm_vis, 'rgba(0, 0, 0, 1.0)');
-			grad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');
+				grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+				grad.addColorStop((this.sim.radius_vis / this.sim.radius_atm_vis + 1.0) / 2, 'rgba(0, 0, 0, 0.25)');
+				grad.addColorStop(this.sim.radius_vis / this.sim.radius_atm_vis, 'rgba(0, 0, 0, 1.0)');
+				grad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');
 
-			litctx.fillStyle = grad;
-			litctx.fill();
-		}
-	litctx.closePath();
+				litctx.fillStyle = grad;
+				litctx.fill();
+			}
+		litctx.closePath();
+	}
+	
 
 	litctx.save();
 		litctx.globalCompositeOperation = 'lighter';
 		let lum_avg = 0;
-		stars.forEach(star => {
-			lum_avg += drawLightCone(litctx, star, this);
-		});
+		stars.forEach(star => { lum_avg += drawLightCone(litctx, star, this); });
 		lum_avg /= stars.length;
 		this.sim.lum_avg = lum_avg;
 	litctx.restore();
@@ -535,7 +672,7 @@ function drawLightCone(ctx, star, planet) {
 	maskGrad.addColorStop(planet.sim.radius_vis / planet.sim.radius_atm_vis, `rgb(255, 255, 255, 1)`);
 	maskGrad.addColorStop(0, `rgb(255, 255, 255, 1)`);
 
-	const starColor = parseColor(star.color);
+	const starColor = utils.parseColor(star.color);
   
 	const dayColor   = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, ${alpha.toFixed(3)})`;
 	const termColor  = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, ${(alpha * 0.5).toFixed(3)})`;
@@ -586,32 +723,17 @@ function calculateStarIllumination(star, planet) {
 	const AU_IN_METERS = 149597870700;
 	const distAU = Math.max(0.01, distanceMeters / AU_IN_METERS);
 	
+	const hdr = planet.renderer.setting_applyHDR;
 	const rawIntensity = star.luminosity / (distAU ** 2);
-	const visualIntensity = Math.min(1.0, Math.pow(rawIntensity, 1/5)); // HDR
+	const visualIntensity = Math.min(1.0, hdr ? Math.pow(rawIntensity, 1/5) : rawIntensity); // HDR
 	const ambientLight = 0.15;
 	const finalAlpha = Math.max(ambientLight, visualIntensity);
+
 
 	return {
 		alpha: finalAlpha,
 		rawIntensity: rawIntensity
 	};
-}
-
-function parseColor(colorStr) {
-  if (colorStr.startsWith('#')) {
-    let hex = colorStr.slice(1);
-    if (hex.length === 3) {
-      hex = hex.split('').map(c => c + c).join('');
-    }
-    const num = parseInt(hex.slice(0, 6), 16);
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255
-    };
-  }
-  
-  return { r: 255, g: 255, b: 255 };
 }
 
 /**
@@ -628,7 +750,7 @@ function drawStar(simTime = 0) {
 	
 	const coreRadius = Math.max(1.5, this.sim.radius_vis);
 
-	const color = parseColor(this.color || '#ffffff');
+	const color = utils.parseColor(this.color);
 
 	ctx.save();
 
@@ -641,34 +763,37 @@ function drawStar(simTime = 0) {
 	const rayCount = 12;
 	const coronaRadius = coreRadius * 3.5 * coronaScale;
 
-	ctx.save();
-	ctx.translate(coords.x, coords.y);
-	
-	const rotationSpeed = -(2 * Math.PI / this.rotationPeriod.getValueAs(types.units.Time.s));
-	const rotation = (simTime * rotationSpeed);
-	ctx.rotate(rotation % (Math.PI * 2));
+	if (rend.setting_showStarsCorona) {
+		ctx.save();
+			ctx.translate(coords.x, coords.y);
+			
+			const rotationSpeed = -(2 * Math.PI / this.rotationPeriod.getValueAs(types.units.Time.s));
+			//if (rend. setting_timewarpStarsFlares setting_timewarpStarsRotation)
+			const rotation = rend.setting_trueStarsRotation ? simTime * rotationSpeed : -(performance.now() / 1000) * 0.1;
+			ctx.rotate(rotation % (Math.PI * 2));
 
-	for (let i = 0; i < rayCount; i++) {
-		const angle = (i / rayCount) * Math.PI * 2;
-		
-		// Pulsating effect utilizing sine functions with different frequencies
-		const pulse = Math.sin(20 * rotation * 2 + i * 1.5) * 0.2 + Math.cos(20 * rotation * 3 - i) * 0.15;
-		const currentRayLength = coronaRadius * (1 + pulse);
+			for (let i = 0; i < rayCount; i++) {
+				const angle = (i / rayCount) * Math.PI * 2;
+				
+				// Pulsating effect utilizing sine functions with different frequencies
+				const pulse = Math.sin(10 * rotation * 2 + i * 1.5) * 0.2 + Math.cos(10 * rotation * 3 - i) * 0.15;
+				const currentRayLength = coronaRadius * (1 + pulse);
 
-		const rayGrad = ctx.createRadialGradient(0, 0, coreRadius * 0.5, 0, 0, currentRayLength);
-		rayGrad.addColorStop(0.0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`);
-		rayGrad.addColorStop(0.4, `rgba(${color.r}, ${color.g}, ${color.b}, 0.1)`);
-		rayGrad.addColorStop(1.0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.0)`);
+				const rayGrad = ctx.createRadialGradient(0, 0, coreRadius * 0.5, 0, 0, currentRayLength);
+				rayGrad.addColorStop(0.0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`);
+				rayGrad.addColorStop(0.4, `rgba(${color.r}, ${color.g}, ${color.b}, 0.1)`);
+				rayGrad.addColorStop(1.0, `rgba(${color.r}, ${color.g}, ${color.b}, 0.0)`);
 
-		ctx.beginPath();
-			ctx.moveTo(0, 0);
-			ctx.arc(0, 0, currentRayLength, angle - 0.15, angle + 0.15);
-		ctx.closePath();
-		ctx.fillStyle = rayGrad;
-		ctx.fill();
+				ctx.beginPath();
+					ctx.moveTo(0, 0);
+					ctx.arc(0, 0, currentRayLength, angle - 0.15, angle + 0.15);
+				ctx.closePath();
+				ctx.fillStyle = rayGrad;
+				ctx.fill();
+			}
+		ctx.restore();
 	}
-	ctx.restore();
-
+	
 	// -------------------------------------------------------------
 	// 2. PHOTOSPHERE (INNER GLOW)
 	// -------------------------------------------------------------

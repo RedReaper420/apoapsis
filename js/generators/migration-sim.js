@@ -95,7 +95,7 @@ export function simulateMigration(settings, starsArray) {
 				}
 			}
 
-			// 3.5. Re-index and Sort System Orbits by Distance Post-Step
+			// 3.5. Re-index bodies by orbits distance Post-Step
 			star.bodies.sort((bodyA, bodyB) => {
 				const distanceA = bodyA.sma.getValueAs(types.units.Dist.m);
 				const distanceB = bodyB.sma.getValueAs(types.units.Dist.m);
@@ -308,11 +308,8 @@ function getMutualHillSphere(planet1, planet2, star) {
  * @param {types.Planet} donor - The consumed planet being destroyed.
  */
 function mergePlanets(recipient, donor) {
-	const totalMass = recipient.mass.value + donor.mass.value;
-	
 	// Conservation of momentum approximation for Semi-Major Axis
-	recipient.sma.value = (recipient.sma.value * recipient.mass.value + donor.sma.value * donor.mass.value) / totalMass;
-	recipient.mass.value = totalMass;
+	recipient.sma.value = (recipient.sma.value * recipient.mass.value + donor.sma.value * donor.mass.value) / (recipient.mass.value + donor.mass.value);
 	recipient.genData.impacts += donor.genData.impacts + 1;
 
 	// --- Core Composition Merge ---
@@ -322,7 +319,10 @@ function mergePlanets(recipient, donor) {
 	const recipientCoreMass = recipient.core.mass.value;
 	const donorCoreMass = donor.core.mass.value;
 
+	const coreCoeff = 0.9; // 90% of core mass will remain
+
 	recipient.core.mass.value += donorCoreMass;
+	recipient.core.mass.value *= coreCoeff;
 	
 	recipient.core.composition.iron = (recipient.core.composition.iron * recipientCoreMass + donor.core.composition.iron * donorCoreMass) / recipient.core.mass.value;
 	recipient.core.composition.rock = (recipient.core.composition.rock * recipientCoreMass + donor.core.composition.rock * donorCoreMass) / recipient.core.mass.value;
@@ -337,16 +337,29 @@ function mergePlanets(recipient, donor) {
 	
 	recipient.envelope.mass.value += donorEnvMass;
 
-	if (recipient.envelope.mass.value > 0) {
+	if (recipient.envelope.mass.value > 0) { // Envelope was there initially or was acquired just now
+		const gasCoeff = 1.0 - prng.range(0.25, 0.50); // 50%-75% of gas will remain
+
+		// Calculating new composition fractions
 		recipient.envelope.composition.gas = (recipient.envelope.composition.gas * recipientEnvMass + donor.envelope.composition.gas * donorEnvMass) / recipient.envelope.mass.value;
 		recipient.envelope.composition.ice = (recipient.envelope.composition.ice * recipientEnvMass + donor.envelope.composition.ice * donorEnvMass) / recipient.envelope.mass.value;
+
+		// Losing some portion of the gas
+		recipient.envelope.mass.value -= recipient.envelope.mass.value * (recipient.envelope.composition.gas - (1 - gasCoeff));
+		recipient.envelope.composition.gas *= gasCoeff;
+
+		// Normalizing composition
+		recipient.envelope.composition.gas = recipient.envelope.composition.gas / (recipient.envelope.composition.gas + recipient.envelope.composition.ice);
+		recipient.envelope.composition.ice = 1 - recipient.envelope.composition.gas;
 	}
-	else {
+	else { // Both bodies had no envelope
 		recipient.envelope.composition.gas = 0;
 		recipient.envelope.composition.ice = 0;
 	}
 
-	// --- Planet Taxonomy Taxonomy Re-evaluation ---
+	// --- Planet Taxonomy Re-evaluation ---
+	recipient.mass.value = recipient.core.mass.value + recipient.envelope.mass.value;
+
 	if (recipient.envelope.mass.value === 0) {
 		recipient.type = types.planetTypes.Terrestrial;
 	}
@@ -355,12 +368,12 @@ function mergePlanets(recipient, donor) {
 			recipient.type = types.planetTypes.BrownDwarf;
 		}
 		else if (recipient.mass.value < consts.DEF_SUB_NEPTUNE_MASS_THRESHOLD) {
-			recipient.type = (recipient.envelope.composition.gas < 0.75)
+			recipient.type = (recipient.envelope.composition.gas < 0.5)
 				? types.planetTypes.MiniNeptune
 				: types.planetTypes.GasDwarf;
 		}
 		else {
-			recipient.type = (recipient.envelope.composition.gas < 0.75)
+			recipient.type = (recipient.envelope.composition.gas < 0.5)
 				? types.planetTypes.IceGiant
 				: types.planetTypes.GasGiant;
 		}

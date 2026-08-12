@@ -112,7 +112,7 @@ export function getMaximalSTypeOrbit(host_mass, companion_mass, binary_sma) {
 	const a_bin = binary_sma.getValueAs(types.units.Dist.AU);
 
 	const u = mB / (mA + mB);
-	const e = 0.125;
+	const e = 0.15;
 	const a_crit = ( 0.464 - 0.38 * u - 0.631 * e + 0.586 * u * e + 0.15 * (e**2) - 0.198 * u * (e**2) ) * a_bin
 	//const a_crit = ( 0.464 - 0.38 * u ) * a_bin; // Simplified for circular binaries
 	return new types.Value(a_crit, types.units.Dist.AU);
@@ -135,7 +135,7 @@ export function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
 	const a_bin = binary_sma.getValueAs(types.units.Dist.AU);
 
 	const u = mB / (mA + mB);
-	const e = 0.125;
+	const e = 0.15;
 	const a_crit = ( 1.6 + 5.1 * e - 2.22 * (e**2) + 4.12 * u - 4.27 * e * u - 5.09 * (u**2) + 4.61 * (e**2) * (u**2) ) * a_bin
 	//const a_crit = ( 1.6 + 4.12 * u - 5.09 * (u**2) ) * a_bin; // Simplified for circular binaries
 	return new types.Value(a_crit, types.units.Dist.AU);
