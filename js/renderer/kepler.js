@@ -1,6 +1,5 @@
 
 import { Orbit } from "../data/types.js";
-import exports from "../../_misc/tween.esm.js";
 
 /**
  * Calculates the eccentric anomaly E using the Newton-Raphson method for M = E - e * sin(E)

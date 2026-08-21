@@ -57,8 +57,11 @@ function handleButtonClick(button) {
 			break;
 		}
 
-		case 'navigation':
+		case 'navigation': 
 		case 'inspector': {
+			button.innerHTML = button.classList.contains('on')
+				? `${button.innerText} ${button.name.charAt(0).toUpperCase() + button.name.slice(1)}` 
+				: button.innerText.slice(0, 2);
 			const targetPanel = document.getElementById(button.name);
 			targetPanel.classList.toggle('closed');
 			break;

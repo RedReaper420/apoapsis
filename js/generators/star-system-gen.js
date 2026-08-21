@@ -1,6 +1,6 @@
 
 import prng from "../utils/prng.js";
-import * as types from "../data/types.js";
+import * as T from "../data/types.js";
 import consts from "../data/consts.js";
 
 import * as starGen from "./star-gen.js";
@@ -8,9 +8,9 @@ import * as starGen from "./star-gen.js";
 /**
  * Generates a stellar system (single or binary star) and injects it into the system environment.
  * 
- * @param {types.System} system	- The core system instance (containing configuration rules).
- * @param {types.Star|types.BinaryStar|null} parentFormation - Parent hierarchical component, or null if generating system baseline.
- * @param {Array<types.Star|types.BinaryStar>} starsArray - Target array reference accumulating system components.
+ * @param {T.System} system	- The core system instance (containing configuration rules).
+ * @param {T.Star|T.BinaryStar|null} parentFormation - Parent hierarchical component, or null if generating system baseline.
+ * @param {Array<T.Star|T.BinaryStar>} starsArray - Target array reference accumulating system components.
  */
 export function generateStarFormation(system, parentFormation = null, starsArray) {
 	if (decideStarBinary(system.settings.star_binary_chance) === false) {
@@ -38,7 +38,7 @@ export function generateStarFormation(system, parentFormation = null, starsArray
 			const secondary = starGen.generateStar(system.settings, primary);
 			const sma = generateStarSeparation(primary.mass, secondary.mass, true);
 
-			const binary = new types.BinaryStar(primary, secondary, sma);
+			const binary = new T.BinaryStar(primary, secondary, sma);
 			appendStarFormation(system, binary, parentFormation, starsArray);
 		}
 		else {
@@ -74,15 +74,15 @@ export function decideStarBinary(binaryChance) {
 /**
  * Adds the generated star formation to the system (and to the stars array).
  * 
- * @param {types.System} system - The core system instance containing global settings.
- * @param {types.Star|types.BinaryStar} starFormation - The single star or binary pair being appended.
- * @param {types.Star|types.BinaryStar|null} parentFormation - The parent gravitational center, or null if it's the system's origin.
- * @param {Array<types.Star|types.BinaryStar>} starsArray - Reference to the list tracking all stars.
+ * @param {T.System} system - The core system instance containing global settings.
+ * @param {T.Star|T.BinaryStar} starFormation - The single star or binary pair being appended.
+ * @param {T.Star|T.BinaryStar|null} parentFormation - The parent gravitational center, or null if it's the system's origin.
+ * @param {Array<T.Star|T.BinaryStar>} starsArray - Reference to the list tracking all stars.
  */
 function appendStarFormation(system, starFormation, parentFormation, starsArray) {
 	if (parentFormation === null) {
 		// Appending the primary star formation to the system's origin
-		starFormation.sma = new types.Value(0, types.units.Dist.m);
+		starFormation.sma = new T.Value(0, T.units.Dist.m);
 		system.bodies.push(starFormation);
 	}
 	else {
@@ -98,24 +98,24 @@ function appendStarFormation(system, starFormation, parentFormation, starsArray)
 /**
  * Calculates the Semi-Major Axis (SMA) for a binary star system using Kepler's Third Law.
  * 
- * @param {types.Value} primaryMass	  - Mass of the primary component (unit: `Mass`)
- * @param {types.Value} secondaryMass - Mass of the secondary component (unit: `Mass`)
+ * @param {T.Value} primaryMass	  - Mass of the primary component (unit: `Mass`)
+ * @param {T.Value} secondaryMass - Mass of the secondary component (unit: `Mass`)
  * @param {boolean} isCloseOrbit	  - *[default: `true`]* If `true`, samples tight short-period orbits; otherwise samples wide orbits.
  * 
- * @returns {types.Value} Semi-major axis distance value (unit: `Dist`)
+ * @returns {T.Value} Semi-major axis distance value (unit: `Dist`)
  */
 function generateStarSeparation(primaryMass, secondaryMass, isCloseOrbit = true) {
-	const totalMassKg = primaryMass.getValueAs(types.units.Mass.kg) + secondaryMass.getValueAs(types.units.Mass.kg);
+	const totalMassKg = primaryMass.as(T.units.Mass.kg) + secondaryMass.as(T.units.Mass.kg);
 
 	// Sampling orbital period log-distribution based on binary separation type
 	const logPeriodYears = isCloseOrbit === true
 		? prng.range(-1.5, 2.0)  // Close orbit: ~11.5 days to 100 years period
 		: prng.range(2.5, 4.5);  // Wide orbit: ~316 years to 31623 years period
 	
-	const periodSeconds = new types.Value(Math.pow(10, logPeriodYears), types.units.Time.y).getValueAs(types.units.Time.s);
+	const periodSeconds = new T.Value(Math.pow(10, logPeriodYears), T.units.Time.y).as(T.units.Time.s);
 	
 	// Kepler's 3rd law: a³ = (G * M * P²) / (4 * π²)
 	const smaMeters = Math.pow( (consts.PHY_G * totalMassKg * periodSeconds**2) / (4 * Math.PI**2), 1/3 );
 	
-	return new types.Value(smaMeters, types.units.Dist.m);
+	return new T.Value(smaMeters, T.units.Dist.m);
 }

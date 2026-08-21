@@ -2,7 +2,7 @@
 import {events, eventBus} from "../utils/eventbus.js";
 
 import prng from "../utils/prng.js";
-import * as types from "../data/types.js";
+import * as T from "../data/types.js";
 import consts from "../data/consts.js";
 
 import * as starSystemGen from "./star-system-gen.js";
@@ -13,7 +13,7 @@ import * as moonSystemGen from "./moon-system-gen.js";
 
 class SystemGenerator {
 	constructor(
-		settings = new types.GenerationSettings()
+		settings = new T.GenerationSettings()
 	) {
 		this.settings = settings;
 
@@ -24,7 +24,7 @@ class SystemGenerator {
 	generate() {
 		this.settings.seed = !this.settings.seed_user ? window.crypto.randomUUID() : this.settings.seed_user;
 		prng.seed(this.settings.seed);
-		this.system = new types.System(this.settings);
+		this.system = new T.System(this.settings);
 
 		console.log(this.settings.seed);
 
@@ -44,7 +44,7 @@ class SystemGenerator {
 
 		// Making the star list correctly include binary components after generating planets
 		stars.forEach(star => {
-			if (star instanceof types.BinaryStar) {
+			if (star instanceof T.BinaryStar) {
 				stars.push(star.primary);
 				stars.push(star.secondary);
 			}
@@ -53,13 +53,13 @@ class SystemGenerator {
 		// Assigning system type
 		let starsCount = 0;
 		stars.forEach(star => {
-			starsCount += star instanceof types.Star ? 1 : 0;
+			starsCount += star instanceof T.Star ? 1 : 0;
 		})
 		switch (starsCount) {
-			case 1: this.system.type = types.systemTypes.Single; break;
-			case 2: this.system.type = types.systemTypes.Binary; break;
-			case 3: this.system.type = types.systemTypes.Triple; break;
-			case 4: this.system.type = types.systemTypes.Quadruple; break;
+			case 1: this.system.type = T.systemTypes.Single; break;
+			case 2: this.system.type = T.systemTypes.Binary; break;
+			case 3: this.system.type = T.systemTypes.Triple; break;
+			case 4: this.system.type = T.systemTypes.Quadruple; break;
 		}
 
 		// Migration simulation
@@ -69,7 +69,7 @@ class SystemGenerator {
 		stars.forEach(star => {
 			for (let i = star.bodies.length-1; i >= 0; i--) {
 				const body = star.bodies[i]
-				if ((body instanceof types.Star) || (body instanceof types.Binary))
+				if ((body instanceof T.Star) || (body instanceof T.Binary))
 					continue;
 
 				planetGen.planetGeneration_Stage2(this.settings, body);
@@ -80,8 +80,8 @@ class SystemGenerator {
 		// 3.5. Resort bodies after adding binary planets
 		stars.forEach(star => {
 			star.bodies.sort((bodyA, bodyB) => {
-				const distanceA = bodyA.sma.getValueAs(types.units.Dist.m);
-				const distanceB = bodyB.sma.getValueAs(types.units.Dist.m);
+				const distanceA = bodyA.sma.as(T.units.Dist.m);
+				const distanceB = bodyB.sma.as(T.units.Dist.m);
 				return distanceA - distanceB;
 			}); 
 		});
@@ -92,37 +92,40 @@ class SystemGenerator {
 			// Reason: children are taking magnetosphere values of their parents.
 
 			// Recursive calls
-			if (body instanceof types.Binary) {
+			if (body instanceof T.Binary) {
 				finishGeneration(body.primary);
 				finishGeneration(body.secondary);
 			}
 
 			// -------
 
-			body.orbit.a = body.sma.getValueAs(types.units.Dist.m);
+			body.orbit.a = body.sma.as(T.units.Dist.m);
 			body.orbit.calculateMeanMotion(body);
 			body.orbit.w = 2 * Math.PI * prng();
 			body.orbit.M0 = 2 * Math.PI * prng();
 			
-			if (body instanceof types.Planet) {
+			if (body instanceof T.Planet) {
 				planetGen.planetGeneration_Stage3(this.settings, body);
 				
 				if (body.genData.retrograde === true) {
 					body.orbit.i = (body.orbit.i + Math.PI) % (2 * Math.PI);
 				}
+
+				if (body.temperature.value > 1000)
+					eventBus.emit('shtap');
 			}
 
-			if ((body instanceof types.Star) || (body instanceof types.BinaryStar)) {
+			if ((body instanceof T.Star) || (body instanceof T.BinaryStar)) {
 				planetGen.setEccentricity(body);
 			}
 
 			body.orbit.e = body.eccentricity;
 
-			if (body instanceof types.Binary) {
+			if (body instanceof T.Binary) {
 				// Setting correct distances for binary components from its barycenter.
 				// For other bodies that detail is ignored.
-				let mass1 = body.primary.mass.getValueAs(types.units.Mass.kg);
-				let mass2 = body.secondary.mass.getValueAs(types.units.Mass.kg);
+				let mass1 = body.primary.mass.as(T.units.Mass.kg);
+				let mass2 = body.secondary.mass.as(T.units.Mass.kg);
 				const primary = mass1 >= mass2 ? body.primary : body.secondary;
 				const secondary = mass1 < mass2 ? body.primary : body.secondary;
 				
@@ -137,7 +140,7 @@ class SystemGenerator {
 				secondary.orbit.M0 = primary.orbit.M0;
 
 				// Setting some random eccentricity for binary star components
-				if (body instanceof types.BinaryStar) {
+				if (body instanceof T.BinaryStar) {
 					const rand_e = 0.15 * prng();
 
 					primary.orbit.e = rand_e;
@@ -160,26 +163,26 @@ class SystemGenerator {
 		const calculateOrbitalPeriodAndSpeed = (body) => {
 			if (body.parentBody !== null) {
 				let host = body.parentBody;
-				if (body.parentBody instanceof types.Binary) {
+				if (body.parentBody instanceof T.Binary) {
 					if (body.parentBody.primary === body)
 						host = body.parentBody.secondary;
 					else if (body.parentBody.secondary === body)
 						host = body.parentBody.primary;
 				}
 
-				const a = body.sma.getValueAs(types.units.Dist.m);
+				const a = body.sma.as(T.units.Dist.m);
 				const M = body.parentBody === host
-					? host.mass.getValueAs(types.units.Mass.kg) // Small body orbiting a central body case
-					: body.parentBody.mass.getValueAs(types.units.Mass.kg); // Two bodies orbiting each other case
+					? host.mass.as(T.units.Mass.kg) // Small body orbiting a central body case
+					: body.parentBody.mass.as(T.units.Mass.kg); // Two bodies orbiting each other case
 				
 				const orbitalPeriod = 2 * Math.PI * Math.sqrt( (a ** 3) / (consts.PHY_G * M) );
-				body.orbitalPeriod = new types.Value(orbitalPeriod, types.units.Time.s);
+				body.orbitalPeriod = new T.Value(orbitalPeriod, T.units.Time.s);
 
 				const orbitalSpeed = (2 * Math.PI * a) / orbitalPeriod;
-				body.orbitalSpeed = new types.Value(orbitalSpeed, types.units.Spd.m_s);
+				body.orbitalSpeed = new T.Value(orbitalSpeed, T.units.Spd.m_s);
 			}
 
-			if (body instanceof types.Binary) {
+			if (body instanceof T.Binary) {
 				calculateOrbitalPeriodAndSpeed(body.primary);
 				calculateOrbitalPeriodAndSpeed(body.secondary);
 			}

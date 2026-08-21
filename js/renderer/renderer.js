@@ -1,7 +1,7 @@
 
 import * as utils from "../utils/utils.js";
 import { events, eventBus } from "../utils/eventbus.js";
-import * as types from "../data/types.js";
+import * as T from "../data/types.js";
 import { getKeplerianPosition } from "./kepler.js";
 import { setDrawFunctions } from "./body-drawers.js";
 import * as inspector from "../ui/inspector.js";
@@ -11,11 +11,21 @@ class Renderer {
 		this.canvas = document.getElementById('simCanvas');
 		this.ctx = this.canvas.getContext('2d');
 
+		this.bodyCanvas = document.createElement('canvas');
+		this.bodyCtx = this.bodyCanvas.getContext('2d');
+
 		this.shadowCanvas = document.createElement('canvas');
 		this.shadowCtx = this.shadowCanvas.getContext('2d');
 
 		this.lightCanvas = document.createElement('canvas');
 		this.lightCtx = this.lightCanvas.getContext('2d');
+
+		this.canvases = [
+			this.canvas, 
+			this.bodyCanvas,
+			this.shadowCanvas,
+			this.lightCanvas
+		];
 
 		// --- Simulation Variables ---
 		this.simTimeSeconds = 0;
@@ -120,15 +130,15 @@ class Renderer {
 			let sma_max = 0;
 
 			let pair_max = 0;
-			if (body instanceof types.BinaryStar) {
+			if (body instanceof T.BinaryStar) {
 				const sma_1 = scan(body.primary);
 				const sma_2 = scan(body.secondary);
-				pair_max = body.primary.sma.getValueAs(types.units.Dist.m) + Math.max(sma_1, sma_2);
+				pair_max = body.primary.sma.as(T.units.Dist.m) + Math.max(sma_1, sma_2);
 			}
 
 			let local_max = 0;
 			for (const child in body.bodies) {
-				let childSma = body.bodies[child].sma.getValueAs(types.units.Dist.m) + scan(body.bodies[child]);
+				let childSma = body.bodies[child].sma.as(T.units.Dist.m) + scan(body.bodies[child]);
 				if (childSma > local_max) local_max = childSma;
 			}
 
@@ -139,7 +149,7 @@ class Renderer {
 			return sma_max;
 		}
 
-		const minRadius = this.currentSystem.bodies[0].radius.getValueAs(types.units.Dist.m) * 10;
+		const minRadius = this.currentSystem.bodies[0].radius.as(T.units.Dist.m) * 10;
 		this.systemMaxRadius = Math.max(minRadius, scan(this.currentSystem.bodies[0]));
 
 		const minScreenDimension = Math.min(this.canvas.width, this.canvas.height);
@@ -158,11 +168,11 @@ class Renderer {
 				screen: { x: 0, y: 0, z: 0 }
 			}
 			body.sim = {
-				radius: body.radius.getValueAs(types.units.Dist.m),
-				radius_atm: (body instanceof types.Planet)
+				radius: body.radius.as(T.units.Dist.m),
+				radius_atm: (body instanceof T.Planet)
 					? Math.max(
-							body.radius.getValueAs(types.units.Dist.m) + (body.atmosphere.scaleHeight * 3.5 * 1000),
-							body.radius.getValueAs(types.units.Dist.m) + 1
+							body.radius.as(T.units.Dist.m) + (body.atmosphere.scaleHeight * 3.5 * 1000),
+							body.radius.as(T.units.Dist.m) + 1
 						)
 					: 0,
 				lum_avg: 0,
@@ -176,22 +186,22 @@ class Renderer {
 			const listItem = document.createElement('li');
 
 			const bodyMark = document.createElement('span');
-			bodyMark.classList.add('body', body instanceof types.Binary
+			bodyMark.classList.add('body', body instanceof T.Binary
 				? 'binary'
-				: body instanceof types.Star
+				: body instanceof T.Star
 					? 'star'
-					: body.type !== types.planetTypes.Terrestrial
+					: body.type !== T.planetTypes.Terrestrial
 						? 'giant'
 						: 'planet'
 			);
 			bodyMark.innerText = `${body.name}`;
 			listItem.appendChild(bodyMark);
 
-			if ((body instanceof types.Binary) || (body.bodies.length > 0)) {
+			if ((body instanceof T.Binary) || (body.bodies.length > 0)) {
 				const listHolder = document.createElement('ul');
 				listItem.appendChild(listHolder);
 				
-				if (body instanceof types.Binary) {
+				if (body instanceof T.Binary) {
 					body.sim.radius = 500 * 1000;
 					body.sim.isSystem = true;
 
@@ -207,7 +217,7 @@ class Renderer {
 				body.bodies.forEach(child => listHolder.appendChild(initBodies(child)));
 			}
 			
-			if (!(body instanceof types.Binary))
+			if (!(body instanceof T.Binary))
 				bodyCount++;
 
 			this.bodyList.push(body);
@@ -226,12 +236,12 @@ class Renderer {
 
 		document.getElementById('systemType').innerText = system.type;
 		document.getElementById('systemTotalBodies').innerText = bodyCount;
-		document.getElementById('systemMaxRadius').innerText = new types.Value(this.systemMaxRadius, types.units.Dist.m).getValueAs(types.units.Dist.AU).toFixed(1);
+		document.getElementById('systemMaxRadius').innerText = new T.Value(this.systemMaxRadius, T.units.Dist.m).as(T.units.Dist.AU).toFixed(1);
 
 		const systemAgeFit = utils.getFittingValue(
 			this.bodyList[0].age,
-			types.units.Time.s,
-			[types.units.Time.y, types.units.Time.My, types.units.Time.Gy],
+			T.units.Time.s,
+			[T.units.Time.y, T.units.Time.My, T.units.Time.Gy],
 			0.5
 		);
 		document.getElementById('systemAgeValue').innerText = systemAgeFit.value.toFixed(2);
@@ -251,7 +261,7 @@ class Renderer {
 				z: parentCoords.z + body.position.local.z
 			}
 
-			if (body instanceof types.Binary) {
+			if (body instanceof T.Binary) {
 				update(body.primary, body.position.absolute);
 				update(body.secondary, body.position.absolute);
 			}
@@ -276,7 +286,7 @@ class Renderer {
 				z: 0
 			}
 
-			if (body instanceof types.Binary) {
+			if (body instanceof T.Binary) {
 				update(body.primary, body.position.absolute);
 				update(body.secondary, body.position.absolute);
 			}
@@ -316,14 +326,10 @@ class Renderer {
 	 * @param {UIEvent} e 
 	 */
 	resizeCanvas(e) {
-		this.canvas.width = window.innerWidth;
-		this.canvas.height = window.innerHeight;
-
-		this.shadowCanvas.width = window.innerWidth;
-		this.shadowCanvas.height = window.innerHeight;
-
-		this.lightCanvas.width = window.innerWidth;
-		this.lightCanvas.height = window.innerHeight;
+		for (const canvas of this.canvases) {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		}
 	}
 
 	/**
@@ -379,10 +385,10 @@ class Renderer {
 		this.trackedBodyElement.classList.add('active');
 
 		if ((this.trackedBody === null) || refocus) {
-			const radius = body instanceof types.Binary
-				? body.primary.sma.getValueAs(types.units.Dist.m)
-				: body.radius.getValueAs(types.units.Dist.m);
-			const broadScale = body instanceof types.Binary
+			const radius = body instanceof T.Binary
+				? body.primary.sma.as(T.units.Dist.m)
+				: body.radius.as(T.units.Dist.m);
+			const broadScale = body instanceof T.Binary
 				? 1.25
 				: 25;
 			this.targetMetersPerPixel = (2 * radius) / Math.min(this.canvas.width, this.canvas.height) * broadScale;
@@ -496,14 +502,19 @@ class Renderer {
 			this.drawGrid();
 
 		const fittingCellScale = utils.getFittingValue(
-			new types.Value(this.metersPerPixel, types.units.Dist.m),
-			types.units.Dist.m,
-			[types.units.Dist.m, types.units.Dist.km, types.units.Dist.AU, types.units.Dist.ly],
+			new T.Value(this.metersPerPixel, T.units.Dist.m),
+			T.units.Dist.m,
+			[
+				T.units.Dist.m, 
+				T.units.Dist.km, 
+				T.units.Dist.AU, 
+				T.units.Dist.ly
+			],
 			(1/100) * 0.1
 		);
 
-		const cellScale = document.getElementById('cellScale');
-		cellScale.innerText = (fittingCellScale.value * 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+		const cellValue = document.getElementById('cellValue');
+		cellValue.innerText = (fittingCellScale.value * 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 		const cellUnit = document.getElementById('cellUnit');
 		cellUnit.innerText = fittingCellScale.unit;

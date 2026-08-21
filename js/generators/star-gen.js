@@ -1,7 +1,7 @@
 
 import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
-import * as types from "../data/types.js";
+import * as T from "../data/types.js";
 import consts from "../data/consts.js";
 
 import * as nameGen from "./name-gen.js";
@@ -9,14 +9,14 @@ import * as nameGen from "./name-gen.js";
 /**
  * Generates a completely initialized Star object instance.
  * 
- * @param {types.GenerationSettings} settings - Generation settings configuration.
- * @param {types.Star|types.BinaryStar|null} constraint - Optional star instance to inherit baseline parameters from.
+ * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {T.Star|T.BinaryStar|null} constraint - Optional star instance to inherit baseline parameters from.
  * @param {number} constraintMassMult  - *[default: 1.0]* Mass modifier factor used to prevent sub-threshold star system generations (see `star-system-gen.js` -> `generateStarFormation()`).
  * 
- * @returns {types.Star} An instantiated and fully calculated Star object.
+ * @returns {T.Star} An instantiated and fully calculated Star object.
  */
 export function generateStar(settings, constraint = null, constraintMassMult = 1.0) {
-	const star = new types.Star();
+	const star = new T.Star();
 
 	// --- 1. Mass Generation ---
 	let mass_min = settings.star_mass_min;
@@ -27,7 +27,7 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	}
 	star.mass = settings.star_mass_use_imf
 		? sampleIMF(mass_min, mass_max)
-		: new types.Value(prng.range(mass_min, mass_max), types.units.Mass.M_Sun);
+		: new T.Value(prng.range(mass_min, mass_max), T.units.Mass.M_Sun);
 	
 	// --- 2. Metallicity Generation ([Fe/H]) ---
 	let metallicity = 0;
@@ -66,8 +66,8 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	star.radius = radius;
 
 	// Density computation: mass (kg) / volume (m³) converted from kg/m³ to g/cm³ (/1000)
-	const volumeM3 = (4 / 3) * Math.PI * Math.pow(radius.getValueAs(types.units.Dist.m), 3);
-	star.density = (star.mass.getValueAs(types.units.Mass.kg) / volumeM3) / 1000;
+	const volumeM3 = (4 / 3) * Math.PI * Math.pow(radius.as(T.units.Dist.m), 3);
+	star.density = (star.mass.as(T.units.Mass.kg) / volumeM3) / 1000;
 
 	star.temperature = getTemperature(star.luminosity, star.radius);
 	star.type = getType(star.temperature);
@@ -82,11 +82,11 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	star.lifespan = getLifespan(star.mass, star.luminosity, star.radius, star.rotationPeriod);
 	if (constraint === null) {
 		const randomAgeFraction = prng.range(0.2, 0.6);
-		const fractionAge_Gy = star.lifespan.getValueAs(types.units.Time.Gy) * randomAgeFraction;
+		const fractionAge_Gy = star.lifespan.as(T.units.Time.Gy) * randomAgeFraction;
 		
 		const flatAge_Gy = prng.range(1.5, 15.0);
 
-		star.age = new types.Value(Math.min(fractionAge_Gy, flatAge_Gy), types.units.Time.Gy);
+		star.age = new T.Value(Math.min(fractionAge_Gy, flatAge_Gy), T.units.Time.Gy);
 	} else {
 		star.age = constraint.age;
 	}
@@ -103,7 +103,7 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
  * @param {number} minMass - Minimum allowed mass in M☉.
  * @param {number} maxMass - Maximum allowed mass in M☉.
  * 
- * @returns {types.Value} The bounded star mass (unit: Mass).
+ * @returns {T.Value} The bounded star mass (unit: Mass).
  * 
  * @see {@link sampleKroupaIMF}
  */
@@ -119,7 +119,7 @@ function sampleIMF(minMass, maxMass) {
 
 	const finalMass = utils.clamp(mass, minMass, maxMass);
 
-	return new types.Value(finalMass, types.units.Mass.M_Sun);
+	return new T.Value(finalMass, T.units.Mass.M_Sun);
 }
 
 /**
@@ -207,14 +207,14 @@ function sampleMetallicity(mean, stdev, min, max) {
 /**
  * Calculates a star's base luminosity from its mass using the Mass-Luminosity relation.
  * 
- * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
+ * @param {T.Value} starMass - The mass of the star (unit: `Mass`).
  * 
  * @returns {number} The base luminosity in solar units (L☉).
  * 
  * @see {@link https://en.wikipedia.org/wiki/Mass-luminosity_relation#Advanced_forms} (slightly modified to make the curve almost seamless)
  */
 function getLuminosity(starMass) {
-	const mass = starMass.getValueAs(types.units.Mass.M_Sun);
+	const mass = starMass.as(T.units.Mass.M_Sun);
 	
 	if (mass < 0.43)
 		return 0.23 * Math.pow(mass, 2.3);
@@ -229,35 +229,35 @@ function getLuminosity(starMass) {
 /**
  * Calculates a star's base radius from its mass.
  * 
- * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
+ * @param {T.Value} starMass - The mass of the star (unit: `Mass`).
  * 
- * @returns {types.Value} The base radius (unit: `Dist`).
+ * @returns {T.Value} The base radius (unit: `Dist`).
  * 
  * @see {@link https://academic.oup.com/mnras/article/479/4/5491/5056185}
  * @see {@link http://astro.vaporia.com/start/massradius.html}
  */
 function getRadius(starMass) {
-	const mass = starMass.getValueAs(types.units.Mass.M_Sun);
+	const mass = starMass.as(T.units.Mass.M_Sun);
 
 	if (mass <= 1.5)
-		return new types.Value(0.438 * (mass**2) + 0.479 * mass + 0.075, types.units.Dist.R_Sun);
+		return new T.Value(0.438 * (mass**2) + 0.479 * mass + 0.075, T.units.Dist.R_Sun);
 	else
-		return new types.Value(Math.pow(10, 0.003 + 0.724 * Math.log10(mass)), types.units.Dist.R_Sun);
-		//return new types.Value(Math.pow(mass, 0.8), types.units.Dist.R_Sun);
+		return new T.Value(Math.pow(10, 0.003 + 0.724 * Math.log10(mass)), T.units.Dist.R_Sun);
+		//return new T.Value(Math.pow(mass, 0.8), T.units.Dist.R_Sun);
 }
 
 /**
  * Calculates effective temperature from luminosity and radius using Stefan-Boltzmann law relation.
  * 
  * @param {number} starLuminosity  - The luminosity in solar units (L☉).
- * @param {types.Value} starRadius - The radius of the star (unit: `Dist`).
+ * @param {T.Value} starRadius - The radius of the star (unit: `Dist`).
  * 
- * @returns {types.Value} The effective temperature (unit: `Temp`).
+ * @returns {T.Value} The effective temperature (unit: `Temp`).
  */
 function getTemperature(starLuminosity, starRadius) {
-	const radius = starRadius.getValueAs(types.units.Dist.R_Sun);
+	const radius = starRadius.as(T.units.Dist.R_Sun);
 	const temperature = consts.PHY_SUN_TEMP * Math.pow(starLuminosity / (radius**2), 1/4);
-	return new types.Value(temperature, types.units.Temp.K);
+	return new T.Value(temperature, T.units.Temp.K);
 }
 
 // Harvard spectral classification temperature thresholds
@@ -274,12 +274,12 @@ const starTypeChart = [
 /**
  * Determines the 2-character spectral type (e.g., "G5", "K8", "O2") from temperature.
  * 
- * @param {types.Value} starTemperature - The effective temperature (unit: `Temp`).
+ * @param {T.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
  * @returns {string} A 2-character string from "O2" to "M9".
  */
 function getType(starTemperature) {
-	const temperature = starTemperature.getValueAs(types.units.Temp.K);
+	const temperature = starTemperature.as(T.units.Temp.K);
 
 	// Very hot stars
 	if (temperature >= starTypeChart[0].max)
@@ -313,13 +313,13 @@ function getAbsMagnitude(starLuminosity) {
 /**
  * Estimates the B-V (Blue minus Visual) color index from temperature.
  * 
- * @param {types.Value} starTemperature - The effective temperature (unit: `Temp`).
+ * @param {T.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
  * @returns {number} B-V color index.
  */
 function getBV(starTemperature) {
 	// Ballesteros 2012 approximation inverted (T -> B-V)
-	const temperature = starTemperature.getValueAs(types.units.Temp.K);
+	const temperature = starTemperature.as(T.units.Temp.K);
 	
 	if (temperature >= 10000)
 		return -0.35 + (10000 - temperature) * 0.00004; // Very blue stars
@@ -332,14 +332,14 @@ function getBV(starTemperature) {
 /**
  * Converts stellar effective temperature to an RGB hex color code string.
  * 
- * @param {types.Value} starTemperature - The effective temperature (unit: `Temp`).
+ * @param {T.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
  * @returns {string} Hex color string format: "#RRGGBB".
  * 
  * @see {@link https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html}
  */
 export function temperatureToColor(starTemperature) {
-	const tempFactor = utils.clamp(starTemperature.getValueAs(types.units.Temp.K), 1000, 40000) / 100;
+	const tempFactor = utils.clamp(starTemperature.as(T.units.Temp.K), 1000, 40000) / 100;
 	let red = 0; 
 	let green = 0; 
 	let blue = 0;
@@ -386,14 +386,14 @@ export function temperatureToColor(starTemperature) {
 /**
  * Calculates a star's rotational period based on its radius and mass.
  * 
- * @param {types.Value} starRadius - The radius of the star (unit: `Dist`).
- * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
- * @returns {types.Value} The rotational period of the star (unit: `Time`).
+ * @param {T.Value} starRadius - The radius of the star (unit: `Dist`).
+ * @param {T.Value} starMass - The mass of the star (unit: `Mass`).
+ * @returns {T.Value} The rotational period of the star (unit: `Time`).
  */
 function getRotation(starRadius, starMass) {
-	const R_Sun = starRadius.getValueAs(types.units.Dist.R_Sun);
-	const R_m = starRadius.getValueAs(types.units.Dist.m);
-	const M_m = starMass.getValueAs(types.units.Mass.kg);
+	const R_Sun = starRadius.as(T.units.Dist.R_Sun);
+	const R_m = starRadius.as(T.units.Dist.m);
+	const M_m = starMass.as(T.units.Mass.kg);
 
 	// Rotational velocity approximation (km/s)
 	// Logistic function centered around the Kraft Break (R = 1.3 R☉)
@@ -410,30 +410,30 @@ function getRotation(starRadius, starMass) {
 	// v = W * R = 2piR / P
 	const P = (2 * Math.PI * R_m) / (v_e * 1000);
 
-	return new types.Value(P, types.units.Time.s);
+	return new T.Value(P, T.units.Time.s);
 }
 
 /**
  * Calculates a star's lifespan based on its mass, luminosity, radius, and rotational period.
  * 
- * @param {types.Value} starMass - The mass of the star (unit: `Mass`).
+ * @param {T.Value} starMass - The mass of the star (unit: `Mass`).
  * @param {number} starLuminosity - The luminosity of the star in solar units (L☉).
- * @param {types.Value} starRadius - The radius of the star (unit: `Dist`).
- * @param {types.Value} starRotation - The rotational period of the star (unit: `Time`).
+ * @param {T.Value} starRadius - The radius of the star (unit: `Dist`).
+ * @param {T.Value} starRotation - The rotational period of the star (unit: `Time`).
  * 
- * @returns {types.Value} The total lifespan of the star (unit: `Time`).
+ * @returns {T.Value} The total lifespan of the star (unit: `Time`).
  */
 function getLifespan(starMass, starLuminosity, starRadius, starRotation) {
-	const M_Sun = starMass.getValueAs(types.units.Mass.M_Sun);
-	const M_m = starMass.getValueAs(types.units.Mass.kg);
-	const R_m = starRadius.getValueAs(types.units.Dist.m);
-	const P = starRotation.getValueAs(types.units.Time.s);
+	const M_Sun = starMass.as(T.units.Mass.M_Sun);
+	const M_m = starMass.as(T.units.Mass.kg);
+	const R_m = starRadius.as(T.units.Dist.m);
+	const P = starRotation.as(T.units.Time.s);
 
 	/*
 	// Mass-only version
 	const a = M_Sun <= 50.0 ? -2.5 : -3.5;
 	const lifespan = consts.PHY_SUN_LIFESPAN * Math.pow(M_Sun, a);
-	return new types.Value(lifespan, types.units.Time.Gy);
+	return new T.Value(lifespan, T.units.Time.Gy);
 	*/
 
 	const lifespan_base = consts.PHY_SUN_LIFESPAN * (M_Sun / starLuminosity);
@@ -444,5 +444,5 @@ function getLifespan(starMass, starLuminosity, starRadius, starRotation) {
 
 	const lifespan = lifespan_base * rotationFactor;
 
-	return new types.Value(lifespan, types.units.Time.Gy);
+	return new T.Value(lifespan, T.units.Time.Gy);
 }

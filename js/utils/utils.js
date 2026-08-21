@@ -1,6 +1,6 @@
 
 import prng from "../utils/prng.js";
-import * as types from "../data/types.js";
+import * as T from "../data/types.js";
 
 /**
  * Returns a value within a range of values between a defined minimum bound and a maximum bound.
@@ -15,8 +15,8 @@ export function clamp(value, min, max) {
 
 /**
  * Generate a random number following a normal (Gaussian) distribution.
- * @param {number} mean - [default 0] mean value.
- * @param {number} stdev - [default 1] standard deviation (width of scatter).
+ * @param {number} [mean=0] - mean value.
+ * @param {number} [stdev=1] - standard deviation (width of scatter).
  * @returns {number}
  */
 export function gaussianRandom(mean = 0, stdev = 1) {
@@ -61,37 +61,42 @@ export function generateFallbackSeed() {
 
 export function parseColor(colorStr) {
 	if (colorStr.startsWith('#')) {
-		let hex = colorStr.slice(1);
+		let hex = colorStr.slice(1); // Removing # character
+
 		if (hex.length === 3) {
-			hex = hex.split('').map(c => c + c).join('');
+			hex = hex.split('').map(c => c + c).join(''); // Reformatting #rgb to #rrggbb
 		}
-		const num = parseInt(hex.slice(0, 6), 16);
+
+		if (hex.length === 6) hex += 'ff'; // If the color is w/o alpha, adding it
+
+		const num = parseInt(hex.slice(0, 8), 16);
 		return {
-			r: (num >> 16) & 255,
-			g: (num >> 8) & 255,
-			b: num & 255
+			r: (num >> 24) & 255,
+			g: (num >> 16) & 255,
+			b: (num >> 8) & 255,
+			a: num & 255
 		};
 	}
 
-	return { r: 255, g: 255, b: 255 };
+	return { r: 255, g: 255, b: 255, a: 255 };
 }
 
 /**
  * 
- * @param {types.Value} value 
+ * @param {T.Value} value 
  * @param {string} unitStd 
- * @param {array[string]} allowedUnits 
+ * @param {string[]} allowedUnits 
  * @param {number} threshold 
  */
 export function getFittingValue(value, unitStd, allowedUnits, threshold = 0.1) {
-	const inputStd = value.getValueAs(unitStd);
-	const comparationUnit = new types.Value(threshold, unitStd);
+	const inputStd = value.as(unitStd);
+	const comparationUnit = new T.Value(threshold, unitStd);
 
 	let lastUnit = allowedUnits[0];
 	for (const iterUnit of allowedUnits) {
 		comparationUnit.unit = iterUnit;
 
-		if (inputStd > comparationUnit.getValueAs(unitStd)) {
+		if (inputStd > comparationUnit.as(unitStd)) {
 			lastUnit = iterUnit;
 		}
 		else {
@@ -101,8 +106,8 @@ export function getFittingValue(value, unitStd, allowedUnits, threshold = 0.1) {
 	}
 
 	const fittingUnit = comparationUnit.unit;
-	const fittingUnitName = types.unitNames.get(fittingUnit);
-	const convertedValue = new types.Value(inputStd, unitStd).getValueAs(fittingUnit);
+	const fittingUnitName = T.unitNames.get(fittingUnit);
+	const convertedValue = new T.Value(inputStd, unitStd).as(fittingUnit);
 
 	return { value: convertedValue, unit: fittingUnitName };
 }

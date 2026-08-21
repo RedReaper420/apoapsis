@@ -11,25 +11,27 @@
 
 <body>
 <main>
-	<div class="ui bar top left small">
-		<div class="group">
-			<button name="generate">♻️ Generate</button>
-			<button class="toggle" name="settings">⚙️</button>
-			<button>📄</button>
-			<button>💾</button>
-			<button>📂</button>
+	<div class="barWrapper">
+		<div class="ui bar top left small">
+			<div class="group">
+				<button name="generate">♻️ Generate</button>
+				<button class="toggle" name="settings">⚙️</button>
+				<button>📄</button>
+				<button>💾</button>
+				<button>📂</button>
+			</div>
 		</div>
-	</div>
-	<div class="ui bar top right small">
-		
-		<div class="group">
-			<button>❓</button>
-			<button>🏠</button>
-		</div>
+		<div class="ui bar top right small">
+			
+			<div class="group">
+				<button>❓</button>
+				<button>🏠</button>
+			</div>
+		</div>	
 	</div>
 	
 	<div class="ui sidePanel left">
-		<button name="navigation" class="sidePanelButton toggle on">💫</button>
+		<button name="navigation" class="sidePanelButton toggle on">💫 Navigation</button>
 		<div class="panelContent" id="navigation">
 			<table>
 				<tr>
@@ -55,7 +57,7 @@
 	</div>
 
 	<div class="ui sidePanel right">
-		<button name="inspector" class="sidePanelButton toggle on">🌐</button>
+		<button name="inspector" class="sidePanelButton toggle on">🌐 Inspector</button>
 		<div class="panelContent" id="inspector"></div>
 
 		<template id="template_binary">
@@ -75,7 +77,14 @@
 					</tr>
 					<tr>
 						<th>Total mass</th>
-						<td><span id="bodyMassValue"></span> <span id="bodyMassUnit"></span> (<span id="bodyMassKg"></span> kg)</td>
+						<td>
+							<span class="tooltip">
+								<span id="bodyMassValue"></span> <span id="bodyMassUnit"></span>
+								<span class="tooltiptext">
+									<span id="bodyMassKg"></span>
+								</span>
+							</span>
+						</td>
 					</tr>
 					<tr>
 						<th>Binary mass ratio</th>
@@ -109,7 +118,14 @@
 				<table>
 					<tr>
 						<th>Mass</th>
-						<td><span id="bodyMassMSun"></span> M☉ (<span id="bodyMassKg"></span> kg)</td>
+						<td>
+							<span class="tooltip">
+								<span id="bodyMassMSun"></span>
+								<span class="tooltiptext">
+									<span id="bodyMassKg"></span>
+								</span>
+							</span>
+						</td>
 					</tr>
 					<tr id="binaryMassFractionRow">
 						<th>Binary mass fraction</th>
@@ -117,11 +133,18 @@
 					</tr>
 					<tr>
 						<th>Radius</th>
-						<td><span id="bodyRadiusRSun"></span> R☉ (<span id="bodyRadiusKm"></span> km)</td>
+						<td>
+							<span class="tooltip">
+								<span id="bodyRadiusRSun"></span>
+								<span class="tooltiptext">
+									<span id="bodyRadiusKm"></span>
+								</span>
+							</span>
+						</td>
 					</tr>
 					<tr>
 						<th>Density</th>
-						<td><span id="density"></span> g/cm³</td>
+						<td><span id="density"></span></td>
 					</tr>
 					<tr>
 						<th>Rotation period</th>
@@ -136,11 +159,11 @@
 				<table>
 					<tr>
 						<th>Surf. temperature</th>
-						<td><span id="surfaceTemperature"></span> K</td>
+						<td><span id="surfaceTemperature"></span></td>
 					</tr>
 					<tr>
 						<th>Luminosity</th>
-						<td><span id="luminosity"></span> L☉</td>
+						<td><span id="luminosity"></span></td>
 					</tr>
 					<tr>
 						<th>Abs. magnitude</th>
@@ -169,11 +192,11 @@
 					</tr>
 					<tr>
 						<th>Lived fraction</th>
-						<td><span id="livedFraction"></span>%</td>
+						<td><span id="livedFraction"></span></td>
 					</tr>
 					<tr>
 						<th>Metallicity</th>
-						<td><span id="metallicity"></span> [Fe/H]</td>
+						<td><span id="metallicity"></span></td>
 					</tr>
 				</table>
 			</details>
@@ -190,6 +213,18 @@
 						<th>Body type</th>
 						<td><span id="bodyType"></span></td>
 					</tr>
+					<tr>
+						<th>Classification</th>
+						<td><span id="classification"></span></td>
+					</tr>
+					<tr>
+						<th>Earth similarity index</th>
+						<td><span id="esi"></span></td>
+					</tr>
+					<tr>
+						<th>Life</th>
+						<td><span id="life"></span></td>
+					</tr>
 				</table>
 			</details>
 
@@ -197,7 +232,14 @@
 				<table>
 					<tr>
 						<th>Mass</th>
-						<td><span id="bodyMassValue"></span> <span id="bodyMassUnit"></span> (<span id="bodyMassKg"></span> kg)</td>
+						<td>
+							<span class="tooltip">
+								<span id="bodyMassValue"></span> <span id="bodyMassUnit"></span>
+								<span class="tooltiptext">
+									<span id="bodyMassKg"></span>
+								</span>
+							</span>
+						</td>
 					</tr>
 					<tr id="binaryMassFractionRow">
 						<th>Binary mass fraction</th>
@@ -209,59 +251,32 @@
 					</tr>
 					<tr>
 						<th>Radius</th>
-						<td><span id="bodyRadiusValue"></span> <span id="bodyRadiusUnit"></span> (<span id="bodyRadiusKm"></span> km)</td>
+						<td>
+							<span class="tooltip">
+								<span id="bodyRadiusValue"></span> <span id="bodyRadiusUnit"></span>
+								<span class="tooltiptext">
+									<span id="bodyRadiusKm"></span>
+								</span>
+							</span>
+						</td>
 					</tr>
 					<tr>
 						<th>Density</th>
-						<td><span id="density"></span> g/cm³</td>
+						<td><span id="density"></span></td>
+					</tr>
+					<tr>
+						<th>Surface gravity</th>
+						<td><span id="surfaceGravity"></span></td>
+					</tr>
+					<tr>
+						<th>Escape velocity</th>
+						<td><span id="escapeVelocity"></span></td>
 					</tr>
 				</table>
 			</details>
 
-			<details open><summary>Rotation</summary>
+			<details><summary>Composition</summary>
 				<table>
-					<tr>
-						<th>Rotation period</th>
-						<td><span id="rotationPeriodValue"></span> <span id="rotationPeriodUnit"></span></td>
-					</tr>
-					<tr>
-						<th>Retrograde rotation</th>
-						<td><span id="rotationRetrograde"></span></td>
-					</tr>
-					<tr>
-						<th>Tidally locked</th>
-						<td><span id="rotationTidalLock"></span></td>
-					</tr>
-					<tr>
-						<th>Tidal lock in</th>
-						<td><span id="rotationTidalLockTimeValue"></span> <span id="rotationTidalLockTimeUnit"></span></td>
-					</tr>
-				</table>
-			</details>
-			
-			<div id="orbitPlaceholder"></div>
-
-			<details open>
-				<summary>Composition</summary>
-				<table>
-					<tbody>
-						<tr>
-							<th colspan="2">Core</th>
-						</tr>
-						<tr>
-							<th>Iron</th>
-							<td><span id="compositionCoreIron"></span></td>
-						</tr>
-						<tr>
-							<th>Silicates</th>
-							<td><span id="compositionCoreRock"></span></td>
-						</tr>
-						<tr>
-							<th>Ices</th>
-							<td><span id="compositionCoreIce"></span></td>
-						</tr>
-					</tbody>
-
 					<tbody id="compositionEnvelope">
 						<tr>
 							<th colspan="2">Gas Envelope</th>
@@ -279,12 +294,152 @@
 							<td><span id="envelopeThickness"></span></td>
 						</tr>
 					</tbody>
+					<tbody>
+						<tr>
+							<th colspan="2">Core</th>
+						</tr>
+						<tr>
+							<th>Iron</th>
+							<td><span id="compositionCoreIron"></span></td>
+						</tr>
+						<tr>
+							<th>Silicates</th>
+							<td><span id="compositionCoreRock"></span></td>
+						</tr>
+						<tr>
+							<th>Ices</th>
+							<td><span id="compositionCoreIce"></span></td>
+						</tr>
+					</tbody>
+				</table>
+			</details>
 
-					<tbody id="compositionAtmosphere"></tbody>
+			<details open><summary>Rotation</summary>
+				<table>
+					<tr>
+						<th>Rotation period</th>
+						<td><span id="rotationPeriodValue"></span> <span id="rotationPeriodUnit"></span></td>
+					</tr>
+					<tr>
+						<th>Retrograde rotation</th>
+						<td><span id="rotationRetrograde"></span></td>
+					</tr>
+					<tr id="tidalLock"></tr>
+				</table>
+			</details>
+			
+			<div id="orbitPlaceholder"></div>
+
+			<details open><summary>Insolation</summary>
+				<table>
+					<tr>
+						<th>Distance to a star</th>
+						<td><span id="starDistance"></span></td>
+					</tr>
+					<tr>
+						<th>Effective distance to a star</th>
+						<td><span id="starDistanceEff"></span></td>
+					</tr>
+					<tr>
+						<th>Light intensity</th>
+						<td><span id="lightIntensity"></span></td>
+					</tr>
+				</table>
+			</details>
+
+			<details open><summary>Surface & Climate</summary>
+				<table>
+					<tr id="mountainHeightRow">
+						<th>Maximal mountain height</th>
+						<td><span id="mountainHeight"></span></td>
+					</tr>
+					<tr id="oceanDepthRow">
+						<th>Ocean depth</th>
+						<td><span id="oceanDepth"></span></td>
+					</tr>
+					<tr id="oceanCoverRow">
+						<th>Ocean cover</th>
+						<td><span id="oceanCover"></span></td>
+					</tr>
+
+
+					<tr>
+						<th>Surface</th>
+						<td><span id="tempSurf"></span></td>
+					</tr>
+					<tr>
+						<th>Greenhouse effect</th>
+						<td><span id="greenhouse"></span></td>
+					</tr>
+					<tr>
+						<th>Effective</th>
+						<td><span id="tempEff"></span></td>
+					</tr>
+					<tr>
+						<th>Equilibrium</th>
+						<td><span id="tempEq"></span></td>
+					</tr>
 				</table>
 
-				
+				<table>
+					<tr>
+						<th>Albedo</th>
+						<td><span id="albedo"></span></td>
+					</tr>
+				</table>
+			</details>
 
+			<details open id="atmosphereSection"><summary>Atmosphere</summary>
+				<table>
+					<tr>
+						<th>Atmosphere pressure</th>
+						<td><span id="atmospherePressure"></span></td>
+					</tr>
+					<tr>
+						<th>Atmosphere mass</th>
+						<td>
+							<span class="tooltip">
+								<span id="atmosphereMass"></span>
+								<span class="tooltiptext">
+									<span id="atmosphereMass_kg"></span>
+								</span>
+							</span>
+						</td>
+					</tr>
+					<tr>
+						<th>Scale height</th>
+						<td><span id="scaleHeight"></span></td>
+					</tr>
+					<tr>
+						<th>Cloud cover</th>
+						<td><span id="cloudCover"></span></td>
+					</tr>
+				</table>
+
+				<table id="compositionAtmosphere"></table>
+			</details>
+
+			<details open id="magnetosphereSection"><summary>Magnetosphere</summary>
+				<table>
+					<tr>
+						<th>Magnetic flux density</th>
+						<td><span id="magneticFlux"></span></td>
+					</tr>
+					<tr>
+						<th>Magnetopause radius</th>
+						<td>
+							<span class="tooltip">
+								<span id="magnetopause_R"></span>
+								<span class="tooltiptext">
+									<span id="magnetopause_km"></span>
+								</span>
+							</span>
+						</td>
+					</tr>
+				</table>
+			</details>
+
+			<details open><summary>History</summary>
 				<table>
 					<tr>
 						<th>Age</th>
@@ -294,48 +449,8 @@
 						<th>Giant impacts</th>
 						<td><span id="giantImpacts"></span></td>
 					</tr>
+					<tr id="magneticFieldLost"></tr>
 				</table>
-
-				<table>
-					<tr>
-						<th>Distance to a star</th>
-						<td><span id="starDistance"></span> AU</td>
-					</tr>
-					<tr>
-						<th>Effective distance to a star</th>
-						<td><span id="starDistanceEff"></span> AU☉</td>
-					</tr>
-					<tr>
-						<th>Light intensity</th>
-						<td><span id="lightIntensity"></span></td>
-					</tr>
-					<tr>
-						<th>Albedo</th>
-						<td><span id="albedo"></span></td>
-					</tr>
-				</table>
-
-				<details open>
-					<summary>Temperature</summary>
-					<table>
-						<tr>
-							<th>Surface</th>
-							<td><span id="tempSurf"></span></td>
-						</tr>
-						<tr>
-							<th>Greenhouse effect</th>
-							<td><span id="greenhouse"></span></td>
-						</tr>
-						<tr>
-							<th>Effective</th>
-							<td><span id="tempEff"></span></td>
-						</tr>
-						<tr>
-							<th>Equilibrium</th>
-							<td><span id="tempEq"></span></td>
-						</tr>
-					</table>
-				</details>
 			</details>
 		</template>
 
@@ -357,7 +472,7 @@
 					</tr>
 					<tr>
 						<th>Mean orbital speed</th>
-						<td><span id="orbitalSpeed"></span> km/s</td>
+						<td><span id="orbitalSpeed"></span></td>
 					</tr>
 					<tr>
 						<th>Semi-major axis</th>
@@ -383,16 +498,16 @@
 					-->
 					<tr>
 						<th>Retrograde orbit</th>
-						<td><span id="retrogradeOrbit">No</span></td>
+						<td><span id="retrogradeOrbit"></span></td>
 					</tr>
 					<tr>
 						<th>Arg. of periapsis</th>
-						<td><span id="argOfPeriapsis"></span>°</td>
+						<td><span id="argOfPeriapsis"></span></td>
 					</tr>
 					<!--
 					<tr>
 						<th>Longitude of the ascending node</th>
-						<td><span id="longAscNode"></span>°</td>
+						<td><span id="longAscNode"></span></td>
 					</tr>
 					-->
 				</table>
@@ -407,7 +522,7 @@
 			<input type="range" id="warpSlider" min="0" max="10" step="0.05" value="4.5">
 			<span id="warpDisplay" class="val">1 day/sec</span>
 			<span>|</span>
-			<span>1 cell (100 px) = <span id="cellScale">0</span> <span id="cellUnit">m</span></span>
+			<span id="cellScale">1 cell = <span id="cellValue">0</span> <span id="cellUnit">m</span></span>
 		</div>
 		<div class="group">
 			<button class="toggle on" name="setting_enableLighting">🌗</button>
@@ -428,12 +543,13 @@
 
 	<div id="generatorSettings">
 		<div id="settingsContent">
+			<div>
+				<label  for="gen_seed">Seed:</label>
+				<input name="gen_seed" type="text" 
+						id="gen_seed" autocomplete="off">
+			</div>
+			
 			<div class="tabsBar">
-				<div>
-					<label  for="gen_seed">Seed:</label>
-					<input name="gen_seed" type="text" 
-							id="gen_seed" autocomplete="off">
-				</div>
 				<button class="tabButton" name="tab_Stars">Stars</button>
 				<button class="tabButton" name="tab_PlanetsOrbits">Planets Orbits</button>
 				<button class="tabButton" name="tab_Filter">Filter</button>

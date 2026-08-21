@@ -40,7 +40,8 @@ export const units = Object.freeze({
 		mo: 'time_mo',
 		y: 'time_y',
 		My: 'time_My',
-		Gy: 'time_Gy'
+		Gy: 'time_Gy',
+		Ty: 'time_Ty'
 	}),
 	Spd: Object.freeze({
 		m_s: 'spd_m_s',
@@ -89,6 +90,7 @@ const unitValues = new Map([
 	[units.Time.y,  1*60*60*24*365],
 	[units.Time.My, 1*60*60*24*365*1e6],
 	[units.Time.Gy, 1*60*60*24*365*1e9],
+	[units.Time.Ty, 1*60*60*24*365*1e12],
 
 	// Speed
 	[units.Spd.m_s,  1],
@@ -124,6 +126,7 @@ export const unitNames = new Map([
 	[units.Time.y,  'y'],
 	[units.Time.My, 'My'],
 	[units.Time.Gy, 'Gy'],
+	[units.Time.Ty, 'Ty'],
 
 	// Speed
 	[units.Spd.m_s,  'm/s'],
@@ -152,7 +155,7 @@ export class Value {
 	 * @param {string} targetUnit - Unit enum (`types.units.GROUP.UNIT`).
 	 * @returns {number}
 	 */
-	getValueAs(targetUnit) {
+	as(targetUnit) {
 		if (targetUnit === undefined) return this.value;
 		if (targetUnit === this.unit) return this.value;
 
@@ -195,9 +198,9 @@ export class Value {
 	 * @param {string} targetUnit - Unit enum (`types.units.GROUP.UNIT`).
 	 * @returns {Value}
 	 */
-	convertUnitTo(targetUnit) {
+	convertTo(targetUnit) {
 		if (targetUnit !== this.unit) {
-			this.value = this.getValueAs(targetUnit);
+			this.value = this.as(targetUnit);
 			this.unit = targetUnit;
 		}
 		return this;
@@ -363,8 +366,8 @@ export class Orbit {
 			else if (body.parentBody.secondary === body)
 				host = body.parentBody.primary;
 		}
-		const bodyMass = body.mass.getValueAs(units.Mass.kg);
-		const hostMass = host.mass.getValueAs(units.Mass.kg);
+		const bodyMass = body.mass.as(units.Mass.kg);
+		const hostMass = host.mass.as(units.Mass.kg);
 
 		this.n = Math.sqrt((consts.PHY_G * (hostMass + bodyMass)) / (this.a ** 3));
 		return this.n;
@@ -477,13 +480,13 @@ export class BinaryStar extends Binary {
 	combineProperties() {
 		// Combined value
 		this.mass = new Value(
-			this.primary.mass.getValueAs(units.Mass.M_Sun) + this.secondary.mass.getValueAs(units.Mass.M_Sun), 
+			this.primary.mass.as(units.Mass.M_Sun) + this.secondary.mass.as(units.Mass.M_Sun), 
 			units.Mass.M_Sun);
 
 		// Max value
 		this.temperature = new Value(Math.max(
-			this.primary.temperature.getValueAs(units.Temp.K),
-			this.secondary.temperature.getValueAs(units.Temp.K)
+			this.primary.temperature.as(units.Temp.K),
+			this.secondary.temperature.as(units.Temp.K)
 		), units.Temp.K);
 
 		// Equal values, first taken
@@ -522,7 +525,7 @@ export class BinaryPlanet extends Binary {
 
 	combineProperties() {
 		this.mass = new Value(
-			this.primary.mass.getValueAs(units.Mass.M_Earth) + this.secondary.mass.getValueAs(units.Mass.M_Earth), 
+			this.primary.mass.as(units.Mass.M_Earth) + this.secondary.mass.as(units.Mass.M_Earth), 
 			units.Mass.M_Earth); // Combined value
 		this.genData = {
 			impacts: this.primary.genData.impacts,

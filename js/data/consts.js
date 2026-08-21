@@ -6,13 +6,13 @@ const consts = Object.freeze({
 	PHY_SIGMA: 5.670374419e-8, // Stefan-Boltzmann constant
 
 	PHY_STAR_MASS_MIN: 0.08, // M☉
-	PHY_STAR_MASS_MAX: 150.0,
+	PHY_STAR_MASS_MAX: 150,
 	
 	PHY_STAR_METALLICITY_MIN: -3.0, // [Fe/H]
 	PHY_STAR_METALLICITY_MAX: 2.0,
 
 	PHY_SUN_LIFESPAN: 10, // Gyr
-	PHY_SUN_TEMP: 5772.0, // K
+	PHY_SUN_TEMP: 5772, // K
 
 	PHY_TEMP_ABSOLUTE_ZERO: -273.15, // C
 	
@@ -24,8 +24,8 @@ const consts = Object.freeze({
 	PHY_EARTH_TEMP_SURF: 288, // K
 
 	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon). ("Lagrange Point test")
-	DEF_SUB_NEPTUNE_MASS_THRESHOLD: 15, // Below 15 M⊕ a gas planet is classified as Mini-Neptune or Gas Dwarf.
-	DEF_BROWN_DWARF_MASS_THRESHOLD: 4100, // Equal and above 4100 M⊕ a gas giant is classified as Brown Dwarf.
+	DEF_SUB_NEPTUNE_MASS_THRESHOLD: 15, // Below 15 M⊕, a gas planet is classified as Mini-Neptune or Gas Dwarf, otherwise as Ice/Gas Giant.
+	DEF_BROWN_DWARF_MASS_THRESHOLD: 4100, // Equal and above 4100 M⊕, a gas giant is classified as Brown Dwarf.
 
 	PHY_MOLAR_MASSES: Object.freeze({
 		 H2: 2.016,

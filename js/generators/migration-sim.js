@@ -1,7 +1,7 @@
 
 import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
-import * as types from "../data/types.js";
+import * as T from "../data/types.js";
 import consts from "../data/consts.js";
 
 const GIANT_MASS = 60;
@@ -10,23 +10,23 @@ const GIANT_MASS = 60;
  * Simulates multi-body planetary migration and dynamic scattering within a decaying protoplanetary gas disk.
  * Modifies orbits, handles planetary collisions, and ejects unstable bodies.
  * 
- * @param {types.GenerationSettings} settings - Generation settings configuration.
- * @param {Array<types.Star|types.BinaryStar>} starsArray - List of tracking stars in the generated cluster.
+ * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {Array<T.Star|T.BinaryStar>} starsArray - List of tracking stars in the generated cluster.
  */
 export function simulateMigration(settings, starsArray) {
 	// --- 1. Unit Standardization ---
 	starsArray.forEach(star => { 
 		star.bodies.forEach(body => { 
-			if (body instanceof types.Planet) {
-				body.sma.convertUnitTo(types.units.Dist.AU);
-				body.mass.convertUnitTo(types.units.Mass.M_Earth);
+			if (body instanceof T.Planet) {
+				body.sma.convertTo(T.units.Dist.AU);
+				body.mass.convertTo(T.units.Mass.M_Earth);
 			}
 		}); 
 	});
 
 	// --- 2. Protoplanetary Disk Parameters Configuration ---
 	const TIME_STEP_YEARS = 10000; // Δt step size
-	const diskLifetimeYears = new types.Value(5, types.units.Time.My).getValueAs(types.units.Time.y); // 5 Myr lifespan
+	const diskLifetimeYears = new T.Value(5, T.units.Time.My).as(T.units.Time.y); // 5 Myr lifespan
 	
 	// --- 3. Discrete Migration Simulation Engine ---
 	starsArray.forEach(star => {
@@ -37,7 +37,7 @@ export function simulateMigration(settings, starsArray) {
 		const canActivateGrandTack = prng() < settings.planet_migration_grand_tack_chance;
 		let isGrandTackTriggered = false;
 		
-		const starAgeYears = star.age.getValueAs(types.units.Time.y);
+		const starAgeYears = star.age.as(T.units.Time.y);
 		const totalDiscreteSteps = Math.round(Math.min(diskLifetimeYears, starAgeYears) / TIME_STEP_YEARS);
 
 		for (let step = 0; step < totalDiscreteSteps; step++) {
@@ -48,11 +48,11 @@ export function simulateMigration(settings, starsArray) {
 			for (let i = 0; i < star.bodies.length; i++) {
 				const planet = star.bodies[i];
 
-				if (!(planet instanceof types.Planet))
+				if (!(planet instanceof T.Planet))
 					continue;
 
-				if ((planet.genData.status === types.migrationStatus.Ejected) ||
-					(planet.genData.status === types.migrationStatus.Merged))
+				if ((planet.genData.status === T.migrationStatus.Ejected) ||
+					(planet.genData.status === T.migrationStatus.Merged))
 					continue;
 
 				// 3.1. Compute and Apply Disk Forces
@@ -65,11 +65,11 @@ export function simulateMigration(settings, starsArray) {
 					for (let n = i + 1; n < star.bodies.length; n++) {
 						const candidatePlanet = star.bodies[n];
 
-						if (!(candidatePlanet instanceof types.Planet))
+						if (!(candidatePlanet instanceof T.Planet))
 							continue;
 
-						if ((candidatePlanet.genData.status === types.migrationStatus.Ejected) ||
-							(candidatePlanet.genData.status === types.migrationStatus.Merged))
+						if ((candidatePlanet.genData.status === T.migrationStatus.Ejected) ||
+							(candidatePlanet.genData.status === T.migrationStatus.Merged))
 							continue;
 
 						validNextPlanet = candidatePlanet;
@@ -83,7 +83,7 @@ export function simulateMigration(settings, starsArray) {
 				}
 				
 				// 3.3. Track active giant planets (>= 60 Earth masses)
-				if ( (planet.genData.status === types.migrationStatus.Still) && (planet.mass.value >= GIANT_MASS) ) {
+				if ( (planet.genData.status === T.migrationStatus.Still) && (planet.mass.value >= GIANT_MASS) ) {
 					activeGiantsCount++;
 				}
 			}
@@ -97,8 +97,8 @@ export function simulateMigration(settings, starsArray) {
 
 			// 3.5. Re-index bodies by orbits distance Post-Step
 			star.bodies.sort((bodyA, bodyB) => {
-				const distanceA = bodyA.sma.getValueAs(types.units.Dist.m);
-				const distanceB = bodyB.sma.getValueAs(types.units.Dist.m);
+				const distanceA = bodyA.sma.as(T.units.Dist.m);
+				const distanceB = bodyB.sma.as(T.units.Dist.m);
 				return distanceA - distanceB;
 			}); 
 		}
@@ -108,16 +108,16 @@ export function simulateMigration(settings, starsArray) {
 	starsArray.forEach(star => {
 		// 4.1. Purge Discarded/Ejected Bodies from Arrays
 		for (let i = star.bodies.length - 1; i >= 0; i--) {
-			if (!(star.bodies[i] instanceof types.Planet))
+			if (!(star.bodies[i] instanceof T.Planet))
 				continue;
 
-			if (star.bodies[i].genData.status !== types.migrationStatus.Still) {
+			if (star.bodies[i].genData.status !== T.migrationStatus.Still) {
 				star.bodies.splice(i, 1);
 				continue;
 			}
 
-			const rocheLimit = getRocheLimit(star, star.bodies[i]).getValueAs(types.units.Dist.AU);
-			if (star.bodies[i].sma.getValueAs(types.units.Dist.AU) <= rocheLimit) {
+			const rocheLimit = getRocheLimit(star, star.bodies[i]).as(T.units.Dist.AU);
+			if (star.bodies[i].sma.as(T.units.Dist.AU) <= rocheLimit) {
 				star.bodies.splice(i, 1);
 				continue;
 			}
@@ -125,7 +125,7 @@ export function simulateMigration(settings, starsArray) {
 
 		// 4.2. Recalculate Relative Orbital Neighbors
 		for (let i = 0; i < star.bodies.length; i++) {
-			if (!(star.bodies[i] instanceof types.Planet))
+			if (!(star.bodies[i] instanceof T.Planet))
 				continue;
 
 			star.bodies[i].genData.neighborPrev = i > 0 ? star.bodies[i - 1] : null;
@@ -137,8 +137,8 @@ export function simulateMigration(settings, starsArray) {
 /**
  * Applies orbital migration forces (Type I / Type II) to a single planet over a time step.
  * 
- * @param {types.GenerationSettings} settings - Generation configuration settings.
- * @param {types.Planet} planet - The target planet undergoing migration.
+ * @param {T.GenerationSettings} settings - Generation configuration settings.
+ * @param {T.Planet} planet - The target planet undergoing migration.
  * @param {number} diskDensity - The current density of the protoplanetary gas disk.
  * @param {number} timeStepYears - Time step duration in years (Δt).
  * @param {boolean} isGrandTackActive - Flag indicating if Jupiter/Saturn-like outward migration is triggered.
@@ -201,20 +201,20 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 /**
  * Resolves close gravitational encounters, leading to mergers, ejections, or orbital shifts.
  * 
- * @param {types.GenerationSettings} settings - Context generation configuration.
- * @param {types.Planet} planet - The primary interacting planet.
- * @param {types.Planet} nextPlanet - The adjacent encountering planet.
- * @param {types.Star|types.BinaryStar} star - Host center of gravity.
+ * @param {T.GenerationSettings} settings - Context generation configuration.
+ * @param {T.Planet} planet - The primary interacting planet.
+ * @param {T.Planet} nextPlanet - The adjacent encountering planet.
+ * @param {T.Star|T.BinaryStar} star - Host center of gravity.
  * @param {boolean} isFinalStep - True if this is the final discrete simulation step.
  */
 function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) {
 	const mutualHillSphere = getMutualHillSphere(planet, nextPlanet, star);
-	const orbitalDistanceAU = Math.abs(planet.sma.getValueAs(types.units.Dist.AU) - nextPlanet.sma.getValueAs(types.units.Dist.AU));
-	const safetyThresholdAU = mutualHillSphere.getValueAs(types.units.Dist.AU) * settings.planet_migration_hill_safety_factor;
+	const orbitalDistanceAU = Math.abs(planet.sma.as(T.units.Dist.AU) - nextPlanet.sma.as(T.units.Dist.AU));
+	const safetyThresholdAU = mutualHillSphere.as(T.units.Dist.AU) * settings.planet_migration_hill_safety_factor;
 	
 	// If two planets are getting dangerously close, then close encounter resolving is being triggered
 	if (orbitalDistanceAU < safetyThresholdAU) {
-		const massRatio = planet.mass.getValueAs(types.units.Mass.M_Earth) / nextPlanet.mass.getValueAs(types.units.Mass.M_Earth);
+		const massRatio = planet.mass.as(T.units.Mass.M_Earth) / nextPlanet.mass.as(T.units.Mass.M_Earth);
 		
 		const outcomeRoll = prng();
 		const OUTCOME_MERGE = 'Merge';
@@ -246,8 +246,8 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 					else {
 						nextPlanet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
 					}
-					planet.genData.status = types.migrationStatus.Ejected;
-					planet.sma = new types.Value(Infinity, types.units.Dist.AU);
+					planet.genData.status = T.migrationStatus.Ejected;
+					planet.sma = new T.Value(Infinity, T.units.Dist.AU);
 						
 				} else {
 					// Recipient is heavier: 'nextPlanet' gets ejected, 'planet' shifts
@@ -257,8 +257,8 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 					else {
 						planet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
 					}
-					nextPlanet.genData.status = types.migrationStatus.Ejected;
-					nextPlanet.sma = new types.Value(Infinity, types.units.Dist.AU);
+					nextPlanet.genData.status = T.migrationStatus.Ejected;
+					nextPlanet.sma = new T.Value(Infinity, T.units.Dist.AU);
 				}
 				break;
 
@@ -280,32 +280,32 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 /**
  * Calculates the mutual Hill sphere radius between two adjacent planetary bodies.
  * 
- * @param {types.Planet} planet1 - First planetary body.
- * @param {types.Planet} planet2 - Second planetary body.
- * @param {types.Star|types.BinaryStar} star - The host stellar system gravitational center.
+ * @param {T.Planet} planet1 - First planetary body.
+ * @param {T.Planet} planet2 - Second planetary body.
+ * @param {T.Star|T.BinaryStar} star - The host stellar system gravitational center.
  * 
- * @returns {types.Value} The mutual Hill radius (unit: `Dist`).
+ * @returns {T.Value} The mutual Hill radius (unit: `Dist`).
  */
 function getMutualHillSphere(planet1, planet2, star) {
-	const sma1Meters = planet1.sma.getValueAs(types.units.Dist.m);
-	const sma2Meters = planet2.sma.getValueAs(types.units.Dist.m);
-	const mass1Kg = planet1.mass.getValueAs(types.units.Mass.kg);
-	const mass2Kg = planet2.mass.getValueAs(types.units.Mass.kg);
-	const starMassKg = star.mass.getValueAs(types.units.Mass.kg);
+	const sma1Meters = planet1.sma.as(T.units.Dist.m);
+	const sma2Meters = planet2.sma.as(T.units.Dist.m);
+	const mass1Kg = planet1.mass.as(T.units.Mass.kg);
+	const mass2Kg = planet2.mass.as(T.units.Mass.kg);
+	const starMassKg = star.mass.as(T.units.Mass.kg);
 
 	// Mass-weighted average semi-major axis
 	//const weightedAverageSma = (sma1Meters * mass1Kg + sma2Meters * mass2Kg) / (mass1Kg + mass2Kg);
 	const smaAverage = (sma1Meters + sma2Meters) / 2;
 	const hillRadiusMeters = smaAverage * Math.pow((mass1Kg + mass2Kg) / (3 * starMassKg), 1 / 3);
 	
-	return new types.Value(hillRadiusMeters, types.units.Dist.m);
+	return new T.Value(hillRadiusMeters, T.units.Dist.m);
 }
 
 /**
  * Physically merges a companion planet (donor) into a target planet (recipient).
  * 
- * @param {types.Planet} recipient - The surviving planet absorbing the mass.
- * @param {types.Planet} donor - The consumed planet being destroyed.
+ * @param {T.Planet} recipient - The surviving planet absorbing the mass.
+ * @param {T.Planet} donor - The consumed planet being destroyed.
  */
 function mergePlanets(recipient, donor) {
 	// Conservation of momentum approximation for Semi-Major Axis
@@ -313,8 +313,8 @@ function mergePlanets(recipient, donor) {
 	recipient.genData.impacts += donor.genData.impacts + 1;
 
 	// --- Core Composition Merge ---
-	recipient.core.mass.convertUnitTo(types.units.Mass.M_Earth);
-	donor.core.mass.convertUnitTo(types.units.Mass.M_Earth);
+	recipient.core.mass.convertTo(T.units.Mass.M_Earth);
+	donor.core.mass.convertTo(T.units.Mass.M_Earth);
 
 	const recipientCoreMass = recipient.core.mass.value;
 	const donorCoreMass = donor.core.mass.value;
@@ -329,8 +329,8 @@ function mergePlanets(recipient, donor) {
 	recipient.core.composition.ice = (recipient.core.composition.ice * recipientCoreMass + donor.core.composition.ice * donorCoreMass) / recipient.core.mass.value;
 
 	// --- Volatile Envelope Merge ---
-	recipient.envelope.mass.convertUnitTo(types.units.Mass.M_Earth);
-	donor.envelope.mass.convertUnitTo(types.units.Mass.M_Earth);
+	recipient.envelope.mass.convertTo(T.units.Mass.M_Earth);
+	donor.envelope.mass.convertTo(T.units.Mass.M_Earth);
 
 	const recipientEnvMass = recipient.envelope.mass.value;
 	const donorEnvMass = donor.envelope.mass.value;
@@ -361,42 +361,42 @@ function mergePlanets(recipient, donor) {
 	recipient.mass.value = recipient.core.mass.value + recipient.envelope.mass.value;
 
 	if (recipient.envelope.mass.value === 0) {
-		recipient.type = types.planetTypes.Terrestrial;
+		recipient.type = T.planetTypes.Terrestrial;
 	}
 	else {
 		if (recipient.mass.value >= consts.DEF_BROWN_DWARF_MASS_THRESHOLD) {
-			recipient.type = types.planetTypes.BrownDwarf;
+			recipient.type = T.planetTypes.BrownDwarf;
 		}
 		else if (recipient.mass.value < consts.DEF_SUB_NEPTUNE_MASS_THRESHOLD) {
 			recipient.type = (recipient.envelope.composition.gas < 0.5)
-				? types.planetTypes.MiniNeptune
-				: types.planetTypes.GasDwarf;
+				? T.planetTypes.MiniNeptune
+				: T.planetTypes.GasDwarf;
 		}
 		else {
 			recipient.type = (recipient.envelope.composition.gas < 0.5)
-				? types.planetTypes.IceGiant
-				: types.planetTypes.GasGiant;
+				? T.planetTypes.IceGiant
+				: T.planetTypes.GasGiant;
 		}
 	}
 
 	// --- Purge Donor Status ---
-	donor.genData.status = types.migrationStatus.Merged;
-	donor.sma = new types.Value(Infinity, types.units.Dist.AU);
+	donor.genData.status = T.migrationStatus.Merged;
+	donor.sma = new T.Value(Infinity, T.units.Dist.AU);
 }
 
 /**
  * Calculates planet's Roche limit.
  * 
- * @param {types.Planet} star - Current star hosting a planet.
- * @param {types.Planet} planet - Current planet orbiting the star.
+ * @param {T.Planet} star - Current star hosting a planet.
+ * @param {T.Planet} planet - Current planet orbiting the star.
  * 
- * @returns {types.Value} Roche limit (unit: `Dist`)
+ * @returns {T.Value} Roche limit (unit: `Dist`)
  */
 function getRocheLimit(star, planet) {
-	const r_s = star.radius.getValueAs(types.units.Dist.m);
+	const r_s = star.radius.as(T.units.Dist.m);
 	const rho_s = star.density;
 	const rho_p = planet.density;
 
 	const R = 2.44 * r_s * Math.pow(rho_s / rho_p, 1/3);
-	return new types.Value(R, types.units.Dist.m);
+	return new T.Value(R, T.units.Dist.m);
 }
