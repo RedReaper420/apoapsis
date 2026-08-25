@@ -236,7 +236,7 @@ body::before {
 
 .panelContent {
 	overflow-y: auto;
-	width: 20em;
+	width: 22.5em;
 	height: 25em;
 	
 	padding: 0.5em;
@@ -263,6 +263,7 @@ body::before {
 	--radius: 0.2em;
 	--color: var(--col-main);
 	padding-inline-start: 0;
+	user-select: none;
 }
 
 .tree li {
@@ -334,8 +335,13 @@ body::before {
 
 /* Inspector tables */
 
+details {
+	margin: 0.5em 0;
+}
+
 summary {
 	font-weight: bold;
+	margin: 0.25em;
 }
 
 table {

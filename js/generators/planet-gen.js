@@ -1,6 +1,4 @@
 
-import {events, eventBus} from "../utils/eventbus.js";
-
 import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
 import * as T from "../data/types.js";
@@ -9,15 +7,17 @@ import consts from "../data/consts.js";
 import * as nameGen from "./name-gen.js";
 import * as planetEvolutionSim from "./planet-evolution-sim.js";
 
+/** @typedef {import("../data/types.js").GenData} GenData */
+
 /**
- * Generates the base of the planet: core mass + possible envelope (ice/gas giants).
+ * Generates the base of the planet/moon: core mass + possible envelope (ice/gas giants).
  * 
- * Further generation is applied after simulating migration. (@see {@link planetGeneration_Stage2})
+ * The further generation (@see {@link planetGeneration_Stage2}) is applied after simulating migration for planets, and immediately for moons. 
  * 
  * @param {T.GenerationSettings} settings 
- * @param {T.Body} parentBody 
+ * @param {T.Star|T.BinaryStar|T.Planet|T.BinaryPlanet} parentBody 
  * @param {T.Value} sma 
- * @param {Object} genData
+ * @param {GenData} genData
  * 
  * @returns {T.Planet}
  */
@@ -27,16 +27,16 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 
 	if (genData.isMoon === false) {
 		// ====== PLANET GENERATION ======
-
+		
 		planet.genData = {
 			isMoon: genData.isMoon,
-			sma_init: genData.sma_init, // Initial spawn distance, used later during moons generation
-			sma_min: genData.sma_min, // Minimum allowed spawn distance, used later during migration
-			sma_max: genData.sma_max, // Maximum allowed spawn distance, used later during migration
-			status: T.migrationStatus.Still, // Planet status that is used (assigned) later during migration
-			impacts: 0, // Planet impacts counter, incremented later during migration, then used during moons generation
+			sma_init: genData.sma_init,
+			sma_min: genData.sma_min,
+			sma_max: genData.sma_max,
+			status: T.migrationStatus.Still,
+			impacts: 0,
 			retrograde: false,
-			sma_norm: sma.as(T.units.Dist.AU) / Math.sqrt(parentBody.luminosity), // Converting to AU☉ units
+			sma_norm: sma.as(T.units.Dist.AU) / Math.sqrt(parentBody.luminosity),
 			sma_init_norm: genData.sma_init / Math.sqrt(parentBody.luminosity),
 			parentStar: planet.parentBody,
 		}
@@ -90,8 +90,8 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 		
 		planet.core = generatePlanetCore(planet);
 		planet.envelope = planet.genData.moonType === T.moonTypes.Binary
-			? makeGasGiant(planet)
-			: new T.Envelope();
+			? makeGasGiant(planet) // Binary component could be converted into a giant planet
+			: new T.Envelope(); // Other moon types are never giant planets
 		
 		planet.mass = new T.Value(
 			planet.core.mass.as(T.units.Mass.M_Earth) + 
@@ -101,39 +101,50 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 
 		setPlanetRadius(planet);
 
-		planetGeneration_Stage2(settings, planet);
+		planetGeneration_Stage2(planet);
 	}
 
 	return planet;
 }
 
 /**
- * @param {T.GenerationSettings} settings 
+ * Continuation of a planet/moon generation.
+ * 
  * @param {T.Planet} planet 
  */
-export function planetGeneration_Stage2(settings, planet) {
-	if (planet.genData.isMoon === false)
+export function planetGeneration_Stage2(planet) {
+	if (planet.genData.isMoon === false) {
+		// Updating normalized SMA after migration
 		planet.genData.sma_norm = planet.sma.as(T.units.Dist.AU) / Math.sqrt(planet.parentBody.luminosity);
-	
-	if (planet.genData.impacts > 0) 
-		setPlanetRadius(planet);
 
-	setInitialRotation(planet);
+		// Recalculating planet's radius and density after giant impacts (merges)
+		if (planet.genData.impacts > 0) 
+			setPlanetRadius(planet);
+	}
+	
+	planet.g = calculateGravitationalAcceleration(planet);
+	planet.v_esc = calculateEscapeVelocity(planet);
+
+	planet.mountainHeight = calculateMountainHeight(planet);
 
 	setEccentricity(planet);
-
 	// Increasing eccentricity for retrograde moons
 	if (planet.genData.isMoon) {
 		if (planet.genData.retrograde) {
-			const e_threshold = 0.05; // 0.05 * 10 = 0.5. Higher ecc. values are dampened, e.g. 0.1 -> (0.05 + 0.05^1.5) * 10 = 0.61
+			// 0.05 * 10 = 0.5. Higher ecc. values are dampened, e.g. 0.1 -> (0.05 + 0.05^1.5) * 10 = 0.61
+			const e_threshold = 0.05; 
 			const e_dampened = Math.min(planet.eccentricity, e_threshold) + Math.pow(Math.max(0, planet.eccentricity - e_threshold), 1.5);
+
 			planet.eccentricity = e_dampened * prng.range(5, 10);
 		}
 	}
-	
-	planet.albedo = 0;
 
-	setInitialEquilibriumTemperature(planet);
+	setInitialRotation(planet);
+	planet.temperature_bb = calculateBlackBodyTemperature(planet);
+	planet.F_tidal = calculateTotalTidalHeating(planet);
+
+	planet.albedo = assumeAlbedo(planet);
+	planet.temperature_eq = calculateEquilibriumTemperature(planet);
 }
 
 /**
@@ -141,9 +152,6 @@ export function planetGeneration_Stage2(settings, planet) {
  * @param {T.Planet} planet 
  */
 export function planetGeneration_Stage3(settings, planet) {
-	planet.mountainHeight = calculateMountainHeight(planet);
-	planet.g = new T.Value(consts.PHY_G * planet.mass.as(T.units.Mass.kg) / (planet.radius.as(T.units.Dist.m) ** 2), T.units.Spd.m_s);
-	planet.v_esc = new T.Value(Math.sqrt(2 * consts.PHY_G * planet.mass.as(T.units.Mass.kg) / planet.radius.as(T.units.Dist.m)), T.units.Spd.m_s);
 
 	if (planet.type === T.planetTypes.Terrestrial) {
 		generateAtmosphere(planet);
@@ -205,53 +213,43 @@ export function planetGeneration_Stage3(settings, planet) {
 	
 	planet.atmosphere.cloudCover = calculateCloudCover(planet);
 
-	const H = (planet.mass.as(T.units.Mass.kg) * planet.core.composition.ice / 1025) / (4 * Math.PI * (planet.radius.as(T.units.Dist.m) ** 2));
-	const H_compr = H * (1 - (H * planet.g.as(T.units.Spd.m_s) / (2 * 2.2e9)));
-	planet.oceanDepth = new T.Value(H_compr, T.units.Dist.m);
-
-	// Earth's ocean takes 0.022% of total mass and covers 71% of surface.
-	// To fully submerge the land, it will take about 3-3.5 times more of ocean's mass.
-	// Thus, 0.070% threshold chosen.
-	// (0.00022 / 0.00070)^1/3 ~= 0.68 = 68% (close enougth to 71%)
-	const totalOcean = 0.00070; 
-	planet.oceanCover = Math.min(1.0, Math.pow(planet.core.composition.ice / totalOcean, 1/3));
+	setOcean(planet);
 }
 
 /**
+ * Generates a rocky base of a planet/moon, with set mass and core composition.
  * 
- * @param {T.Planet} planet
+ * @param {T.Planet} planet A planet for which the core is being generated.
+ * 
+ * @returns {T.Core} A planet core with a certain mass and a set of elements' fractions.
  */
 function generatePlanetCore(planet) {
 	const planetCoreMass = samplePlanetCoreMass(planet.genData);
+
 	const coreIronFraction = sampleCoreIronFraction(planet.genData, planetCoreMass);
 	const coreIceFraction = (1.0 - coreIronFraction) * sampleCoreIceFraction(planet.genData);
 	const coreRockFraction = 1.0 - (coreIronFraction + coreIceFraction);
 
 	if (planet.genData.isMoon === false) {
 		// Generating a planet
-		return new T.Core(
-			planetCoreMass, 
-			coreIronFraction, 
-			coreRockFraction, 
-			coreIceFraction
-		);
+		return new T.Core(planetCoreMass, coreIronFraction, coreRockFraction, coreIceFraction);
 	}
 	else {
 		// Generating a moon
 		const parentBody = planet.parentBody;
 		switch (planet.genData.moonType) {
 			case T.moonTypes.Impact: {
-				const f_iron = parentBody.core.composition.iron ** 2; // Not much of heavy iron leaves the parent planet
-				const f_rock = parentBody.core.composition.rock;
-				const f_ice  = parentBody.core.composition.ice ** 2; // Portion of ices evaporates and escapes into space
+				let f_iron = parentBody.core.composition.iron ** 2; // Not much of heavy iron leaves the parent planet
+				let f_rock = parentBody.core.composition.rock;
+				let f_ice  = (parentBody.core.composition.ice * 0.1) ** 2; // Most of the ice evaporates and escapes into outer space
+
+				// Re-normalization
 				const f_total = f_iron + f_rock + f_ice;
+				f_iron /= f_total;
+				f_rock /= f_total;
+				f_ice /= f_total;
 				
-				return new T.Core(
-					planet.genData.mass,
-					f_iron / f_total,
-					f_rock / f_total,
-					f_ice / f_total
-				);
+				return new T.Core(planet.genData.mass, f_iron, f_rock, f_ice);
 			}
 			default: {
 				const likeness_min = 0.25;
@@ -262,28 +260,28 @@ function generatePlanetCore(planet) {
 				let f_rock = parentBody.core.composition.rock * likeness + coreRockFraction * (1 - likeness);
 				let f_ice  = parentBody.core.composition.ice  * likeness + coreIceFraction  * (1 - likeness);
 
-				f_iron = f_iron ** prng.range(1.0, 1.3);
+				f_iron = f_iron ** prng.range(1.0, 1.3); // Less iron
 				f_rock = f_rock ** prng.range(0.9, 1.1);
-				f_ice  = f_ice  ** prng.range(0.7, 1.0);
+				f_ice  = f_ice  ** prng.range(0.7, 1.0); // More ice
 
+				// Re-normalization
 				const f_total = f_iron + f_rock + f_ice;
+				f_iron /= f_total;
+				f_rock /= f_total;
+				f_ice /= f_total;
 				
-				return new T.Core(
-					planet.genData.mass,
-					f_iron / f_total,
-					f_rock / f_total,
-					f_ice / f_total
-				);
+				return new T.Core(planet.genData.mass, f_iron, f_rock, f_ice);
 			}
 		}
 	}
 }
 
 /**
+ * Samples mass for the core of a planet/moon.
  * 
- * @param {object} genData 
+ * @param {GenData} genData - Generation data of a planet.
  * 
- * @returns {T.Value} Planet core mass
+ * @returns {T.Value} Planet core mass (unit: `Mass`)
  */
 function samplePlanetCoreMass(genData) {
 	const star = genData.parentStar;
@@ -310,21 +308,19 @@ function samplePlanetCoreMass(genData) {
 
 	const metalFactor = Math.pow(1.2, 2 * star.metallicity);
 	
-	//const varianceRange = 1/2;
-	//const variance = utils.randomRangeGaussian(1-varianceRange, 1+varianceRange);
-	
 	const varianceMin = 0.05;
 	const variance = ( prng.range(varianceMin, 1.0) + utils.randomRangeGaussian(varianceMin, 1.0) ) / 2;
 
 	let coreMass = baseMass * metalFactor * variance;
 	if (sma_norm > consts.PHY_DIST_SNOW_LINE * 5)
-		if (prng() < (0.4 + 0.1 * (sma_norm - consts.PHY_DIST_SNOW_LINE * 5))) 
+		if (prng() < (0.2 * (sma_norm - consts.PHY_DIST_SNOW_LINE * 5))) 
 			coreMass *= prng.range(0.1, 0.5); // "failed" distant cores
 	
 	// Filtering out very small bodies. Those will be automatically removed during the migration simulation.
 	if (coreMass < 0.001)
 		genData.status = T.migrationStatus.Ejected;
 
+	// Heavy core mass dampening
 	if (coreMass > 25)
 		coreMass = 25 + Math.pow(coreMass - 25, 1/3);
 
@@ -332,11 +328,12 @@ function samplePlanetCoreMass(genData) {
 }
 
 /**
+ * Samples an iron fraction in the planet's core.
  * 
- * @param {object} genData
- * @param {number} coreMass 
+ * @param {GenData} genData - Generation data of a planet.
+ * @param {T.Value} coreMass - Planet's core mass (unit: `Mass`).
  * 
- * @returns {number}
+ * @returns {number} Iron fraction [0.01, 0.85]
  */
 function sampleCoreIronFraction(genData, coreMass) {
 	const randomBase = 0.20; const randomScatter = 0.25;
@@ -348,16 +345,18 @@ function sampleCoreIronFraction(genData, coreMass) {
 	const sma_norm = genData.sma_norm;
 	const distanceFactor = Math.exp(-0.125 * (sma_norm - consts.PHY_DIST_SNOW_LINE));
 
-	const massFactor = coreMass > 1 ? 1.0 + 0.05 * Math.log10(planetMass_MEarth) : 1.0;
+	const coreMass_MEarth = genData.isMoon ? genData.mass : coreMass.as(T.units.Mass.M_Earth);
+	const massFactor = coreMass_MEarth > 1 ? 1.0 + 0.025 * Math.log10(coreMass_MEarth) : 1.0;
 
 	return utils.clamp((randIronFraction + starMetallicityFactor) * distanceFactor * massFactor, 0.01, 0.85);
 }
 
 /**
+ * Samples an ice fraction in the planet's core.
  * 
- * @param {object} genData
+ * @param {GenData} genData - Generation data of a planet.
  * 
- * @returns {number} Ice fraction of the planet core's mass
+ * @returns {number} Ice fraction [0, 0.65]
  */
 function sampleCoreIceFraction(genData) {
 	const starMetallicity = genData.parentStar.metallicity;
@@ -371,8 +370,15 @@ function sampleCoreIceFraction(genData) {
 }
 
 /**
+ * Attempts to generate a thick gas envelope for a planet, potentially turning it into some type of a giant.
  * 
- * @param {T.Planet} planet 
+ * Outcomes:
+ * - No gas envelope (an empty envelope is assigned). Planet type is left as `Terrestrial`.
+ * - Relatively thin gas envelope is set. Total planet mass < 15 M⊕. Planet type is set as `Mini-Neptune` or `Gas Dwarf`.
+ * - Thick gas envelope is set. Total planet mass >= 15 M⊕. Planet type is set as `Ice Giant` or `Gas Giant`.
+ * - Extremely thick gas envelope is set. Total planet mass >= 4100 M⊕. Planet type is set as `Brown Dwarf`.
+ * 
+ * @param {T.Planet} planet - A planet being transformed.
  */
 function makeGasGiant(planet) {
 	const sma_norm = planet.genData.sma_init_norm;
@@ -505,6 +511,7 @@ function makeGasGiant(planet) {
 }
 
 /**
+ * Calculates and sets radius and density for a planet.
  * 
  * @param {T.Planet} planet
  */
@@ -581,7 +588,7 @@ function setPlanetRadius(planet) {
 	planet.density = bulkDensity;
 }
 
-// Constants derived from Seager et al. and Lopez & Fortney
+/** Constants for planet radius calculation derived from Seager et al. and Lopez & Fortney. */
 const RadiusEOS = {
 	iron: { r0: 0.70, alpha: 0.266, beta: -0.015, gamma: 0.50 },
 	rock: { r0: 1.00, alpha: 0.274, beta: -0.021, gamma: 0.51 },
@@ -589,11 +596,12 @@ const RadiusEOS = {
 };
 
 /**
+ * Calculates radius of a sphere with a certain mass, made from the specified material. 
  * 
- * @param {number} mass 
- * @param {string} material 
+ * @param {number} mass - in M⊕
+ * @param {string} material - `iron`, `rock`, or `ice`
  * 
- * @returns {number}
+ * @returns {number} Sphere radius in R⊕
  */
 export function getMaterialRadius(mass, material) {
 	if (mass <= 0) return 0;
@@ -603,83 +611,153 @@ export function getMaterialRadius(mass, material) {
 }
 
 /**
+ * Calculates gravitational acceleration for a planet.
  * 
  * @param {T.Planet} planet 
+ * 
+ * @returns {T.Value} g (unit: `Acc`)
  */
-function setInitialEffectiveTemperature(planet) {
-	const sma_norm = planet.genData.sma_norm;
-
-	// 1. Calculating black-body temperature (albedo = 0)
-	// Using Earth's effective temperature w/o its albedo (0.3)
-	const T_earth_blackbody = consts.PHY_EARTH_TEMP_EQ / Math.pow(1 - 0.30, 1/4);
-	const T_blackbody = new T.Value(T_earth_blackbody / Math.sqrt(sma_norm), T.units.Temp.K);
-
-	// 2. Getting a realistic albedo based on the black-body temperature
-	planet.albedo = assumeAlbedo(planet, T_blackbody);
-
-	// 3. Calculating final effective temperature based on assumed albedo
-	const T_eq = (consts.PHY_EARTH_TEMP_EQ * Math.pow(1 - planet.albedo, 1/4)) / Math.sqrt(sma_norm);
-	planet.temperature_eq = new T.Value(T_eq, T.units.Temp.K);
+function calculateGravitationalAcceleration(planet) {
+	const M = planet.mass.as(T.units.Mass.kg);
+	const R = planet.radius.as(T.units.Dist.m);
+	const g = consts.PHY_G * M / (R ** 2);
+	return new T.Value(g, T.units.Acc.m_s2);
 }
 
 /**
- * Assumes the planet's albedo based on the planet's type and its black-body temperature.
+ * Calculates escape velocity for a planet.
  * 
  * @param {T.Planet} planet 
- * @param {T.Value} T_blackbody Black-body temperature (unit: Temp)
+ * 
+ * @returns {T.Value} (unit: `Spd`)
  */
-function assumeAlbedo(planet, T_blackbody) {
-	const temp = T_blackbody.as(T.units.Temp.K);
-	switch (planet.type) {
-		case T.planetTypes.BrownDwarf: {
-			return 0.4;
-		}
+function calculateEscapeVelocity(planet) {
+	const M = planet.mass.as(T.units.Mass.kg);
+	const R = planet.radius.as(T.units.Dist.m);
+	const v_esc = Math.sqrt(2 * consts.PHY_G * M / R);
+	return new T.Value(v_esc, T.units.Spd.m_s);
+}
 
-		case T.planetTypes.GasGiant:
-		case T.planetTypes.GasDwarf: {
-			// Sudarsky's classification based on temperature
-			if (temp < 150) {
-				return 0.57; // Type I: Ammonia clouds (high albedo, like Jupiter's)
-			}
-			if (temp >= 150 && temp < 250) {
-				return 0.81; // Type II: Water clounds (very bright)
-			}
-			if (temp >= 250 && temp < 350) {
-				return 0.12; // Type III: No clouds (pure hydrogen absorbs light, Rayleigh scattering is on)
-			}
-			if (temp >= 350 && temp < 900) {
-				return 0.30; // Intermediate zone (semi-transparent atmosphere, salts clouds)
-			}
-			if (temp >= 900 && temp < 1400) {
-				return 0.03; // Type IV: Hot Jupiters (alkali metals absorb light; the planet is blacker than coal)
-			}
-			// temp >= 1400
-			return 0.55; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
-		}
+/**
+ * Calculates maximal mountain height for a planet.
+ * 
+ * @param {T.Planet} planet 
+ * 
+ * @returns {T.Value} (unit: `Dist`)
+ */
+function calculateMountainHeight(planet) {
+	if (planet.type !== T.planetTypes.Terrestrial)
+		return new T.Value(0, T.units.Dist.m);
 
-		case T.planetTypes.IceGiant:
-		case T.planetTypes.MiniNeptune: {
-			if (temp < 100) {
-				return 0.40; // Far and cold (like Uranus and Neptune)
-			}
-			if (temp >= 100 && temp < 300) {
-				return 0.30; // Temperate ice giants (methane evaporates, atmosphere darkens)
-			}
-			// If an ice giant got too close to its star, it turns into a "hot Neptune", similar to Sudarsky's type III/IV gas giant
-			return 0.10;
-		}
+	const f_iron = planet.core.composition.iron;
+	const f_rock = planet.core.composition.rock;
+	const f_ice = planet.core.composition.ice;
 
-		default: { // Terrestrial worlds
-			if (planet.core.composition.ice >= 0.3) return 0.6;
-			if (planet.core.composition.rock >= 0.5) return 0.2;
-			if (planet.core.composition.iron >= 0.5) return 0.1;
-			return 0.3;
+	// Total non-iron surface-forming materials
+	const f_crust = f_rock + f_ice;
+
+	// If, somehow, we've got a sphere of pure iron
+	if (f_crust <= 0.001)
+		return new T.Value(0, T.units.Dist.m);
+
+	// Normalize crust composition (rock vs ice ratio on the surface)
+	const rock_ratio = f_rock / f_crust;
+	const ice_ratio = f_ice / f_crust;
+
+	/** Crust material yield strength, Pa */
+	const mat_yield = (2e8 * rock_ratio) + (1e7 * ice_ratio);
+
+	/** Crust material density, kg/m³ (density of the mountain itself) */
+	const rho_mat = (3000 * rock_ratio) + (920 * ice_ratio);
+	
+	const R = planet.radius.as(T.units.Dist.m);
+	const g = planet.g.as(T.units.Acc.m_s2);
+
+	/**
+	 * Hydrostatic unconstrained height (m) taken by this formula:
+	 * 
+	 * `h_max ~= σ_yield / (ρ_rock * g)`, where:
+	 * 
+	 * - `σ_yield` - rock compressive strength (yield strength), Pa
+	 * - `ρ_rock` - rock density, kg/m³
+	 * - `g` - gravitational acceleration, m/s²
+	 */
+	const h_0 = mat_yield / (rho_mat * g);
+
+	/**
+	 * Geometrically corrected height for small bodies.
+	 * `h_geo = h_0 / (1 - (h_0 / R))`
+	 */
+	const h_geo = (h_0 / R) < 0.7
+		? h_0 / (1 - (h_0 / R))
+		: 0.3 * R; // Smooth cap for small bodies where gravity drops off significantly with altitude
+
+	// Estimating litosphere thickness
+	const R_Earth = planet.radius.as(T.units.Dist.R_Earth);
+
+	// Base lithosphere fraction for silicate body (smaller bodies cool deeper)
+	const lithoFraction = Math.min(0.8, 0.03 * Math.pow(R_Earth, -0.8));
+
+	/*
+	Mercury-like planets correction.
+	High iron content means a massive metal core and a thin silicate mantle/crust.
+	The thickness of the silicate mantle scales roughly as (1 - f_iron)^(1/3).
+	Heavy iron cores also accelerate cooling (iron conducts heat faster than rock).
+	*/
+	const mantleVolumeFactor = Math.pow(Math.max(0.01, 1.0 - f_iron), 1/3);
+	
+	// Ice lithospheres deform/relax much faster under lower temperatures 
+	const compositionSoftening = 1.0 - (0.7 * ice_ratio); 
+
+	// Younger planets have thinner lithospheres
+	const age_Gy = planet.age.as(T.units.Time.Gy);
+	const ageFactor = Math.min(1.5, Math.sqrt(age_Gy / 4.5));
+
+	// Litosphere thickness is capped by the actual physical thickness of the mantle shell
+	const maxPossibleMantleThickness = R * mantleVolumeFactor;
+	const T_e_estimated = R * lithoFraction * compositionSoftening * ageFactor;
+
+	const T_e = Math.min(T_e_estimated, maxPossibleMantleThickness * 0.8);
+	
+	// Elastic support limit: mountains rarely exceed ~25% of effective lithosphere thickness
+	const h_max = Math.min(h_geo, T_e * 0.25);
+
+	return new T.Value(h_max, T.units.Dist.m);
+}
+
+/**
+ * Sets eccentricity value for a planet based on the distance from the host expressed in Roche radii.
+ * 
+ * @param {T.Planet} planet 
+ */
+export function setEccentricity(planet) {
+	if (planet.parentBody === null) {
+		planet.eccentricity = 0;
+		return;
+	}
+	
+	let host = planet.parentBody;
+	if (planet.parentBody instanceof T.BinaryPlanet) {
+		if (planet.parentBody.primary === planet) {
+			host = planet.parentBody.secondary;
+		}
+		else if (planet.parentBody.secondary === planet) {
+			host = planet.parentBody.primary;
 		}
 	}
+	
+	const R_host = host.radius.as(T.units.Dist.m);
+	const a = planet.sma.as(T.units.Dist.m);
+	const R_roche = 2.44 * R_host * Math.pow(host.density / planet.density, 1/3);
+	const x = a / R_roche;
+	const exp = Math.exp(-5 * (x / 3500));
+	const e = 0.001 + 0.125 * (1 - exp) * utils.randomRangeGaussian(1 - 0.20 * exp, 1 + 0.20 * exp);
+
+	planet.eccentricity = e;
 }
 
 /**
- * Sets the initial rotation period for a planet.
+ * Sets initial rotation period for a planet.
  * 
  * @param {T.Planet} planet - Current planet
  */
@@ -743,38 +821,17 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 	}
 }
 
-export function setEccentricity(planet) {
-	if (planet.parentBody === null)
-		return 0;
-	
-	let host = planet.parentBody;
-	if (planet.parentBody instanceof T.BinaryPlanet) {
-		if (planet.parentBody.primary === planet) {
-			host = planet.parentBody.secondary;
-		}
-		else if (planet.parentBody.secondary === planet) {
-			host = planet.parentBody.primary;
-		}
-	}
-	
-	const R_host = host.radius.as(T.units.Dist.m);
-	const a = planet.sma.as(T.units.Dist.m);
-	const R_roche = 2.44 * R_host * Math.pow(host.density / planet.density, 1/3);
-	const x = a / R_roche;
-	const exp = Math.exp(-5 * (x / 3500));
-	const e = 0.001 + 0.125 * (1 - exp) * utils.randomRangeGaussian(1 - 0.20 * exp, 1 + 0.20 * exp);
-
-	planet.eccentricity = e;
-}
-
 /**
  * 
  * @param {T.Planet} planet 
+ * 
+ * @returns {T.Value} (unit: `Temp`)
  */
-function setInitialEquilibriumTemperature(planet) {
-	const T_eq_prim = consts.PHY_EARTH_TEMP_EQ / Math.sqrt(planet.genData.sma_norm) * Math.pow(1 - planet.albedo, 1/4);
+function calculateBlackBodyTemperature(planet) {
+	// Calculating black-body temperature (albedo = 0) from Earth's effective temperature w/o its albedo (0.3)
+	const T_bb_prim = consts.PHY_EARTH_TEMP_EQ / Math.sqrt(planet.genData.sma_norm) / Math.pow(1 - 0.30, 1/4);
 
-	let T_eq_sec = 0;
+	let T_bb_sec = 0;
 	const parentStar = planet.genData.parentStar;
 	if (parentStar.parentBody instanceof T.BinaryStar) {
 		let companionStar = parentStar.parentBody;
@@ -788,48 +845,24 @@ function setInitialEquilibriumTemperature(planet) {
 		const sma_norm = companionStar !== parentStar.parentBody
 			? parentStar.sma.as(T.units.Dist.AU) / Math.sqrt(companionStar.luminosity)
 			: parentStar.sma.as(T.units.Dist.AU) / Math.sqrt(parentStar.parentBody.luminosity);
-		T_eq_sec = consts.PHY_EARTH_TEMP_EQ / Math.sqrt(sma_norm) * Math.pow(1 - planet.albedo, 1/4);
+		T_bb_sec = consts.PHY_EARTH_TEMP_EQ / Math.sqrt(sma_norm) / Math.pow(1 - 0.30, 1/4);
 	}
 	else if (parentStar.parentBody instanceof T.Star) {
 		const sma_norm = parentStar.sma.as(T.units.Dist.AU) / Math.sqrt(parentStar.parentBody.luminosity);
-		T_eq_sec = consts.PHY_EARTH_TEMP_EQ / Math.sqrt(sma_norm) * Math.pow(1 - planet.albedo, 1/4);
+		T_bb_sec = consts.PHY_EARTH_TEMP_EQ / Math.sqrt(sma_norm) / Math.pow(1 - 0.30, 1/4);
 	}
 
-	const T_eq = Math.pow( (T_eq_prim ** 4) + (T_eq_sec ** 4) , 1/4);
-	planet.temperature_eq = new T.Value(T_eq, T.units.Temp.K);
-	planet.temperature = new T.Value(T_eq, T.units.Temp.K);
+	const T_bb = Math.pow((T_bb_prim ** 4) + (T_bb_sec ** 4), 1/4);
+	return new T.Value(T_bb, T.units.Temp.K);
 }
 
 /**
  * 
  * @param {T.Planet} planet 
- * @returns {T.Value}
+ * 
+ * @returns
  */
-function calculateMountainHeight(planet) {
-	if (planet.type !== T.planetTypes.Terrestrial)
-		return new T.Value(0, T.units.Dist.m);
-
-	const f_rock = planet.core.composition.rock;
-	const f_ice = planet.core.composition.ice;
-	const f_mat = f_rock + f_ice;
-
-	const mat_yield = 3e8 * (f_rock / f_mat) + 1e7 * (f_ice / f_mat);
-	const rho_mat = 3000 * (f_rock / f_mat) + 920 * (f_ice / f_mat);
-
-	const rho_planet = planet.density * 1000;
-	const R = planet.radius.as(T.units.Dist.m);
-
-	const h_max = (3 * mat_yield) / (4 * Math.PI * consts.PHY_G * rho_mat * rho_planet * R);
-
-	return new T.Value(h_max, T.units.Dist.m);
-}
-
-function generateAtmosphere(planet) {
-	const planetMass_MEarth = planet.mass.as(T.units.Mass.M_Earth);
-	const planetRadius_REarth = planet.radius.as(T.units.Dist.R_Earth);
-
-	const T_eq = planet.temperature_eq.as(T.units.Temp.K);
-
+function calculateTotalTidalHeating(planet) {
 	const star = planet.genData.parentStar;
 	const sma_star = new T.Value(planet.genData.sma_norm * Math.sqrt(planet.genData.parentStar.luminosity), T.units.Dist.AU);
 	const F_tidal_star = calculateTidalHeating(planet, star, sma_star, planet.eccentricity);
@@ -847,12 +880,107 @@ function generateAtmosphere(planet) {
 	const F_tidal_sat = planet.bodies.length > 0 ? calculateTidalHeating(planet, planet.bodies[0], planet.bodies[0].sma, planet.bodies[0].eccentricity) : 0;
 
 	const F_tidal = F_tidal_star + F_tidal_host + F_tidal_sat;
-	planet.F_tidal = {
+
+	return {
 		star: F_tidal_star,
 		host: F_tidal_host,
 		sat: F_tidal_sat,
 		total: F_tidal
+	};
+}
+
+/**
+ * Assumes the planet's albedo based on the planet's type and black-body temperature.
+ * 
+ * @param {T.Planet} planet 
+ * 
+ * @returns
+ */
+function assumeAlbedo(planet) {
+	const temp = planet.temperature_bb.as(T.units.Temp.K);
+	switch (planet.type) {
+		case T.planetTypes.BrownDwarf: {
+			return 0.4;
+		}
+
+		case T.planetTypes.GasGiant:
+		case T.planetTypes.GasDwarf: {
+			// Sudarsky's classification based on temperature
+			if (temp < 150) {
+				return 0.57; // Type I: Ammonia clouds (high albedo, like Jupiter's)
+			}
+			if (temp >= 150 && temp < 250) {
+				return 0.81; // Type II: Water clounds (very bright)
+			}
+			if (temp >= 250 && temp < 350) {
+				return 0.12; // Type III: No clouds (pure hydrogen absorbs light, Rayleigh scattering is on)
+			}
+			if (temp >= 350 && temp < 900) {
+				return 0.30; // Intermediate zone (semi-transparent atmosphere, salts clouds)
+			}
+			if (temp >= 900 && temp < 1400) {
+				return 0.03; // Type IV: Hot Jupiters (alkali metals absorb light; the planet is blacker than coal)
+			}
+			// temp >= 1400
+			return 0.55; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
+		}
+
+		case T.planetTypes.IceGiant:
+		case T.planetTypes.MiniNeptune: {
+			if (temp < 100) {
+				return 0.40; // Far and cold (like Uranus and Neptune)
+			}
+			if (temp >= 100 && temp < 300) {
+				return 0.30; // Temperate ice giants (methane evaporates, atmosphere darkens)
+			}
+			// If an ice giant got too close to its star, it turns into a "hot Neptune", similar to Sudarsky's type III/IV gas giant
+			return 0.10;
+		}
+
+		default: { // Terrestrial worlds
+			/*
+			if (planet.core.composition.ice >= 0.2) return 0.6;
+			if (planet.core.composition.iron >= 0.4) return 0.1;
+			if (planet.core.composition.rock >= 0.6) return 0.2;
+			return 0.3;
+			*/
+
+			const f_iron = planet.core.composition.iron;
+			const f_rock = planet.core.composition.rock;
+			const f_ice = planet.core.composition.ice;
+			
+			const rockAlbedo = (0.1 * f_iron) + (0.2 * f_rock);
+
+			const iceToWaterRegime = 1 / (1 + Math.exp(0.2 * (temp - 130)));
+			const iceAlbedo = (f_ice ** (1/6)) * ( (0.7 * iceToWaterRegime) + (0.3 * (1 - iceToWaterRegime)) );
+
+			return rockAlbedo + iceAlbedo;
+		}
 	}
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ * 
+ * @returns {T.Value} (unit: `Temp`)
+ */
+function calculateEquilibriumTemperature(planet) {
+	const T_bb = planet.temperature_bb.as(T.units.Temp.K);
+	const T_eq = T_bb * Math.pow(1 - planet.albedo, 1/4);
+	return new T.Value(T_eq, T.units.Temp.K);
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ */
+function generateAtmosphere(planet) {
+	const planetMass_MEarth = planet.mass.as(T.units.Mass.M_Earth);
+	const planetRadius_REarth = planet.radius.as(T.units.Dist.R_Earth);
+
+	const T_eq = planet.temperature_eq.as(T.units.Temp.K);
+	const F_tidal = planet.F_tidal.total;
 
 	const T_eff = Math.pow( (T_eq ** 4) + (F_tidal / consts.PHY_SIGMA) , 1/4);
 	planet.temperature_eff = new T.Value(T_eff, T.units.Temp.K);
@@ -887,7 +1015,7 @@ function generateAtmosphere(planet) {
 	const f_ret = utils.clamp( (K_ret - 0.20) / 0.70 , 0.0, 10.0) ** 2;
 	const g_Earth = planetMass_MEarth / (planetRadius_REarth ** 2);
 	const tidalOutgassing = 1.0 + Math.min(F_tidal / 0.1, 50.0);
-	const M_press = Math.pow(10, utils.clamp( utils.gaussianRandom(0, 0.5) , -2, 2));
+	const M_press = Math.pow(10, utils.clamp( utils.gaussianRandom(0, 0.5) , -1, 1));
 
 	const P_surf_raw = P_base * f_ret * g_Earth * tidalOutgassing * M_press;
 
@@ -981,15 +1109,16 @@ function generateAtmosphere(planet) {
 		};
 	}
 
-	if ( ((K_ret >= 2.5) && (prng() < 0.5)) || (K_ret >= 3.5) ) {
-		const impacts = planet.genData.isMoon ? planet.parentBody.genData.impacts : planet.genData.impacts;
-
+	const envelopeChance = utils.clamp((K_ret - 2.5) / (6.5 - 2.5), 0.0, 1.0);
+	if (prng() < envelopeChance) {
 		const envelope = {
 			 H2: prng.range(0.70, 0.80),
 			 He: prng.range(0.15, 0.25),
 			CH4: prng.range(0.01, 0.04),
 		};
-		const envelopeWeight = prng.range(0.75, 0.95) / ((impacts + 1) ** 2);
+
+		const impacts = planet.genData.isMoon ? planet.parentBody.genData.impacts : planet.genData.impacts;
+		const envelopeWeight = prng.range(0.75, 0.95) * (envelopeChance ** 2) / ((impacts + 1) ** 2);
 
 		const compositionMixed = {};
 		for (const gas in envelope)
@@ -999,6 +1128,8 @@ function generateAtmosphere(planet) {
 		
 		compositionRaw = compositionMixed;
 	}
+
+	console.log(planet.name, K_ret.toFixed(2));
 	
 	const compositionFinal = normalizeComposition(compositionRaw);
 	const mu = calculateMeanMolarMass(compositionFinal);
@@ -1007,7 +1138,7 @@ function generateAtmosphere(planet) {
 	const H = (T_surf / (g_Earth * mu)) * H_Earth;
 	
 	const A = 4 * Math.PI * (planet.radius.as(T.units.Dist.m) ** 2);
-	const atmosphereMass = new T.Value((P_surf * 101325) * A / planet.g.as(T.units.Spd.m_s), T.units.Mass.kg);
+	const atmosphereMass = new T.Value((P_surf * 101325) * A / planet.g.as(T.units.Acc.m_s2), T.units.Mass.kg);
 
 	planet.atmosphere = {
 		pressure: P_surf,
@@ -1129,14 +1260,14 @@ function getGlowColor(temperature) {
 	else {
 		const toHex = (colorVal) => colorVal.toString(16).padStart(2, '0');
 		
-		const a = Math.round(Math.pow((temp - 700) / (1400 - 700), 2) * 255);
+		const a = Math.min(255, Math.floor(Math.pow((1400, temp - 700) / (1400 - 700), 2) * 255));
 
 		if (temp < 1000) {
 			// Calculating color from #170000 at 700K to #ff4400 at 1000K.
 			const x = temp - 700 + 23;
 
-			const r = Math.min(255, Math.round(x));
-			const g = Math.max(255, Math.round(x)) % 255;
+			const r = Math.min(255, Math.floor(x));
+			const g = Math.max(255, Math.floor(x)) % 255;
 			const b = 0;
 
 			return `#${toHex(r)}${toHex(g)}${toHex(b)}${toHex(a)}`;
@@ -1166,9 +1297,9 @@ function setPlanetColor(planet) {
 function setTerrestrialColor(planet) {
 	const metallicity = planet.core.composition.iron / (1 - planet.core.composition.ice);
 
-	const red 	= Math.floor(75 + 90 * (1 - metallicity));
-	const green = Math.floor(65 + 80 * (1 - metallicity));
-	const blue 	= Math.floor(55 + 70 * (1 - metallicity));
+	const red 	= Math.floor(65 + 90 * (1 - metallicity));
+	const green = Math.floor(55 + 80 * (1 - metallicity));
+	const blue 	= Math.floor(45 + 70 * (1 - metallicity));
 	
 	const toHex = (colorVal) => colorVal.toString(16).padStart(2, '0');
 	return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
@@ -1290,4 +1421,430 @@ function setGasGiantColor(planet) {
 			return "#6A0000";
 		}
 	}
+}
+
+/**
+ * Phase points constants for pure substances (Temperature in K, Pressure in Pa)
+ */
+const SUBSTANCES = {
+  	H2O: {
+		name: "Water",
+		triple: { T: 273.16, P: 611.657 },
+		critical: { T: 647.096, P: 22064000 },
+		antoine: { A: 10.073, B: 1730.63, C: -39.724 },
+		meltTemp: 273.15,
+  	},
+	CH4: {
+		name: "Methane",
+		triple: { T: 90.69, P: 11700 },
+		critical: { T: 190.56, P: 4599200 },
+		antoine: { A: 8.928, B: 405.42, C: -5.88 },
+		meltTemp: 90.69,
+	}
+};
+
+/**
+ * Calculates equilibrium vapor pressure by Antoine equation
+ * @param {Object} substance
+ * @param {number} tempK  
+ * @returns {number}
+ */
+function getVaporPressure(substance, tempK) {
+	const { A, B, C } = substance.antoine;
+	const logP = A - (B / (tempK + C));
+	return Math.pow(10, logP);
+}
+
+/**
+ * Determines phase state of a pure substance.
+ * @param {string} substanceKey - `H2O` or `CH4`
+ * @param {number} tempK - Surface temperature (in K)
+ * @param {number} pressurePa - Atmosphere pressure (in Pa, 1 atm = 101325 Pa)
+ * @returns {Object} An object with phase state (`.phase`) and description (`.desc`)
+ */
+function getPhaseState(substanceKey, tempK, pressurePa) {
+	const sub = SUBSTANCES[substanceKey];
+	if (!sub) throw new Error(`Unknown substance: ${substanceKey}`);
+
+	const { triple, critical, meltTemp } = sub;
+
+	// 1. Supercritical fluid
+	if (tempK > critical.T && pressurePa > critical.P) {
+		return { phase: "SUPERCRITICAL", desc: "Supercritical fluid (no distinction between gas and liquid)" };
+	}
+
+	// 2. Gas at high temperatures (above critical T, but at low pressure)
+	if (tempK > critical.T) {
+		return { phase: "GAS", desc: "Gas (above critical temperature)" };
+	}
+
+	// 3. Sublimation check (pressure is below the triple point)
+	if (pressurePa < triple.P) {
+		const pVapor = getVaporPressure(sub, tempK);
+		if (pressurePa < pVapor || tempK > triple.T) {
+			return { phase: "GAS", desc: "Gas / Vapor (pressure is below the triple point)" };
+		} 
+		else {
+			return { phase: "SOLID", desc: "Solid (Ice / Frost)" };
+		}
+	}
+
+	// 4. Melting check (Solid vs Liquid/Gas)
+	if (tempK < meltTemp) {
+		return { phase: "SOLID", desc: "Solid (Ice)" };
+	}
+
+	// 5. Boiling / condensing check (Liquid vs Gas)
+	const pVapor = getVaporPressure(sub, tempK);
+	if (pressurePa >= pVapor) {
+		return { phase: "LIQUID", desc: "Liquid" };
+	} 
+	else {
+		return { phase: "GAS", desc: "Gas / Vapor" };
+	}
+}
+
+/**
+ * Constants for eutectic system Water-Ammonia (~1 atm)
+ */
+const EUTECTIC_SYSTEM_H2O_NH3 = {
+	eutecticPoint: {
+		w_NH3: 0.321,    // Ammonia mass fraction (32.1%)
+		T_melt: 176.15   // Eutectic freezing temperature (~ -97°C)
+	},
+	pureH2O: { T_melt: 273.15, T_boil: 373.15, pCrit: 22064000 },
+	pureNH3: { T_melt: 195.42, T_boil: 239.82, pCrit: 11280000 },
+
+	/**
+	 * Approximate liquidus temperature (freezing point) based on NH3 fraction
+	 * @param {number} w - NH3 mass fraction [0..1]
+	 */
+	getMeltTemperature(w) {
+		const wE = this.eutecticPoint.w_NH3;
+		const TE = this.eutecticPoint.T_melt;
+
+		if (w <= wE) {
+			// Left branch: from pure H2O to the eutectic (H2O crystallizes as ice)
+			return this.pureH2O.T_melt - (this.pureH2O.T_melt - TE) * Math.pow(w / wE, 0.85);
+		} 
+		else {
+			// Right branch: from the eutectic to pure NH3 (ammonia hydrate crystallizes)
+			return TE + (this.pureNH3.T_melt - TE) * Math.pow((w - wE) / (1 - wE), 1.2);
+		}
+	},
+
+	/**
+	 * Simplified boiling point of a compound (Raoult/Henry law deviation)
+	 */
+	getBoilingTemperature(w, pressurePa) {
+		// Base T_boil proportionate to molar fraction (at 1 атм)
+		const tBoil1atm = this.pureH2O.T_boil * (1 - w) + this.pureNH3.T_boil * w;
+		
+		// Atmospheric pressure correction (Clausius-Clapeyron)
+		const P0 = 101325;
+		const dH_vap = 35000; // J/mol (average heat of vaporization)
+		const R = 8.314;
+		
+		const invT = (1 / tBoil1atm) - (R * Math.log(pressurePa / P0) / dH_vap);
+		return 1 / invT;
+	}
+};
+
+/**
+ * Estimates the state of a water-ammonia ocean.
+ * @param {number} tempK - Surface temperature (K)
+ * @param {number} pressurePa - Atmosphere pressure (Pa)
+ * @param {number} ammoniaFraction - NH3 mass fraction in the ocean (от 0.0 до 1.0)
+ */
+function getEutecticOceanState(tempK, pressurePa, ammoniaFraction = 0.15) {
+	const sys = EUTECTIC_SYSTEM_H2O_NH3;
+	const w = Math.max(0, Math.min(1, ammoniaFraction));
+
+	const T_melt = sys.getMeltTemperature(w);
+	const T_boil = sys.getBoilingTemperature(w, pressurePa);
+
+	// 1. Freezing check
+	if (tempK < T_melt) {
+		return {
+		phase: "SOLID",
+		composition: w > 0 ? "Water-ammonia ice / Hydrates" : "Water ice",
+		desc: `Frozen surface (T < ${T_melt.toFixed(1)} K)`
+		};
+	}
+
+	// 2. Boiling / total evaporation check
+	if (tempK > T_boil) {
+		return {
+		phase: "GAS",
+		composition: "H2O + NH3 vapor",
+		desc: `Ocean has been evaporated (T > ${T_boil.toFixed(1)} K)`
+		};
+	}
+
+	// 3. Stable liquid phase
+	return {
+		phase: "LIQUID",
+		meltTemp: Number(T_melt.toFixed(1)),
+		boilTemp: Number(T_boil.toFixed(1)),
+		desc: `Liquid ocean (${(w * 100).toFixed(1)}% NH3). Is liquid within the range: ${T_melt.toFixed(1)}K - ${T_boil.toFixed(1)}K`
+	};
+}
+
+class OceanSubstance {
+	constructor () {
+		this.name = '';
+		this.color = '#00000000';
+
+		this.amount = 0;
+		this.state = '';
+
+		this.substance = '';
+		this.density = 1.0; // Density, g/cm^3
+		this.bulk = 1; // Bulk modulus, Pa
+
+		this.calculateState = (planet) => {
+			const temp = planet.temperature.as(T.units.Temp.K);
+			const pressure = planet.atmosphere.pressure * 101325;
+			this.state = (getPhaseState(this.substance, temp, pressure)).phase;
+		};
+
+		this.calculateAmount = () => { this.amount = 0 };
+	}
+}
+
+class Lava extends OceanSubstance {
+	constructor () {
+		super();
+
+		this.name = 'Lava';
+		this.color = '#ff4400';
+
+		this.density = 2.2;
+		this.bulk = 3e9;
+
+		this.calculateState = (planet) => {
+			const temp = planet.temperature.as(T.units.Temp.K);
+			this.state = temp >= 1000 ? 'LIQUID' : 'SOLID';
+			this.color = planet.glowColor.slice(0, planet.glowColor.length-2);
+		};
+
+		this.calculateAmount = (planet) => {
+			if (this.state === 'SOLID') {
+				this.amount = 0;
+				return;
+			}
+
+			this.amount = planet.core.composition.rock * 0.001;
+
+			const temp = planet.temperature.as(T.units.Temp.K);
+			this.amount *= (temp - 1000) / (1400 - 1000);
+		};
+	}
+}
+
+class Water extends OceanSubstance {
+	constructor () {
+		super();
+
+		this.name = 'Water';
+		this.color = '#164b92';
+
+		this.substance = 'H2O';
+		this.density = 1.025;
+		this.bulk = 2.2e9;
+
+		this.calculateAmount = (planet) => {
+			if (((this.state === 'SOLID') || (this.state === 'LIQUID')) === false) {
+				this.amount = 0;
+				return;
+			}
+
+			if (1 / Math.sqrt(planet.genData.sma_norm) > 1.15) {
+				this.amount = 0;
+				return;
+			}
+
+			this.amount = planet.core.composition.ice * 0.99;
+
+			if (this.state === 'SOLID')
+				this.amount *= -1;
+		};
+	}
+}
+
+class Methane extends OceanSubstance {
+	constructor () {
+		super();
+
+		this.name = 'Methane';
+		this.color = '#bf610f';
+
+		this.substance = 'CH4';
+		this.density = 0.423;
+		this.bulk = 1.3e8;
+
+		this.calculateAmount = (planet) => {
+			if (!(this.state === 'LIQUID')) {
+				this.amount = 0;
+				return;
+			}
+
+			this.amount = planet.core.composition.ice * 0.02;
+		};
+	}
+}
+
+class AmmoniaWater extends OceanSubstance {
+	constructor () {
+		super();
+
+		this.name = 'Ammonia water';
+		this.color = '#22a2d1';
+
+		this.NH3_f = 0;
+		this.density = 0.89;
+		this.bulk = 11e9;
+
+		this.calculateState = (planet) => {
+			const temp = planet.temperature.as(T.units.Temp.K);
+			const pressure = planet.atmosphere.pressure * 101325;
+
+			const iceFactor = Math.min(1, (planet.core.composition.ice * 10) ** 3);
+			const distFactor = Math.min(1, Math.exp(3 * (planet.genData.sma_norm - consts.PHY_DIST_SNOW_LINE)));
+			this.NH3_f = 0.33 * iceFactor * distFactor;
+
+			this.state = (getEutecticOceanState(temp, pressure, this.NH3_f)).phase;
+		};
+
+		this.calculateAmount = (planet) => {
+			if (((this.state === 'SOLID') || (this.state === 'LIQUID')) === false) {
+				this.amount = 0;
+				return;
+			}
+
+			if (this.NH3_f < 0.05) {
+				this.amount = 0;
+				return;
+			}
+
+			this.amount = planet.core.composition.ice;
+
+			if (this.state === 'SOLID')
+				this.amount *= -1;
+		};
+	}
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ */
+function setOcean(planet) {
+	const oceanSubstances = {
+		lava: new Lava(),
+		water: new Water(),
+		methane: new Methane(),
+		ammonia: new AmmoniaWater(),
+	};
+
+	/*
+	Earth's ocean takes 0.022% of total mass and covers 71% of the surface area.
+	It will take about 3 times more of the ocean's mass to fully submerge the land.
+	Thus, 0.067% threshold chosen.
+	(0.00022 / 0.00067)^1/3 ~= 0.69 = 69% (close enough to 71%)
+	*/
+	const totalOceanThreshold = 0.00067;
+
+	// Getting surface ocean
+	let maxSubstance = oceanSubstances.lava;
+	for (const substance in oceanSubstances) {
+		oceanSubstances[substance].calculateState(planet);
+		oceanSubstances[substance].calculateAmount(planet);
+
+		if (oceanSubstances[substance].amount > maxSubstance.amount)
+			maxSubstance = oceanSubstances[substance];
+	} 
+	
+	if (maxSubstance.amount > 0) {
+		// Setting surface ocean
+
+		planet.ocean = maxSubstance.name;
+		planet.oceanColor = maxSubstance.color;
+
+		planet.oceanDepth = calculateOceanDepth(planet, maxSubstance);
+		planet.oceanCover = Math.min(1.0, Math.pow(maxSubstance.amount / totalOceanThreshold, 1/3));
+		planet.oceanCoverVisual = planet.oceanCover;
+	}
+	else {
+		// Getting frozen/subsurface ocean
+
+		let hasFrozenOcean = false;
+		// A planet must be cold enough, otherwise its ice will sublimate too quickly, 
+		// leaving no ice at the surface in geological time.
+		if (planet.temperature.as(T.units.Temp.K) <= 150) {
+			for (const substance in oceanSubstances) {
+				if (oceanSubstances[substance].amount < maxSubstance.amount)
+					maxSubstance = oceanSubstances[substance];
+			}
+
+			if (maxSubstance.amount < 0)
+				hasFrozenOcean = true;
+		}
+
+		if (hasFrozenOcean) {
+			// Frozen (ammonia) water ocean case
+
+			maxSubstance.amount = Math.abs(maxSubstance.amount);
+
+			planet.ocean = maxSubstance.name + ' (frozen)';
+			planet.oceanColor = '#d7f0ffbf';
+
+			planet.oceanDepth = calculateOceanDepth(planet, maxSubstance);
+			planet.oceanCover = Math.min(1.0, Math.pow(maxSubstance.amount / totalOceanThreshold, 1/3))
+			planet.oceanCoverVisual = planet.oceanCover;
+		}
+		else {
+			// Dry planet case
+
+			planet.ocean = 'Dry';
+			
+			// Setting a slightly darker land color to draw dried up "seas" later.
+			const color = utils.parseColor(planet.color);
+			for (const c in color) { color[c] = Math.floor(color[c] * 0.85); }
+			const toHex = (colorVal) => colorVal.toString(16).padStart(2, '0');
+			planet.oceanColor = `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
+			
+			planet.oceanDepth = new T.Value(0, T.units.Dist.m);
+			planet.oceanCover = 1; // 100% of the surface is dry in the stats.
+
+			// Visually, dried up seas with some variance are left.
+			const iceComponent = Math.min(1.0, Math.pow(planet.core.composition.ice / totalOceanThreshold, 1/3));
+			const randComponent = prng.range(0.25, 0.75);
+			planet.oceanCoverVisual = (iceComponent * 0.75) + (randComponent * 0.25);
+		}
+	}
+
+	planet.landscape = prng.range(0.01, 0.05); // Determines islands/continents scale (bigger value -> smaller islands)
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ * @param {OceanSubstance} substance 
+ * @returns 
+ */
+function calculateOceanDepth(planet, substance) {
+	const M = planet.mass.as(T.units.Mass.kg);
+	const R = planet.radius.as(T.units.Dist.m);
+	const g = planet.g.as(T.units.Acc.m_s2);
+
+	const f = substance.amount;
+	const rho = substance.density * 1000;
+	const K = substance.bulk;
+
+	const V = (M * f) / rho;
+	const H = V / (4 * Math.PI * (R ** 2))
+	const H_compr = H * (1 - (H * g / (2 * K)));
+
+	return new T.Value(H_compr, T.units.Dist.m);
 }

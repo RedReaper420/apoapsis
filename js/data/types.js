@@ -49,6 +49,10 @@ export const units = Object.freeze({
 		km_h: 'spd_km_h',
 		c: 'spd_c'
 	}),
+	Acc: Object.freeze({
+		m_s2: 'acc_m_s2',
+		g: 'acc_g'
+	}),
 	Temp: Object.freeze({
 		K: 'temp_k',
 		C: 'temp_c'
@@ -58,11 +62,19 @@ export const units = Object.freeze({
 		Mass: 'mass',
 		Time: 'time',
 		Spd: 'spd',
+		Acc: 'acc',
 		Temp: 'temp'
 	})
 });
 
-const unitTypes = [units.GROUPS.Dist, units.GROUPS.Mass, units.GROUPS.Time, units.GROUPS.Spd, units.GROUPS.Temp];
+const unitTypes = [
+	units.GROUPS.Dist, 
+	units.GROUPS.Mass, 
+	units.GROUPS.Time, 
+	units.GROUPS.Spd, 
+	units.GROUPS.Acc,
+	units.GROUPS.Temp,
+];
 const unitValues = new Map([
 	// Distance
 	[units.Dist.m,         1],
@@ -97,6 +109,10 @@ const unitValues = new Map([
 	[units.Spd.km_s, 1000],
 	[units.Spd.km_h, 1/3.6],
 	[units.Spd.c,    299792458],
+
+	// Acceleration
+	[units.Acc.m_s2, 1],
+	[units.Acc.g,	 9.80665],
 ]);
 
 export const unitNames = new Map([
@@ -134,6 +150,10 @@ export const unitNames = new Map([
 	[units.Spd.km_h, 'km/h'],
 	[units.Spd.c,    'c'],
 
+	// Acceleration
+	[units.Acc.m_s2, 'm/s²'],
+	[units.Acc.g,	 'g'],
+
 	// Temperature
 	[units.Temp.K,  'K'],
 	[units.Temp.C,  '°C'],
@@ -143,7 +163,7 @@ export class Value {
 	/**
 	 * A value with an assigned unit (convertable).
 	 * @param {number} value - Numeric value.
-	 * @param {string} unit - Unit name. Use `units` enum to assssign (`types.units.GROUP.UNIT`).
+	 * @param {string} unit - Unit name. Use `units` enum to assign (`types.units.GROUP.UNIT`).
 	 */
 	constructor (value, unit) {
 		this.value = value;
@@ -298,7 +318,7 @@ export class System {
 		settings = new GenerationSettings()
 	) {
 		this.settings = settings;
-		this.bodies = [];
+		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */ this.bodies = [];
 		this.type = systemTypes.Single;
 	}
 }
@@ -320,9 +340,11 @@ export const systemTypes = Object.freeze({
 
 export class Body {
 	constructor (parentBody = null, name = 'Spaceball') {
+		/** @type {BinaryPlanet|BinaryStar|Planet|Star|null} */
 		this.parentBody = parentBody;
 		this.name = name;
 
+		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */
 		this.bodies = [];
 		this.sma = new Value(1.26, units.Dist.AU);
 		this.eccentricity = -1;
@@ -413,10 +435,33 @@ export const moonTypes = Object.freeze({
 });
 
 export const migrationStatus = Object.freeze({
-	Still: '',
+	Still: 'Still',
 	Ejected: 'Ejected',
 	Merged: 'Merged',
 });
+
+/**
+ * Generation data of a planet.
+ * 
+ * @typedef {Object} GenData
+ * 
+ * @property {boolean} isMoon - Is the planet a moon of other planet. Affects generation.
+ * @property {string} moonType - Moon type (`T.moonTypes`)
+ * @property {boolean} retrograde - Retrograde orbit flag, assigned for some regular moons.
+ * @property {number} mass - Moon mass (M⊕).
+ * 
+ * @property {BinaryStar|Star} parentStar - A star that hosts the planet.
+ * @property {string} status - Planet's status that is assigned and used during the migration.
+ * @property {number} impacts - Giant impacts counter, incremented during the migration, then used during the moons generation.
+ * 
+ * @property {number} sma_norm - Distance converted to normalized, solar units (AU☉).
+ * 
+ * @property {number} sma_init - Initial spawn distance, used during the moons generation (AU).
+ * @property {number} sma_init_norm - Initial spawn distance converted to normalized, solar units (AU☉).
+ * 
+ * @property {number} sma_min - Minimum allowed spawn distance, used during the migration (AU).
+ * @property {number} sma_max - Maximum allowed spawn distance, used during the migration (AU).
+ */
 
 export class Planet extends Body {
 	constructor (parentBody = null, name = 'Terra') {
@@ -431,7 +476,10 @@ export class Planet extends Body {
 		this.envelope = new Envelope();
 
 		this.type = planetTypes.Terrestrial;
+		/** @type {Array<RingSystem>} */
 		this.rings = [];
+
+		/** @type {GenData} */
 		this.genData = {};
 		this.hasLife = false;
 	}
@@ -448,7 +496,9 @@ export class Planet extends Body {
 
 export class Binary extends Body {
 	constructor (
+		/** @type {Planet|Star} */
 		primary = null,
+		/** @type {Planet|Star} */
 		secondary = null,
 		sma = new Value(1, units.Dist.AU),
 	) {

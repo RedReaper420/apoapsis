@@ -73,7 +73,6 @@ function handleButtonClick(button) {
 		case 'setting_applyHDR':
 		case 'setting_showMagnetospheres':
 		case 'setting_showAtmospheres':
-		case 'setting_showOceans':
 		case 'setting_showGrid':
 		case 'setting_showHabitableZone':
 		case 'setting_showStarsCorona':

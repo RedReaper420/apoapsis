@@ -5,6 +5,9 @@ import * as utils from "../../utils/utils.js";
 export default function drawLighting() {
 	if (!(this instanceof T.Planet))
 		return;
+	
+	if (this.sim.radius_vis < 0.05)
+		return;
 
 	const coords = this.position.screen;
 	const rend = this.renderer;
@@ -13,8 +16,6 @@ export default function drawLighting() {
 	const shdctx = rend.shadowCtx;
 	const litctx = rend.lightCtx;
 
-	if (this.sim.radius_vis < 0.05)
-		return;
 
 	// Getting the list of stars (light sources)
 	const stars = [];
@@ -57,6 +58,9 @@ export default function drawLighting() {
 		stars.forEach(star => { lum_avg += drawLightCone(litctx, star, this); });
 		lum_avg /= stars.length;
 		this.sim.lum_avg = lum_avg;
+
+		litctx.globalCompositeOperation = 'destination-in';
+		litctx.drawImage(rend.shadowCanvas, 0, 0);
 	litctx.restore();
 	
 	shdctx.save();
@@ -106,16 +110,6 @@ function drawLightCone(ctx, star, planet) {
 		planet.position.screen.y - lightDirY * planet.sim.radius_atm_vis
 	);
 
-	const maskGrad = ctx.createRadialGradient(
-		planet.position.screen.x, planet.position.screen.y, 0,
-		planet.position.screen.x, planet.position.screen.y, planet.sim.radius_atm_vis
-	);
-
-	maskGrad.addColorStop(1, `rgb(255, 255, 255, 0)`);
-	maskGrad.addColorStop((planet.sim.radius_vis / planet.sim.radius_atm_vis + 1) / 2, `rgb(255, 255, 255, 0.25)`);
-	maskGrad.addColorStop(planet.sim.radius_vis / planet.sim.radius_atm_vis, `rgb(255, 255, 255, 1)`);
-	maskGrad.addColorStop(0, `rgb(255, 255, 255, 1)`);
-
 	const starColor = utils.parseColor(star.color);
   
 	const dayColor   = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, ${alpha.toFixed(3)})`;
@@ -136,15 +130,6 @@ function drawLightCone(ctx, star, planet) {
 		ctx.fillStyle = grad;
 		ctx.fill();
 	ctx.closePath();
-
-	ctx.save();
-		ctx.globalCompositeOperation = 'destination-in';
-		ctx.beginPath();
-			ctx.arc(planet.position.screen.x, planet.position.screen.y, planet.sim.radius_atm_vis, 0, Math.PI * 2);
-			ctx.fillStyle = maskGrad;
-			ctx.fill();
-		ctx.closePath();
-	ctx.restore();
 
 	return alpha;
 }
@@ -169,7 +154,7 @@ function calculateStarIllumination(star, planet) {
 	
 	const hdr = planet.renderer.setting_applyHDR;
 	const rawIntensity = star.luminosity / (distAU ** 2);
-	const visualIntensity = Math.min(1.0, hdr ? Math.pow(rawIntensity, 1/4) : rawIntensity); // HDR
+	const visualIntensity = Math.min(1.0, hdr ? Math.pow(rawIntensity, 1/5) : rawIntensity); // HDR
 	const ambientLight = 0.15;
 	const finalAlpha = Math.max(ambientLight, visualIntensity);
 

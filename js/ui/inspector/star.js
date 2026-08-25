@@ -31,7 +31,7 @@ export default function generateStarProfile(body) {
 
 	// MASS
 	const bodyMassMSun = star.querySelector('#bodyMassMSun');
-	bodyMassMSun.innerText = body.mass.as(T.units.Mass.M_Sun).toFixed(2) + ' M☉';
+	bodyMassMSun.innerText = body.mass.as(T.units.Mass.M_Sun).toPrecision(3) + ' M☉';
 
 	const bodyMassKg = star.querySelector('#bodyMassKg');
 	bodyMassKg.innerText = body.mass.as(T.units.Mass.kg).toExponential(3).replace('+','') + ' kg';
@@ -49,7 +49,7 @@ export default function generateStarProfile(body) {
 
 	// RADIUS
 	const bodyRadiusRSun = star.querySelector('#bodyRadiusRSun');
-	bodyRadiusRSun.innerText = body.radius.as(T.units.Dist.R_Sun).toFixed(2) + ' R☉';
+	bodyRadiusRSun.innerText = body.radius.as(T.units.Dist.R_Sun).toPrecision(3) + ' R☉';
 
 	const bodyRadiusKm = star.querySelector('#bodyRadiusKm');
 	bodyRadiusKm.innerText = body.radius.as(T.units.Dist.km).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' km';
@@ -120,7 +120,12 @@ export default function generateStarProfile(body) {
 	const ageFit = utils.getFittingValue(
 		body.age,
 		T.units.Time.s,
-		[T.units.Time.y, T.units.Time.My, T.units.Time.Gy],
+		[
+			T.units.Time.y, 
+			T.units.Time.My, 
+			T.units.Time.Gy,
+			T.units.Time.Ty
+		],
 		0.5
 	);
 	ageValue.innerText = ageFit.value.toFixed(2);
@@ -135,7 +140,8 @@ export default function generateStarProfile(body) {
 		[
 			T.units.Time.y, 
 			T.units.Time.My, 
-			T.units.Time.Gy
+			T.units.Time.Gy,
+			T.units.Time.Ty
 		],
 		0.5
 	);

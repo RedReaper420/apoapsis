@@ -2,10 +2,10 @@
 import * as T from "../../data/types.js";
 
 export default function drawRings() {
-	if (this.sim.radius_vis < 0.1)
+	if (!(this instanceof T.Planet))
 		return;
 
-	if (!(this instanceof T.Planet))
+	if (this.sim.radius_vis < 0.1)
 		return;
 
 	const coords = this.position.screen;

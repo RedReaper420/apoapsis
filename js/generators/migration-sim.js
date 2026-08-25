@@ -4,7 +4,7 @@ import * as utils from "../utils/utils.js";
 import * as T from "../data/types.js";
 import consts from "../data/consts.js";
 
-const GIANT_MASS = 60;
+const GIANT_MASS = 60; // M⊕, mass threshold above which a planet is being accounted for activating the Grand Tack.
 
 /**
  * Simulates multi-body planetary migration and dynamic scattering within a decaying protoplanetary gas disk.
@@ -338,7 +338,7 @@ function mergePlanets(recipient, donor) {
 	recipient.envelope.mass.value += donorEnvMass;
 
 	if (recipient.envelope.mass.value > 0) { // Envelope was there initially or was acquired just now
-		const gasCoeff = 1.0 - prng.range(0.25, 0.50); // 50%-75% of gas will remain
+		const gasCoeff = prng.range(0.50, 0.75); // 50%-75% of gas will remain
 
 		// Calculating new composition fractions
 		recipient.envelope.composition.gas = (recipient.envelope.composition.gas * recipientEnvMass + donor.envelope.composition.gas * donorEnvMass) / recipient.envelope.mass.value;
@@ -379,7 +379,7 @@ function mergePlanets(recipient, donor) {
 		}
 	}
 
-	// --- Purge Donor Status ---
+	// --- Setting donor's status to be purged ---
 	donor.genData.status = T.migrationStatus.Merged;
 	donor.sma = new T.Value(Infinity, T.units.Dist.AU);
 }

@@ -53,13 +53,13 @@ export function generateStarFormation(system, parentFormation = null, starsArray
 /**
  * Determines whether a star system should form as a binary configuration.
  * 
- * Under the default 33.3% chance setting ({@link consts.UI_STAR_BINARY_CHANCE_VAL_DEF}), generations with two subsequent function calls result in:
- * - 44.44% Single Star				  [ ✹ ]
- * - 22.22% Close Binary			  [ ✹✷ ]
- * - 14.81% Wide Binary				  [ ✹ ··· ✷ ]
- * -  7.41% Wide Triple System (1)	  [ ✹ ··· ✷✴ ]
- * -  7.41% Wide Triple System (2)	  [ ✹✷ ··· ✷ ]
- * -  3.70% Complex Quadruple System  [ ✹✷ ··· ✷✴ ]
+ * Under the default 33.3% chance setting ({@link consts.UI_STAR_BINARY_CHANCE_VAL_DEF}), generations with two subsequent function calls will result in:
+ * - 44.44% Single star				  [ ✹ ]
+ * - 22.22% Close binary			  [ ✹✷ ]
+ * - 14.81% Wide binary				  [ ✹ ··· ✷ ]
+ * -  7.41% Wide triple system (1-2)  [ ✹ ··· ✷✴ ]
+ * -  7.41% Wide triple system (2-1)  [ ✹✷ ··· ✷ ]
+ * -  3.70% Complex quadruple system  [ ✹✷ ··· ✷✴ ]
  * 
  * Note: there's actually a bit greater amount of single stars on a wide orbit (@see {@link generateStarFormation}).
  * 
@@ -100,7 +100,7 @@ function appendStarFormation(system, starFormation, parentFormation, starsArray)
  * 
  * @param {T.Value} primaryMass	  - Mass of the primary component (unit: `Mass`)
  * @param {T.Value} secondaryMass - Mass of the secondary component (unit: `Mass`)
- * @param {boolean} isCloseOrbit	  - *[default: `true`]* If `true`, samples tight short-period orbits; otherwise samples wide orbits.
+ * @param {boolean} isCloseOrbit  - *[default: `true`]* If `true`, samples tight, short-period orbits; otherwise samples wide orbits.
  * 
  * @returns {T.Value} Semi-major axis distance value (unit: `Dist`)
  */

@@ -28,7 +28,8 @@ class SystemGenerator {
 
 		console.log(this.settings.seed);
 
-		const stars = []; // single stars and binary stars list
+		/** @type {Array<T.Star|T.BinaryStar>} */
+		const stars = []; // Single stars and binary stars list
 
 		// Generating the primary single/binary star
 		starSystemGen.generateStarFormation(this.system, null, stars);
@@ -50,7 +51,7 @@ class SystemGenerator {
 			}
 		});
 
-		// Assigning system type
+		// Assigning a system type
 		let starsCount = 0;
 		stars.forEach(star => {
 			starsCount += star instanceof T.Star ? 1 : 0;
@@ -72,12 +73,12 @@ class SystemGenerator {
 				if ((body instanceof T.Star) || (body instanceof T.Binary))
 					continue;
 
-				planetGen.planetGeneration_Stage2(this.settings, body);
+				planetGen.planetGeneration_Stage2(body);
 				moonSystemGen.generateMoons(this.settings, body);
 			}
 		});
 
-		// 3.5. Resort bodies after adding binary planets
+		// Resorting bodies after adding binary planets
 		stars.forEach(star => {
 			star.bodies.sort((bodyA, bodyB) => {
 				const distanceA = bodyA.sma.as(T.units.Dist.m);
@@ -87,7 +88,7 @@ class SystemGenerator {
 		});
 
 		// Performing stage 3 generation for all planetary bodies
-		const finishGeneration = (body) => {
+		const finishGeneration = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
 			// Generation order "Binary components -> Children" is deliberate.
 			// Reason: children are taking magnetosphere values of their parents.
 
@@ -110,9 +111,6 @@ class SystemGenerator {
 				if (body.genData.retrograde === true) {
 					body.orbit.i = (body.orbit.i + Math.PI) % (2 * Math.PI);
 				}
-
-				if (body.temperature.value > 1000)
-					eventBus.emit('shtap');
 			}
 
 			if ((body instanceof T.Star) || (body instanceof T.BinaryStar)) {
@@ -124,8 +122,9 @@ class SystemGenerator {
 			if (body instanceof T.Binary) {
 				// Setting correct distances for binary components from its barycenter.
 				// For other bodies that detail is ignored.
-				let mass1 = body.primary.mass.as(T.units.Mass.kg);
-				let mass2 = body.secondary.mass.as(T.units.Mass.kg);
+				const mass1 = body.primary.mass.as(T.units.Mass.kg);
+				const mass2 = body.secondary.mass.as(T.units.Mass.kg);
+
 				const primary = mass1 >= mass2 ? body.primary : body.secondary;
 				const secondary = mass1 < mass2 ? body.primary : body.secondary;
 				
@@ -160,7 +159,7 @@ class SystemGenerator {
 		};
 		this.system.bodies.forEach(body => { finishGeneration(body) });
 
-		const calculateOrbitalPeriodAndSpeed = (body) => {
+		const calculateOrbitalPeriodAndSpeed = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
 			if (body.parentBody !== null) {
 				let host = body.parentBody;
 				if (body.parentBody instanceof T.Binary) {
@@ -196,21 +195,25 @@ class SystemGenerator {
 		console.log('--------------------')
 	}
 
+	startGeneration() {
+		let gen = true;
+		let attempts = 0+999*1;
+		eventBus.on('shtap', () => { gen = false });
+
+		while (gen && (attempts < 1000)) {
+			this.generate();
+			attempts++;
+		}
+		console.log(attempts);
+
+		eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
+	}
+
 	// -------------------------------------------------
 
 	#subscribe() {
 		eventBus.on(events.Generator.Generation.Start, () => {
-			let gen = true;
-			let attempts = 0+999*1;
-			eventBus.on('shtap', () => { gen = false });
-
-			while (gen && (attempts < 1000)) {
-				this.generate();
-				attempts++;
-			}
-			console.log(attempts);
-
-			eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
+			this.startGeneration();
 		});
 
 		// Settings change subscriptions

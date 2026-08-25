@@ -5,6 +5,7 @@ import * as T from "../data/types.js";
 import { getKeplerianPosition } from "./kepler.js";
 import { setDrawFunctions } from "./body-drawers.js";
 import * as inspector from "../ui/inspector.js";
+import generateIslandMap from "./islands-gen.js";
 
 class Renderer {
 	constructor () {
@@ -51,7 +52,6 @@ class Renderer {
 		this.setting_applyHDR = true;
 		this.setting_showMagnetospheres = true;
 		this.setting_showAtmospheres = true;
-		this.setting_showOceans = true;
 		this.setting_showHabitableZone = false;
 		this.setting_showStarsCorona = true;
 		this.setting_trueStarsRotation = true;
@@ -180,6 +180,7 @@ class Renderer {
 				cursorDist: Infinity,
 				trail: [],
 				isSystem: false,
+				islandMap: generateIslandMap(body.oceanColor || '#00000000', body.color, body.oceanCoverVisual || '0', body.landscape || undefined),
 			}
 			setDrawFunctions(body, this);
 

@@ -4,6 +4,19 @@ import * as utils from "../../utils/utils.js";
 
 import generateOrbitSection from "./orbit.js";
 
+const messageThreshold = 1e13; // 10 trillion years - a lifespan of lightest red dwarfs
+const MESSAGES = [
+	{ threshold: 1e300, text: "At the end of eternity" },
+	{ threshold: 1e200, text: "At the heat death" },
+	{ threshold: 1e100, text: "After the last black hole fades" },
+	{ threshold: 1e43,  text: "When only black holes remain" },
+	{ threshold: 1e36,  text: "When protons decay(?)" },
+	{ threshold: 1e30,  text: "In the era of frozen black dwarfs" },
+	{ threshold: 1e20,  text: "After the galaxies dissolve" },
+	{ threshold: 1e14,  text: "After the last red dwarf dies" },
+	{ threshold: messageThreshold, text: "Beyond any red dwarf's lifespan" }
+];
+
 /**
  * 
  * @param {T.Planet} body 
@@ -41,7 +54,7 @@ export default function generatePlanetProfile(body) {
 		],
 		0.1
 	);
-	bodyMassValue.innerText = bodyMassFit.value.toFixed(2);
+	bodyMassValue.innerText = bodyMassFit.value.toPrecision(3);
 	bodyMassUnit.innerText = bodyMassFit.unit;
 
 	const bodyMassKg = planet.querySelector('#bodyMassKg');
@@ -88,7 +101,7 @@ export default function generatePlanetProfile(body) {
 		],
 		0.5
 	);
-	bodyRadiusValue.innerText = bodyRadiusFit.value.toFixed(2);
+	bodyRadiusValue.innerText = bodyRadiusFit.value.toPrecision(3);
 	bodyRadiusUnit.innerText = bodyRadiusFit.unit;
 
 	const bodyRadiusKm = planet.querySelector('#bodyRadiusKm');
@@ -100,42 +113,42 @@ export default function generatePlanetProfile(body) {
 
 	// SURFACE GRAVITY
 	const surfaceGravity = planet.querySelector('#surfaceGravity');
-	surfaceGravity.innerText = body.g.as(T.units.Spd.m_s).toFixed(2) + ' m/s²';
+	surfaceGravity.innerText = `${body.g.as(T.units.Acc.m_s2).toFixed(2)} m/s² (${body.g.as(T.units.Acc.g).toFixed(2)} g)`;
 
 	// ESCAPE VELOCITY
 	const escapeVelocity = planet.querySelector('#escapeVelocity');
 	escapeVelocity.innerText = body.v_esc.as(T.units.Spd.km_s).toFixed(2) + ' km/s';
 
-	// MOUNTAIN HEIGHT
-	const mountainHeightRow = planet.querySelector('#mountainHeightRow');
-	if (body.mountainHeight.value > 0) {
-		const mountainHeight = planet.querySelector('#mountainHeight');
-		mountainHeight.innerText = (body.mountainHeight.as(T.units.Dist.km)).toFixed(0) + ' km';
-	}
-	else {
-		mountainHeightRow.remove();
-	}
+	// ====== OCEAN ======
 
-	// OCEAN DEPTH
-	const oceanDepthRow = planet.querySelector('#oceanDepthRow');
-	if (true) {
+	const oceanSection = planet.querySelector('#oceanSection');
+	if (body.type === T.planetTypes.Terrestrial) {
+		// OCEAN SUBSTANCE
+		const oceanSubstance = planet.querySelector('#oceanSubstance');
+		oceanSubstance.innerText = body.ocean;
+
+		// OCEAN COVER
+		const oceanCover = planet.querySelector('#oceanCover');
+		const oceanCoverPercent = body.oceanCover * 100;
+		oceanCover.innerText = (oceanCoverPercent < 100 ? oceanCoverPercent.toPrecision(2) : oceanCoverPercent.toFixed(0)) + '%';
+
+		// OCEAN DEPTH
 		const oceanDepth = planet.querySelector('#oceanDepth');
 		const oceanDepth_km = body.oceanDepth.as(T.units.Dist.km);
 		oceanDepth.innerText = (oceanDepth_km < 10 ? oceanDepth_km.toPrecision(2) : oceanDepth_km.toFixed(0)) + ' km';
 	}
 	else {
-		oceanDepthRow.remove();
+		oceanSection.remove();
 	}
 
-	// OCEAN COVER
-	const oceanCoverRow = planet.querySelector('#oceanCoverRow');
-	if (true) {
-		const oceanCover = planet.querySelector('#oceanCover');
-		const oceanCoverPercent = body.oceanCover * 100;
-		oceanCover.innerText = (oceanCoverPercent < 100 ? oceanCoverPercent.toPrecision(2) : oceanCoverPercent.toFixed(0)) + '%';
+	// MOUNTAIN HEIGHT
+	const mountainHeightRow = planet.querySelector('#mountainHeightRow');
+	if (body.mountainHeight.value > 0) {
+		const mountainHeight = planet.querySelector('#mountainHeight');
+		mountainHeight.innerText = (body.mountainHeight.as(T.units.Dist.km)).toPrecision(2) + ' km';
 	}
 	else {
-		oceanCoverRow.remove();
+		mountainHeightRow.remove();
 	}
 
 	// ====== COMPOSITION ======
@@ -200,9 +213,8 @@ export default function generatePlanetProfile(body) {
 	}
 	else {
 		// TIDAL LOCK TIME
-		const lockIn_Gy = isFinite(body.tidalLockIn.value) ? body.tidalLockIn.as(T.units.Time.Gy) : Infinity;
-		const messageThreshold = 1e4; // 10000 Gyrs = 10 trillion years - a lifespan of lightest red dwarfs
-		if (lockIn_Gy < messageThreshold) {
+		const lockIn_y = body.tidalLockIn.as(T.units.Time.y);
+		if (lockIn_y < messageThreshold) {
 			const rotationTidalLockTimeFit = utils.getFittingValue(
 				body.tidalLockIn,
 				T.units.Time.s,
@@ -212,7 +224,8 @@ export default function generatePlanetProfile(body) {
 					T.units.Time.d, 
 					T.units.Time.y, 
 					T.units.Time.My, 
-					T.units.Time.Gy
+					T.units.Time.Gy,
+					T.units.Time.Ty
 				],
 				0.9
 			);
@@ -223,18 +236,7 @@ export default function generatePlanetProfile(body) {
 			`;
 		}
 		else {
-			const messages = [
-				{ threshold: 1e290, text: "At the end of eternity" },
-				{ threshold: 1e140, text: "At the heat death" },
-				{ threshold: 1e91,  text: "After the last black hole fades" },
-				{ threshold: 1e50,  text: "When only black holes remain" },
-				{ threshold: 1e24,  text: "When protons decay(?)" },
-				{ threshold: 1e21,  text: "In the era of frozen black dwarfs" },
-				{ threshold: 1e11,  text: "After the galaxies dissolve" },
-				{ threshold: 1e5,   text: "After the last red dwarf dies" },
-				{ threshold: messageThreshold, text: "Beyond any red dwarf's lifespan" }
-			];
-			const match = messages.find(msg => lockIn_Gy >= msg.threshold);
+			const match = MESSAGES.find(msg => lockIn_y >= msg.threshold);
 
 			tidalLock.innerHTML = `
 				<th>Tidal lock in</th>
@@ -242,7 +244,7 @@ export default function generatePlanetProfile(body) {
 					<span class='tooltip'>
 						${match.text}
 						<span class='tooltiptext'>
-							${(body.tidalLockIn.as(T.units.Time.y)).toExponential(1).replace('+','')} y
+							${lockIn_y.toExponential(1).replace('+','')} y
 						</span>
 					</span>
 				</td>
@@ -341,7 +343,7 @@ export default function generatePlanetProfile(body) {
 
 	// ALBEDO
 	const albedo = planet.querySelector('#albedo');
-	albedo.innerText = body.albedo;
+	albedo.innerText = body.albedo.toPrecision(2);
 
 	// TEMPERATURE
 	
@@ -393,7 +395,8 @@ export default function generatePlanetProfile(body) {
 		[
 			T.units.Time.y, 
 			T.units.Time.My, 
-			T.units.Time.Gy
+			T.units.Time.Gy,
+			T.units.Time.Ty
 		],
 		0.5
 	);
@@ -413,7 +416,8 @@ export default function generatePlanetProfile(body) {
 			[
 				T.units.Time.y, 
 				T.units.Time.My, 
-				T.units.Time.Gy
+				T.units.Time.Gy,
+				T.units.Time.Ty
 			],
 			0.5
 		);

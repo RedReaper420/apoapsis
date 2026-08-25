@@ -1,11 +1,14 @@
 
-import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
 import * as T from "../data/types.js";
 import consts from "../data/consts.js";
 
 export class PlanetEvolution {
 	/**
+	 * An object that models planet's evolution. Modeled properties:
+	 * - Rotation (tidal locking with the parent body)
+	 * - Magnetosphere (modeling from planet's composition and internal heat)
+	 * - Atmosphere (dissipation by solar wind and radiation)
 	 * 
 	 * @param {T.GenerationSettings} settings 
 	 * @param {T.Planet} planet 
@@ -31,8 +34,10 @@ export class PlanetEvolution {
 			this.magnetManager.setMagneticField(t);
 			this.dissipationManager.dissipateAtmosphere(d_t, t);
 			
-			d_t *= 1.075;
+			// Floating (increasing) timestep
+			d_t *= 1.05; 
 			d_t = Math.round(d_t);
+
 			t += d_t;
 		}
 
@@ -42,6 +47,7 @@ export class PlanetEvolution {
 
 class RotationManager {
 	/**
+	 * Module that calculates tidal locking.
 	 * 
 	 * @param {PlanetEvolution} evo
 	 */
@@ -232,7 +238,7 @@ export function calculateLoveNumber(planet) {
 	const totalIceFraction = (coreIce + envIce) / totalMass;
 	const mu = 3e10 * (1 - totalIceFraction) + 4e9 * totalIceFraction; // Linear interpolation of satellite's rigidity ("rocky" and "icy" regimes)
 	
-	const k2 = 1.5 / (1 + ((19 * mu) / (2 * rho * g * R))); // Planets's tidal Love number 
+	const k2 = 1.5 / (1 + ((19 * mu) / (2 * rho * g * R))); // Tidal Love number of the planet
 
 	return k2;
 }
@@ -258,6 +264,7 @@ function getTidalLockRotationPeriod(planet, parent) {
 
 class SolarManager {
 	/**
+	 * Module that calculates solar activity. Used for magnetosphere and atmosphere calculation.
 	 * 
 	 * @param {PlanetEvolution} evo 
 	 */
@@ -290,7 +297,7 @@ class SolarManager {
 
 		const base_density = 8.4e-21; // Base stellar wind density at 1 AU
 		const v_sw = 400e3; // Stellar wind velocity
-		const solarActivity = Math.min(1000, 1 + Math.pow(starAge_Gy / this.saturationTime_Gy, -1.1));
+		const solarActivity = Math.min(10000, 1 + Math.pow(starAge_Gy / this.saturationTime_Gy, -1.1));
 
 		this.rho_sw = (base_density * solarActivity) / (this.distance_AU**2); // Stellar wind density
 
@@ -302,6 +309,7 @@ import {getMaterialRadius} from './planet-gen.js';
 
 class MagnetManager {
 	/**
+	 * Module that calculates magnetosphere.
 	 * 
 	 * @param {PlanetEvolution} evo 
 	 */
@@ -336,6 +344,7 @@ class MagnetManager {
 				
 				this.f_ad = 0.04;
 				this.c = 20;
+				
 				break;
 			}
 			case T.planetTypes.MiniNeptune:
@@ -351,6 +360,7 @@ class MagnetManager {
 
 				this.f_ad = 0.05;
 				this.c = 25;
+				
 				break;
 			}
 			case T.planetTypes.GasGiant:
@@ -365,6 +375,7 @@ class MagnetManager {
 				// and high thermal conductivity of hydrogen.
 				this.f_ad = 0.6;
 				this.c = 30;
+				
 				break;
 			}
 		}
@@ -375,16 +386,10 @@ class MagnetManager {
 
 	setMagneticField(t) {
 		this.planet.magneticField = this.calculatePlanetMagneticField(t);
-		this.planet.magnetosphereRadius = this.calculateMagnetosphereRadius(t);
+		this.planet.magnetosphereRadius = this.calculateMagnetosphereRadius();
 		this.planet.magnetosphereHistory.set(t, this.planet.magnetosphereRadius);
 	}
 	
-	/**
-	 * 
-	 * @param {number} t 
-	 * 
-	 * @returns {number}
-	 */
 	calculatePlanetMagneticField(t) {
 		const planetAge_Gy = new T.Value(t, T.units.Time.y).as(T.units.Time.Gy);
 
@@ -425,12 +430,8 @@ class MagnetManager {
 
 		return b_surf; // T
 	}
-
-	/**
-	 * 
-	 * @param {number} t 
-	 */
-	calculateMagnetosphereRadius(t) {
+	
+	calculateMagnetosphereRadius() {
 		if (this.planet.magneticField === 0) {
 			return new T.Value(this.planet.radius.value, this.planet.radius.unit);
 		}
@@ -450,6 +451,7 @@ class MagnetManager {
 
 class DissipationManager {
 	/**
+	 * Module that integtates atmosphere dissipation.
 	 * 
 	 * @param {PlanetEvolution} evo 
 	 */

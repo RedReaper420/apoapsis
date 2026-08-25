@@ -2,14 +2,13 @@
 import prng from "../utils/prng.js";
 import * as utils from "../utils/utils.js";
 import * as T from "../data/types.js";
-import consts from "../data/consts.js";
 
 import * as planetGen from "./planet-gen.js";
 
 const PLANET_SPAWN_START_DIST = 0.1; // AU
 
 const evilAndIntimidatingRedDwarf = new T.Value(0.3, T.units.Mass.M_Sun);
-const lightYear = new T.Value(0.2, T.units.Dist.ly);
+const perturbatorDistance = new T.Value(0.1, T.units.Dist.ly);
 
 /**
  * Wrapper for generating planets for the specified star formation.
@@ -47,7 +46,7 @@ function generatePlanetsForSingleStar(star, settings) {
 	}
 	else { // This single star is alone
 		// Simulating a pass-by of a stray red dwarf at 0.2 ly distance
-		a_crit = getMaximalSTypeOrbit(star.mass, evilAndIntimidatingRedDwarf, lightYear);
+		a_crit = getMaximalSTypeOrbit(star.mass, evilAndIntimidatingRedDwarf, perturbatorDistance);
 	}
 	a_crit_safe = a_crit.as(T.units.Dist.AU) * settings.planet_s_type_safety_factor;
 
@@ -84,7 +83,7 @@ function generatePlanetsForBinary(binary, settings) {
 		}
 		else { // This binary is alone
 			// Simulating a pass-by of a stray red dwarf at 0.2 ly distance
-			limit = getMaximalSTypeOrbit(binary.mass, evilAndIntimidatingRedDwarf, lightYear);
+			limit = getMaximalSTypeOrbit(binary.mass, evilAndIntimidatingRedDwarf, perturbatorDistance);
 			limit_safe = limit.as(T.units.Dist.AU) * settings.planet_s_type_safety_factor;
 		}
 
@@ -147,7 +146,7 @@ export function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
  * @param {T.GenerationSettings} settings - Generation settings configuration.
  * @param {T.Star|T.BinaryStar} star - Current star formation.
  * @param {number} distanceLimit - Distance limit (in AU) beyond which planets won't be generated.
- * @param {number} distanceStart - *[min, default: {@link PLANET_SPAWN_START_DIST}]* distance (in AU) from which planets will start generating.
+ * @param {number} distanceStart - *[min & default: {@link PLANET_SPAWN_START_DIST}]* distance (in AU) from which planets will start generating.
  * @param {number} planetsNumber - *[optional]* specified planets number to generate instead of a random one (@see {@link generatePlanetsForBinary}).
  * 
  * @returns {number} number of not generated planets, as they've got beyond the allowed distance limit.
@@ -253,13 +252,13 @@ export function tryToSkipOrbit(sma) {
 }
 
 /**
- * Get SMA for the next orbit with 1.4-2.2 times longer period.
+ * Get SMA for the next orbit with 1.5-2.5 times longer period.
  * 
  * @param {number} smaCurrent - Current SMA value (AU).
  * 
  * @returns {number} New SMA value (AU).
  */
 export function getNextOrbit(smaCurrent) {
-	const newPeriod = prng.range(1.5, 2.4);
+	const newPeriod = prng.range(1.5, 2.5);
 	return smaCurrent * ((newPeriod**2)**(1/3)); // Simplified Kepler's 3rd law
 }

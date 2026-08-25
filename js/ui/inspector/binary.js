@@ -50,7 +50,7 @@ export default function generateBinaryProfile(body) {
 		],
 		0.1
 	);
-	bodyMassValue.innerText = bodyMassFit.value.toFixed(2);
+	bodyMassValue.innerText = bodyMassFit.value.toPrecision(3);
 	bodyMassUnit.innerText = bodyMassFit.unit;
 
 	const bodyMassKg = binary.querySelector('#bodyMassKg');

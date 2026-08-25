@@ -4,11 +4,11 @@ import * as T from "../../data/types.js";
 export default function drawMagneticField() {
 	if (!(this instanceof T.Planet))
 		return;
-	
-	if (this.magneticField === 0) 
-		return;
 
 	if (this.sim.radius_vis < 0.1)
+		return;
+	
+	if (this.magneticField === 0) 
 		return;
 
 	const coords = this.position.screen;

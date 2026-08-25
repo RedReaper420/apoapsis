@@ -11,7 +11,7 @@ import * as nameGen from "./name-gen.js";
  * 
  * @param {T.GenerationSettings} settings - Generation settings configuration.
  * @param {T.Star|T.BinaryStar|null} constraint - Optional star instance to inherit baseline parameters from.
- * @param {number} constraintMassMult  - *[default: 1.0]* Mass modifier factor used to prevent sub-threshold star system generations (see `star-system-gen.js` -> `generateStarFormation()`).
+ * @param {number} constraintMassMult  - *[default: 1.0]* Mass modifier factor used to prevent sub-threshold star system generation (see `star-system-gen.js` -> `generateStarFormation()`).
  * 
  * @returns {T.Star} An instantiated and fully calculated Star object.
  */
@@ -103,7 +103,7 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
  * @param {number} minMass - Minimum allowed mass in M☉.
  * @param {number} maxMass - Maximum allowed mass in M☉.
  * 
- * @returns {T.Value} The bounded star mass (unit: Mass).
+ * @returns {T.Value} The bounded star mass (unit: `Mass`).
  * 
  * @see {@link sampleKroupaIMF}
  */
@@ -404,7 +404,7 @@ function getRotation(starRadius, starMass) {
 	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_m) / R_m); 
 
 	// Rotational velocity can't exceed 90% of critical value
-	const v_e = Math.min(v_base, v_crit * 0.9); 
+	const v_e = Math.min(v_base * randomFactor, v_crit * 0.9); 
 
 	// Calculating rotation period.
 	// v = W * R = 2piR / P
@@ -430,7 +430,7 @@ function getLifespan(starMass, starLuminosity, starRadius, starRotation) {
 	const P = starRotation.as(T.units.Time.s);
 
 	/*
-	// Mass-only version
+	// Basic mass-only version
 	const a = M_Sun <= 50.0 ? -2.5 : -3.5;
 	const lifespan = consts.PHY_SUN_LIFESPAN * Math.pow(M_Sun, a);
 	return new T.Value(lifespan, T.units.Time.Gy);

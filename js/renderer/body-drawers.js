@@ -96,7 +96,7 @@ function drawBody() {
 	this.drawStar(rend.simTimeSeconds);
 
 	// Planet
-	this.drawPlanet();
+	this.drawPlanet(rend.simTimeSeconds);
 
 	// Atmosphere
 	if (rend.setting_showAtmospheres)
