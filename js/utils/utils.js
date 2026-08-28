@@ -15,8 +15,8 @@ export function clamp(value, min, max) {
 
 /**
  * Generate a random number following a normal (Gaussian) distribution.
- * @param {number} [mean=0] - mean value.
- * @param {number} [stdev=1] - standard deviation (width of scatter).
+ * @param {number} mean - *[default: 0]* mean value.
+ * @param {number} stdev - *[default: 1]* standard deviation (width of scatter).
  * @returns {number}
  */
 export function gaussianRandom(mean = 0, stdev = 1) {
@@ -34,9 +34,9 @@ export function gaussianRandom(mean = 0, stdev = 1) {
  * 
  * Uses Box-Muller + clamping to approximate normal distribution in range.
  * 
- * @param {number} min - [default 0] minimal range value
- * @param {number} max - [default 1] maximal range value
- * @returns {number} [min, max], mean = (min + max) / 2
+ * @param {number} min - *[default 0]* minimal range value
+ * @param {number} max - *[default 1]* maximal range value
+ * @returns {number} [min, max], exp. value (mean) = (min + max) / 2
  */
 export function randomRangeGaussian(min = 0, max = 1) {
     const gaussian = gaussianRandom(3, 1); // mean = 3, stdev = 1 -> ~99.73% of values are in [0, 6] range

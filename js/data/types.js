@@ -163,7 +163,7 @@ export class Value {
 	/**
 	 * A value with an assigned unit (convertable).
 	 * @param {number} value - Numeric value.
-	 * @param {string} unit - Unit name. Use `units` enum to assign (`types.units.GROUP.UNIT`).
+	 * @param {string} unit - Unit name. Use `units` enum to assign (`T.units.GROUP.UNIT`).
 	 */
 	constructor (value, unit) {
 		this.value = value;
@@ -172,7 +172,7 @@ export class Value {
 
 	/**
 	 * Gets a raw number value converted to a specified unit.
-	 * @param {string} targetUnit - Unit enum (`types.units.GROUP.UNIT`).
+	 * @param {string} targetUnit - Unit enum (`T.units.GROUP.UNIT`).
 	 * @returns {number}
 	 */
 	as(targetUnit) {
@@ -215,7 +215,7 @@ export class Value {
 
 	/**
 	 * Converts value object's unit to a new specified one (of the same unit type).
-	 * @param {string} targetUnit - Unit enum (`types.units.GROUP.UNIT`).
+	 * @param {string} targetUnit - Unit enum (`T.units.GROUP.UNIT`).
 	 * @returns {Value}
 	 */
 	convertTo(targetUnit) {
@@ -224,6 +224,19 @@ export class Value {
 			this.unit = targetUnit;
 		}
 		return this;
+	}
+
+	/**
+	 * Sets the value in specified units.
+	 * 
+	 * First in converts the type, then assigns the value.
+	 * 
+	 * @param {number} value - Numeric value.
+	 * @param {string} unit - Unit enum (`T.units.GROUP.UNIT`).
+	 */
+	setValue(value, unit) {
+		this.convertTo(unit);
+		this.value = value;
 	}
 }
 

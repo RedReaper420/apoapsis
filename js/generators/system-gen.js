@@ -18,7 +18,7 @@ class SystemGenerator {
 		this.settings = settings;
 
 		this.#subscribe();
-		//this.settings.seed_user = 'ec10d7b7-a0cb-490a-bff8-e555891fa3e2';
+		//this.settings.seed_user = 'bf007859-f91b-4feb-a31e-96edf8cf25b6';
 	}
 
 	generate() {
@@ -204,7 +204,7 @@ class SystemGenerator {
 			this.generate();
 			attempts++;
 		}
-		console.log(attempts);
+		console.log(attempts, gen);
 
 		eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
 	}

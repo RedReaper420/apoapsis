@@ -168,7 +168,9 @@ export function planetGeneration_Stage3(settings, planet) {
 
 	planet.planetEvolution = new planetEvolutionSim.PlanetEvolution(settings, planet);
 	planet.planetEvolution.doTheEvolution();
+	planet.temperature = calculateSurfaceTemperature(planet);
 	
+	/*
 	if (planet.type === T.planetTypes.Terrestrial) {
 		const T_surf = planet.temperature.as(T.units.Temp.K);
 		const P_surf = planet.atmosphere.pressure;
@@ -195,6 +197,7 @@ export function planetGeneration_Stage3(settings, planet) {
 			}
 		}
 	}
+	*/
 
 	if (planet.type !== T.planetTypes.Terrestrial) {
 		planet.albedo = assumeAlbedo(planet, planet.temperature_eq);
@@ -214,6 +217,22 @@ export function planetGeneration_Stage3(settings, planet) {
 	planet.atmosphere.cloudCover = calculateCloudCover(planet);
 
 	setOcean(planet);
+	planet.albedo = calculateAlbedo(planet);
+	planet.temperature = calculateSurfaceTemperature(planet);
+
+	if ((planet.type === T.planetTypes.Terrestrial) && (planet.temperature.as(T.units.K) < 50)) {
+		planet.atmosphere.pressure *= 0.01 * (1 - Math.exp(-0.075 * planet.temperature.as(T.units.K)));
+
+		const A = 4 * Math.PI * (planet.radius.as(T.units.Dist.m) ** 2);
+		console.log(planet.atmosphere.mass)
+		planet.atmosphere.mass.setValue((planet.atmosphere.pressure * 101325) * A / planet.g.as(T.units.Acc.m_s2), T.units.Mass.kg);
+
+		planet.albedo = calculateAlbedo(planet);
+		planet.temperature = calculateSurfaceTemperature(planet);
+	}
+
+	if (planet.type === T.planetTypes.Terrestrial)
+		console.log(planet.name, planet.F_tidal.total.toPrecision(2));
 }
 
 /**
@@ -715,12 +734,12 @@ function calculateMountainHeight(planet) {
 
 	// Litosphere thickness is capped by the actual physical thickness of the mantle shell
 	const maxPossibleMantleThickness = R * mantleVolumeFactor;
-	const T_e_estimated = R * lithoFraction * compositionSoftening * ageFactor;
+	const T_c_estimated = R * lithoFraction * compositionSoftening * ageFactor;
 
-	const T_e = Math.min(T_e_estimated, maxPossibleMantleThickness * 0.8);
+	const T_c = Math.min(T_c_estimated, maxPossibleMantleThickness * 0.8);
 	
 	// Elastic support limit: mountains rarely exceed ~25% of effective lithosphere thickness
-	const h_max = Math.min(h_geo, T_e * 0.25);
+	const h_max = Math.min(h_geo, T_c * 0.25);
 
 	return new T.Value(h_max, T.units.Dist.m);
 }
@@ -765,8 +784,8 @@ function setInitialRotation(planet) {
 	planet.isRotationRetrograde = false;
 
 	// Setting an initial rotation period from an empirical formula.
-	let rotationPeriod_h = 24 * Math.pow(planet.mass.as(T.units.Mass.M_Earth), -utils.randomRangeGaussian(0.3, 0.5)) * prng.range(0.8, 1.2);
-	
+	let rotationPeriod_h = 24 * Math.pow(planet.mass.as(T.units.Mass.M_Earth), -utils.randomRangeGaussian(0.3, 0.5)) * (10 ** utils.gaussianRandom(0, 0.5));
+
 	// Cumulatively modifying rotation period from giant impacts.
 	let rotationSpeedModifier = 1.0;
 	for (let i = 0; i < planet.genData.impacts; i++) {
@@ -817,7 +836,7 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 	else {
 		// Current rotation speed passed the limit, setting the slightly slowed down limit value.
 		const surfOrbitPeriod_h = new T.Value(surfOrbitPeriod_s, T.units.Time.s).as(T.units.Time.h);
-		return surfOrbitPeriod_h * 1.2 * prng.range(1.0, 2.0);
+		return surfOrbitPeriod_h * 1.25 * prng.range(1.0, 3.0);
 	}
 }
 
@@ -938,19 +957,13 @@ function assumeAlbedo(planet) {
 		}
 
 		default: { // Terrestrial worlds
-			/*
-			if (planet.core.composition.ice >= 0.2) return 0.6;
-			if (planet.core.composition.iron >= 0.4) return 0.1;
-			if (planet.core.composition.rock >= 0.6) return 0.2;
-			return 0.3;
-			*/
-
 			const f_iron = planet.core.composition.iron;
 			const f_rock = planet.core.composition.rock;
-			const f_ice = planet.core.composition.ice;
+			const f_mat = f_iron + f_rock;
 			
-			const rockAlbedo = (0.1 * f_iron) + (0.2 * f_rock);
+			const rockAlbedo = 0.1 * (f_iron / f_mat) + 0.2 * (f_rock / f_mat);
 
+			const f_ice = planet.core.composition.ice;
 			const iceToWaterRegime = 1 / (1 + Math.exp(0.2 * (temp - 130)));
 			const iceAlbedo = (f_ice ** (1/6)) * ( (0.7 * iceToWaterRegime) + (0.3 * (1 - iceToWaterRegime)) );
 
@@ -996,7 +1009,7 @@ function generateAtmosphere(planet) {
 	if (K_ret < 0.2) {
 		planet.atmosphere = {
 			pressure: 0,
-			mass: 0,
+			mass: new T.Value(0, T.units.Mass.kg),
 			scaleHeight: 0,
 			mu: 0,
 			cloudCover: 0,
@@ -1011,13 +1024,14 @@ function generateAtmosphere(planet) {
 	const f_rock = planet.core.composition.rock;
 	const f_iron = planet.core.composition.iron;
 
-	const P_base = (f_ice * 1.0) + (f_rock * 0.1) + (f_iron * 0.01);
+	const P_base = (f_ice * 0.1) + (f_rock * 0.01) + (f_iron * 0.001);
 	const f_ret = utils.clamp( (K_ret - 0.20) / 0.70 , 0.0, 10.0) ** 2;
 	const g_Earth = planetMass_MEarth / (planetRadius_REarth ** 2);
-	const tidalOutgassing = 1.0 + Math.min(F_tidal / 0.1, 50.0);
+	const tidalOutgassing = 1.0 + Math.min(F_tidal / 0.01, 50.0);
 	const M_press = Math.pow(10, utils.clamp( utils.gaussianRandom(0, 0.5) , -1, 1));
+	const distFactor = planet.genData.sma_norm > 1 ? 1 / Math.sqrt(planet.genData.sma_norm) : 1;
 
-	const P_surf_raw = P_base * f_ret * g_Earth * tidalOutgassing * M_press;
+	const P_surf_raw = P_base * f_ret * g_Earth * tidalOutgassing * M_press * distFactor;
 
 	const dampeningThreshold = 200 * Math.exp(-5 * planetMass_MEarth);
 	const P_dampened = P_surf_raw >= dampeningThreshold
@@ -1031,15 +1045,7 @@ function generateAtmosphere(planet) {
 	planet.temperature = new T.Value(T_surf, T.units.Temp.K);
 	
 	let compositionRaw = {};
-	/*
-	if ((F_tidal > 5.0) && (f_ice < 0.05)) {
-		compositionRaw = {
-			SO2: prng.range(0.60, 0.85),
-			CO2: prng.range(0.10, 0.30),
-			H2O: prng.range(0.01, 0.05),
-		}
-	}
-	else*/if (T_surf > 1500) {
+	if (T_surf > 1500) {
 		compositionRaw = {
 			SiO2: prng.range(0.50, 0.70),
 			 SO2: prng.range(0.10, 0.30),
@@ -1095,8 +1101,8 @@ function generateAtmosphere(planet) {
 		}
 		else {
 			compositionRaw = {
-				 N2: prng.range(0.75, 0.90),
-				CH4: prng.range(0.05, 0.15),
+				 N2: prng.range(0.85, 0.95),
+				CH4: prng.range(0.02, 0.05),
 				 CO: prng.range(0.01, 0.05),
 			};
 		}
@@ -1104,9 +1110,16 @@ function generateAtmosphere(planet) {
 	else {
 		compositionRaw = {
 			 N2: prng.range(0.80, 0.95),
-			CH4: prng.range(0.01, 0.10),
+			CH4: prng.range(0.01, 0.02),
 			 Ne: prng.range(0.01, 0.05),
 		};
+	}
+
+	
+	if ((F_tidal > 0.05) && (f_ice < 0.05)) {
+		compositionRaw.SO2 = (compositionRaw.SO2 || 0) + prng.range(0.10, 0.15);
+		compositionRaw.CO2 = (compositionRaw.CO2 || 0) + prng.range(0.10, 0.30);
+		compositionRaw.H2O = (compositionRaw.H2O || 0) + prng.range(0.01, 0.05);
 	}
 
 	const envelopeChance = utils.clamp((K_ret - 2.5) / (6.5 - 2.5), 0.0, 1.0);
@@ -1128,8 +1141,6 @@ function generateAtmosphere(planet) {
 		
 		compositionRaw = compositionMixed;
 	}
-
-	console.log(planet.name, K_ret.toFixed(2));
 	
 	const compositionFinal = normalizeComposition(compositionRaw);
 	const mu = calculateMeanMolarMass(compositionFinal);
@@ -1148,6 +1159,8 @@ function generateAtmosphere(planet) {
 		mu: mu,
 		cloudCover: 0,
 	}
+	
+	planet.temperature = calculateSurfaceTemperature(planet);
 }
 
 /**
@@ -1199,6 +1212,7 @@ function calculateMeanMolarMass(composition) {
 const CONDENSABLE_GASES = ['H2O', 'CH4', 'NH3', 'SO2', 'CO2', 'SiO2'];
 
 function calculateCloudCover(planet) {
+	
 	const { pressure, composition } = planet.atmosphere;
 	if (pressure < 0.005) return 0; // На Марсе облаков мало, а без атмосферы их вовсе нет
 
@@ -1219,33 +1233,10 @@ function calculateCloudCover(planet) {
 	const coverage = Math.min(1.0, Math.sqrt(condensableShare) * pressureFactor * 1.5);
 
 	return coverage; // Значение float [0.0 ... 1.0]
-	/*
-	const { pressure, composition } = planet.atmosphere;
-	const temp = planet.temperature.as(T.units.Temp.K);
-
-	if (pressure < 0.01) return 0;
-	
-	let condensableShare = (composition.H2O || 0) + (composition.CH4 || 0) + 
-							(composition.NH3 || 0) + (composition.SO2 || 0);
-
-	if (condensableShare === 0) return 0;
-	
-	const pressureFactor = Math.min(1.0, Math.log10(1 + pressure * 2));
-	
-	let tempFactor = 1.0;
-	if (composition.H2O > 0) {
-		if (temp < 220) tempFactor = 0.2; // All water is frozen
-		else if (temp > 373) tempFactor = 0.1; // All water is vaporized
-		else tempFactor = Math.sin(((temp - 220) / (373 - 220)) * Math.PI);
-	}
-	
-	const cloudCover = Math.min(0.98, condensableShare * 3.0 * pressureFactor * tempFactor);
-	
-	return Math.max(0, cloudCover);
-	*/
 }
 
 import {temperatureToColor} from "./star-gen.js";
+import { eventBus } from "../utils/eventbus.js";
 
 /**
  * 
@@ -1432,14 +1423,18 @@ const SUBSTANCES = {
 		triple: { T: 273.16, P: 611.657 },
 		critical: { T: 647.096, P: 22064000 },
 		antoine: { A: 10.073, B: 1730.63, C: -39.724 },
-		meltTemp: 273.15,
   	},
 	CH4: {
 		name: "Methane",
 		triple: { T: 90.69, P: 11700 },
 		critical: { T: 190.56, P: 4599200 },
 		antoine: { A: 8.928, B: 405.42, C: -5.88 },
-		meltTemp: 90.69,
+	},
+	NH3: {
+		name: "Ammonia",
+		triple: { T: 195.4, P: 6060 },
+		critical: { T: 405.5, P: 11280 },
+		antoine: { A: 8.1876, B: 506.71, C: -80.78 },
 	}
 };
 
@@ -1466,7 +1461,7 @@ function getPhaseState(substanceKey, tempK, pressurePa) {
 	const sub = SUBSTANCES[substanceKey];
 	if (!sub) throw new Error(`Unknown substance: ${substanceKey}`);
 
-	const { triple, critical, meltTemp } = sub;
+	const { triple, critical } = sub;
 
 	// 1. Supercritical fluid
 	if (tempK > critical.T && pressurePa > critical.P) {
@@ -1490,7 +1485,7 @@ function getPhaseState(substanceKey, tempK, pressurePa) {
 	}
 
 	// 4. Melting check (Solid vs Liquid/Gas)
-	if (tempK < meltTemp) {
+	if (tempK < triple.T) {
 		return { phase: "SOLID", desc: "Solid (Ice)" };
 	}
 
@@ -1595,7 +1590,7 @@ class OceanSubstance {
 		this.name = '';
 		this.color = '#00000000';
 
-		this.amount = 0;
+		this.budget = 0;
 		this.state = '';
 
 		this.substance = '';
@@ -1605,10 +1600,11 @@ class OceanSubstance {
 		this.calculateState = (planet) => {
 			const temp = planet.temperature.as(T.units.Temp.K);
 			const pressure = planet.atmosphere.pressure * 101325;
-			this.state = (getPhaseState(this.substance, temp, pressure)).phase;
+			const state = getPhaseState(this.substance, temp, pressure);
+			this.state = state.phase;
 		};
 
-		this.calculateAmount = () => { this.amount = 0 };
+		this.calculateBudget = () => { this.budget = 0 };
 	}
 }
 
@@ -1628,16 +1624,16 @@ class Lava extends OceanSubstance {
 			this.color = planet.glowColor.slice(0, planet.glowColor.length-2);
 		};
 
-		this.calculateAmount = (planet) => {
+		this.calculateBudget = (planet) => {
 			if (this.state === 'SOLID') {
-				this.amount = 0;
+				this.budget = 0;
 				return;
 			}
 
-			this.amount = planet.core.composition.rock * 0.001;
+			this.budget = planet.core.composition.rock * 0.001;
 
 			const temp = planet.temperature.as(T.units.Temp.K);
-			this.amount *= (temp - 1000) / (1400 - 1000);
+			this.budget *= (temp - 1000) / (1400 - 1000);
 		};
 	}
 }
@@ -1653,21 +1649,21 @@ class Water extends OceanSubstance {
 		this.density = 1.025;
 		this.bulk = 2.2e9;
 
-		this.calculateAmount = (planet) => {
+		this.calculateBudget = (planet) => {
 			if (((this.state === 'SOLID') || (this.state === 'LIQUID')) === false) {
-				this.amount = 0;
+				this.budget = 0;
 				return;
 			}
 
 			if (1 / Math.sqrt(planet.genData.sma_norm) > 1.15) {
-				this.amount = 0;
+				this.budget = 0;
 				return;
 			}
 
-			this.amount = planet.core.composition.ice * 0.99;
+			this.budget = planet.core.composition.ice * 0.99;
 
 			if (this.state === 'SOLID')
-				this.amount *= -1;
+				this.budget *= -1;
 		};
 	}
 }
@@ -1683,13 +1679,13 @@ class Methane extends OceanSubstance {
 		this.density = 0.423;
 		this.bulk = 1.3e8;
 
-		this.calculateAmount = (planet) => {
+		this.calculateBudget = (planet) => {
 			if (!(this.state === 'LIQUID')) {
-				this.amount = 0;
+				this.budget = 0;
 				return;
 			}
 
-			this.amount = planet.core.composition.ice * 0.02;
+			this.budget = planet.core.composition.ice * 0.005;
 		};
 	}
 }
@@ -1702,6 +1698,7 @@ class AmmoniaWater extends OceanSubstance {
 		this.color = '#22a2d1';
 
 		this.NH3_f = 0;
+		this.substance = 'NH3';
 		this.density = 0.89;
 		this.bulk = 11e9;
 
@@ -1709,28 +1706,28 @@ class AmmoniaWater extends OceanSubstance {
 			const temp = planet.temperature.as(T.units.Temp.K);
 			const pressure = planet.atmosphere.pressure * 101325;
 
-			const iceFactor = Math.min(1, (planet.core.composition.ice * 10) ** 3);
-			const distFactor = Math.min(1, Math.exp(3 * (planet.genData.sma_norm - consts.PHY_DIST_SNOW_LINE)));
+			const iceFactor = Math.min(1, (planet.core.composition.ice * 15) ** 3);
+			const distFactor = Math.min(1, Math.exp(2 * (planet.genData.sma_norm - consts.PHY_DIST_SNOW_LINE)));
 			this.NH3_f = 0.33 * iceFactor * distFactor;
 
 			this.state = (getEutecticOceanState(temp, pressure, this.NH3_f)).phase;
 		};
 
-		this.calculateAmount = (planet) => {
+		this.calculateBudget = (planet) => {
 			if (((this.state === 'SOLID') || (this.state === 'LIQUID')) === false) {
-				this.amount = 0;
+				this.budget = 0;
 				return;
 			}
 
 			if (this.NH3_f < 0.05) {
-				this.amount = 0;
+				this.budget = 0;
 				return;
 			}
 
-			this.amount = planet.core.composition.ice;
+			this.budget = planet.core.composition.ice;
 
 			if (this.state === 'SOLID')
-				this.amount *= -1;
+				this.budget *= -1;
 		};
 	}
 }
@@ -1740,6 +1737,9 @@ class AmmoniaWater extends OceanSubstance {
  * @param {T.Planet} planet 
  */
 function setOcean(planet) {
+	if (planet.type !== T.planetTypes.Terrestrial)
+		return;
+
 	const oceanSubstances = {
 		lava: new Lava(),
 		water: new Water(),
@@ -1759,21 +1759,51 @@ function setOcean(planet) {
 	let maxSubstance = oceanSubstances.lava;
 	for (const substance in oceanSubstances) {
 		oceanSubstances[substance].calculateState(planet);
-		oceanSubstances[substance].calculateAmount(planet);
+		oceanSubstances[substance].calculateBudget(planet);
 
-		if (oceanSubstances[substance].amount > maxSubstance.amount)
+		if (oceanSubstances[substance].budget > maxSubstance.budget)
 			maxSubstance = oceanSubstances[substance];
-	} 
+	}
 	
-	if (maxSubstance.amount > 0) {
+	if ((maxSubstance.budget > 0) && (maxSubstance.name !== 'Lava')) {
+		// Adds ocean substance's vapor into the atmosphere
+		for (let i = 0; i < 5; i++) {
+			const t = planet.temperature.as(T.units.Temp.K);
+			const p = planet.atmosphere.pressure * 101325 * (planet.atmosphere.composition[maxSubstance.substance] || 0);
+			const pSat = getVaporPressure(SUBSTANCES[maxSubstance.substance], t);
+
+			if (pSat >= p)
+				enrichAtmosphere(planet, maxSubstance.substance, pSat / 101325);
+			else
+				break;
+		}
+
+		const t = planet.temperature.as(T.units.Temp.K);
+		const p = planet.atmosphere.pressure * 101325;
+		const pSat = getVaporPressure(SUBSTANCES[maxSubstance.substance], t);
+
+		if (pSat >= p) {
+			// If needed vapor pressure still exceeds total atmosphere pressure - deleting the ocean
+			maxSubstance.budget = 0;
+		}
+		else {
+			// Decreasing ocean size according to pressure ratio
+			const liquidFraction = Math.max(0, 1 - Math.pow(pSat / p, 1/3));
+			maxSubstance.budget *= liquidFraction;
+		}
+	}
+	
+	if (maxSubstance.budget > 0) {
 		// Setting surface ocean
 
 		planet.ocean = maxSubstance.name;
 		planet.oceanColor = maxSubstance.color;
-
 		planet.oceanDepth = calculateOceanDepth(planet, maxSubstance);
-		planet.oceanCover = Math.min(1.0, Math.pow(maxSubstance.amount / totalOceanThreshold, 1/3));
+		planet.oceanCover = Math.min(1.0, Math.pow(maxSubstance.budget / totalOceanThreshold, 1/3));
 		planet.oceanCoverVisual = planet.oceanCover;
+
+		if (planet.ocean === 'Water')
+			eventBus.emit('shtap');
 	}
 	else {
 		// Getting frozen/subsurface ocean
@@ -1783,24 +1813,24 @@ function setOcean(planet) {
 		// leaving no ice at the surface in geological time.
 		if (planet.temperature.as(T.units.Temp.K) <= 150) {
 			for (const substance in oceanSubstances) {
-				if (oceanSubstances[substance].amount < maxSubstance.amount)
+				if (oceanSubstances[substance].budget < maxSubstance.budget)
 					maxSubstance = oceanSubstances[substance];
 			}
 
-			if (maxSubstance.amount < 0)
+			if (maxSubstance.budget < 0)
 				hasFrozenOcean = true;
 		}
 
 		if (hasFrozenOcean) {
 			// Frozen (ammonia) water ocean case
 
-			maxSubstance.amount = Math.abs(maxSubstance.amount);
+			maxSubstance.budget = Math.abs(maxSubstance.budget);
 
 			planet.ocean = maxSubstance.name + ' (frozen)';
 			planet.oceanColor = '#d7f0ffbf';
 
 			planet.oceanDepth = calculateOceanDepth(planet, maxSubstance);
-			planet.oceanCover = Math.min(1.0, Math.pow(maxSubstance.amount / totalOceanThreshold, 1/3))
+			planet.oceanCover = Math.min(1.0, Math.pow(maxSubstance.budget / totalOceanThreshold, 1/3))
 			planet.oceanCoverVisual = planet.oceanCover;
 		}
 		else {
@@ -1815,7 +1845,7 @@ function setOcean(planet) {
 			planet.oceanColor = `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`;
 			
 			planet.oceanDepth = new T.Value(0, T.units.Dist.m);
-			planet.oceanCover = 1; // 100% of the surface is dry in the stats.
+			planet.oceanCover = 0; // 0% in the stats.
 
 			// Visually, dried up seas with some variance are left.
 			const iceComponent = Math.min(1.0, Math.pow(planet.core.composition.ice / totalOceanThreshold, 1/3));
@@ -1838,7 +1868,7 @@ function calculateOceanDepth(planet, substance) {
 	const R = planet.radius.as(T.units.Dist.m);
 	const g = planet.g.as(T.units.Acc.m_s2);
 
-	const f = substance.amount;
+	const f = substance.budget;
 	const rho = substance.density * 1000;
 	const K = substance.bulk;
 
@@ -1847,4 +1877,139 @@ function calculateOceanDepth(planet, substance) {
 	const H_compr = H * (1 - (H * g / (2 * K)));
 
 	return new T.Value(H_compr, T.units.Dist.m);
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ * @param {string} substance 
+ * @param {number} pressure 
+ */
+function enrichAtmosphere(planet, substance, pressure) {
+	const radius_RE = planet.radius.as(T.units.Dist.R_Earth);
+	const mass_ME = planet.mass.as(T.units.Mass.M_Earth);
+	
+	const payloadMass = pressure * (radius_RE ** 4) / mass_ME;
+	const massRatio = payloadMass / (planet.atmosphere.mass.as(T.units.Mass.M_Earth_atm) + payloadMass);
+	
+	const payload = { N2: 0.75 };
+	payload[substance] = 0.25;
+
+	const compositionMixed = {};
+	let compositionRaw = planet.atmosphere.composition;
+	for (const gas in payload)
+		compositionMixed[gas] = (compositionMixed[gas] || 0) + payload[gas] * massRatio;
+	for (const gas in compositionRaw)
+		compositionMixed[gas] = (compositionMixed[gas] || 0) + compositionRaw[gas] * (1 - massRatio);
+	
+	compositionRaw = compositionMixed;
+	const compositionFinal = normalizeComposition(compositionRaw);
+
+	planet.atmosphere.composition = compositionFinal;
+	planet.atmosphere.pressure += pressure;
+	planet.atmosphere.mass.convertTo(T.units.Mass.M_Earth_atm);
+	planet.atmosphere.mass.value += payloadMass;
+
+	planet.temperature = calculateSurfaceTemperature(planet);
+}
+
+/**
+ * Calculates surface temperature using gray-atmosphere optical depth.
+ * 
+ * @param {T.Planet} planet 
+ * 
+ * @returns {T.Value}
+ */
+function calculateSurfaceTemperature(planet) {
+	const totalPressureAtm = planet.atmosphere.pressure;
+
+	// Greenhouse coefficients (k_i) and saturation powers (alpha_i)
+	const greenhouseParams = {
+		CO2: { k: 0.85, alpha: 0.7 },
+		H2O: { k: 1.50, alpha: 0.8 },
+		CH4: { k: 2.10, alpha: 0.6 },
+		NH3: { k: 3.50, alpha: 0.5 },
+		SO2: { k: 1.20, alpha: 0.6 },
+		CO:  { k: 0.10, alpha: 0.8 },
+		H2:  { k: 0.05 + 0.45 * (1 / (1 + Math.exp(-2 * (totalPressureAtm - 3)))), alpha: 1.3 } // CIA effect at high pressure
+	};
+
+	let totalTau = 0;
+
+	for (const [gas, fraction] of Object.entries(planet.atmosphere.composition)) {
+		const params = greenhouseParams[gas];
+		if (!params || fraction <= 0) continue;
+
+		// Partial pressure in atm
+		const pPartial = totalPressureAtm * fraction;
+		
+		// Optical depth contribution
+		const tau_i = params.k * Math.pow(pPartial, params.alpha);
+		totalTau += tau_i;
+	}
+
+	// Eddington approximation for gray atmosphere
+	// T_surf = T_eff * (1 + 0.75 * tau)^(1/4)
+	const T_eff = planet.temperature_eff.as(T.units.Temp.K);
+	const T_surf = T_eff * Math.pow(1 + 0.75 * totalTau, 0.25);
+
+	return new T.Value(T_surf, T.units.Temp.K);
+}
+
+/**
+ * Calculates surface temperature using gray-atmosphere optical depth.
+ * 
+ * @param {T.Planet} planet 
+ */
+function calculateAlbedo(planet) {
+	if (planet.type !== T.planetTypes.Terrestrial)
+		return planet.albedo;
+
+	const f_iron = planet.core.composition.iron;
+	const f_rock = planet.core.composition.rock;
+	const f_mat = f_iron + f_rock;
+	const albLand = 0.1 * (f_iron / f_mat) + 0.2 * (f_rock / f_mat);
+	
+	const liqConfig = {
+		lava: 0.04,
+		water: 0.06,
+		methane: 0.02,
+		ammonia: 0.05,
+	};
+
+	let albOcean = 0;
+	for (const liq in liqConfig) {
+		const ocean = planet.ocean.toLowerCase();
+		if (ocean.includes(liq)) {
+			albOcean += ocean.includes('frozen') ? 0.7 : liqConfig[liq];
+			break;
+		}
+	}
+
+	const albSurf = albLand * (1 - planet.oceanCover) + albOcean * planet.oceanCover;
+
+	const gasConfig = {
+		H2O: 0.65,
+		CH4: 0.35,
+		NH3: 0.55,
+		SO2: 0.85,
+		SiO2: 0.5,
+	};
+
+	let albAtmComp = 0;
+	for (const [gas, fraction] of Object.entries(planet.atmosphere.composition)) {
+		const albedo = gasConfig[gas];
+		if (!albedo || fraction <= 0) continue;
+		
+		albAtmComp += albedo * Math.pow(fraction, 1/3);
+	}
+	albAtmComp = Math.min(0.8, albAtmComp) + Math.pow(Math.max(0, albAtmComp - 0.8), 3);
+
+	const albAtmP = 0.5 * (1 - Math.exp(-0.05 * planet.atmosphere.pressure));
+
+	const albAtm = Math.max(albAtmComp, albAtmP);
+
+	const alb = albAtm + Math.pow(1 - albAtm, 2) * albSurf;
+
+	return alb;
 }

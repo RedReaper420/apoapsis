@@ -561,9 +561,5 @@ class DissipationManager {
 		const atmosphereMass = new T.Value(this.atmosphereMass_kg, T.units.Mass.kg).as(T.units.Mass.M_Earth_atm);
 		const P_surf = (atmosphereMass * this.planetMass_ME) / (this.planetRadius_RE**4);
 		this.planet.atmosphere.pressure = P_surf;
-		
-		const T_eff = this.planet.temperature_eff.as(T.units.Temp.K);
-		const T_surf = T_eff * (1 + 0.4 * Math.log10(1 + P_surf));
-		this.planet.temperature = new T.Value(T_surf, T.units.Temp.K);
 	}
 }
