@@ -18,7 +18,7 @@ class SystemGenerator {
 		this.settings = settings;
 
 		this.#subscribe();
-		//this.settings.seed_user = 'bf007859-f91b-4feb-a31e-96edf8cf25b6';
+		//this.settings.seed_user = '1d425c6f-aebe-4e2e-acb4-ddc9f4bdcfab';
 	}
 
 	generate() {
@@ -190,6 +190,24 @@ class SystemGenerator {
 			});
 		}
 		this.system.bodies.forEach(body => { calculateOrbitalPeriodAndSpeed(body) });
+
+		const filter = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
+			if (body instanceof T.Planet) {
+				if (body.life > 3)
+					eventBus.emit('shtap');
+			}
+
+			// ---
+
+			if (body instanceof T.Binary) {
+				filter(body.primary);
+				filter(body.secondary);
+			}
+			body.bodies.forEach(child => { 
+				filter(child) 
+			});
+		}
+		this.system.bodies.forEach(body => { filter(body) });
 		
 		console.log(this.system);
 		console.log('--------------------')
@@ -254,42 +272,51 @@ class SystemGenerator {
 			this.settings.star_metallicity_std = cb.data;
 		});
 
+		eventBus.on(events.Generator.Settings.Star.AgeUnbound, (cb) => {
+			this.settings.star_age_unbound = cb.data;
+		});
+
+		// Planet orbit settings
+
+		eventBus.on(events.Generator.Settings.PlanetOrbit.sTypeSafetyFactor, (cb) => {
+			this.settings.planet_s_type_safety_factor = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.pTypeEnabled, (cb) => {
+			this.settings.planet_p_type_enabled = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.pTypeSafetyFactor, (cb) => {
+			this.settings.planet_p_type_safety_factor = cb.data;
+		});
+
+		eventBus.on(events.Generator.Settings.PlanetOrbit.type1MigrationEnabled, (cb) => {
+			this.settings.planet_migration_type_1_enabled = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.type1MigrationCoeff, (cb) => {
+			this.settings.planet_migration_type_1_coeff = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.type2MigrationEnabled, (cb) => {
+			this.settings.planet_migration_type_2_enabled = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.type2MigrationCoeff, (cb) => {
+			this.settings.planet_migration_type_2_coeff = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.migrationInterpolated, (cb) => {
+			this.settings.planet_migration_interpolated = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.grandTackChance, (cb) => {
+			this.settings.planet_migration_grand_tack_chance = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.PlanetOrbit.hillSafetyFactor, (cb) => {
+			this.settings.planet_migration_hill_safety_factor = cb.data;
+		});
+
 		// Planet settings
 		
 		eventBus.on(events.Generator.Settings.Planet.amountMultiplier, (cb) => {
 			this.settings.planet_amount_multiplier = cb.data;
 		});
-
-		eventBus.on(events.Generator.Settings.Planet.sTypeSafetyFactor, (cb) => {
-			this.settings.planet_s_type_safety_factor = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.pTypeSafetyFactor, (cb) => {
-			this.settings.planet_p_type_safety_factor = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.pTypeEnabled, (cb) => {
-			this.settings.planet_p_type_enabled = cb.data;
-		});
-
-		eventBus.on(events.Generator.Settings.Planet.type1MigrationEnabled, (cb) => {
-			this.settings.planet_migration_type_1_enabled = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.type1MigrationCoeff, (cb) => {
-			this.settings.planet_migration_type_1_coeff = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.type2MigrationEnabled, (cb) => {
-			this.settings.planet_migration_type_2_enabled = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.type2MigrationCoeff, (cb) => {
-			this.settings.planet_migration_type_2_coeff = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.migrationInterpolated, (cb) => {
-			this.settings.planet_migration_interpolated = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.grandTackEnabled, (cb) => {
-			this.settings.planet_migration_grand_tack_enabled = cb.data;
-		});
-		eventBus.on(events.Generator.Settings.Planet.hillSafetyFactor, (cb) => {
-			this.settings.planet_migration_hill_safety_factor = cb.data;
+		eventBus.on(events.Generator.Settings.Planet.lifeChance, (cb) => {
+			this.settings.planet_life_chance = cb.data;
 		});
 	}
 }

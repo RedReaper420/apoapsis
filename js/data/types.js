@@ -25,6 +25,7 @@ export const units = Object.freeze({
 		R_Earth: 'dist_R_earth',
 		R_Moon: 'dist_R_moon'
 	}),
+
 	Mass: Object.freeze({
 		kg: 'mass_kg',
 		M_Sun: 'mass_M_sun',
@@ -33,6 +34,18 @@ export const units = Object.freeze({
 		M_Moon: 'mass_M_moon',
 		M_Earth_atm: 'mass_M_Earth_atm',
 	}),
+
+	Dens: Object.freeze({
+		g_cm3: 'dens_g_cm3',
+		kg_m3: 'dens_kg_m3',
+	}),
+
+	Press: Object.freeze({
+		Pa: 'press_Pa',
+		atm: 'press_atm',
+		bar: 'press_bar',
+	}),
+
 	Time: Object.freeze({
 		s: 'time_s',
 		h: 'time_h',
@@ -43,23 +56,29 @@ export const units = Object.freeze({
 		Gy: 'time_Gy',
 		Ty: 'time_Ty'
 	}),
+
 	Spd: Object.freeze({
 		m_s: 'spd_m_s',
 		km_s: 'spd_km_s',
 		km_h: 'spd_km_h',
 		c: 'spd_c'
 	}),
+
 	Acc: Object.freeze({
 		m_s2: 'acc_m_s2',
 		g: 'acc_g'
 	}),
+
 	Temp: Object.freeze({
 		K: 'temp_k',
 		C: 'temp_c'
 	}),
+
 	GROUPS: Object.freeze({
 		Dist: 'dist',
 		Mass: 'mass',
+		Dens: 'dens',
+		Press: 'press',
 		Time: 'time',
 		Spd: 'spd',
 		Acc: 'acc',
@@ -70,17 +89,20 @@ export const units = Object.freeze({
 const unitTypes = [
 	units.GROUPS.Dist, 
 	units.GROUPS.Mass, 
+	units.GROUPS.Dens,
+	units.GROUPS.Press,
 	units.GROUPS.Time, 
 	units.GROUPS.Spd, 
 	units.GROUPS.Acc,
 	units.GROUPS.Temp,
 ];
+
 const unitValues = new Map([
 	// Distance
 	[units.Dist.m,         1],
 	[units.Dist.km,        1000],
 	[units.Dist.AU,        149597870700],
-	[units.Dist.ly,        9460730472580800],
+	[units.Dist.ly,        9460730472580800.0],
 	[units.Dist.R_Sun,     695700e3],
 	[units.Dist.R_Jupiter, 69886e3],
 	[units.Dist.R_Earth,   6371e3],
@@ -93,6 +115,15 @@ const unitValues = new Map([
 	[units.Mass.M_Earth,     5.97217e24],
 	[units.Mass.M_Moon,      7.346e22],
 	[units.Mass.M_Earth_atm, 5.15e18],
+
+	// Density
+	[units.Dens.kg_m3, 1],
+	[units.Dens.g_cm3, 1000],
+
+	// Pressure
+	[units.Press.Pa,  1],
+	[units.Press.bar, 1e5],
+	[units.Press.atm, 101325],
 
 	// Time
 	[units.Time.s,  1],
@@ -134,6 +165,15 @@ export const unitNames = new Map([
 	[units.Mass.M_Moon,      'M☾'],
 	[units.Mass.M_Earth_atm, 'Matm⊕'],
 
+	// Density
+	[units.Dens.g_cm3, 'g/cm³'],
+	[units.Dens.kg_m3, 'kg/m³'],
+
+	// Pressure
+	[units.Press.Pa,  'Pa'],
+	[units.Press.bar, 'bar'],
+	[units.Press.atm, 'atm'],
+
 	// Time
 	[units.Time.s,  's'],
 	[units.Time.h,  'h'],
@@ -166,8 +206,8 @@ export class Value {
 	 * @param {string} unit - Unit name. Use `units` enum to assign (`T.units.GROUP.UNIT`).
 	 */
 	constructor (value, unit) {
-		this.value = value;
-		this.unit = unit;
+		/** @type {number} */ this.value = value;
+		/** @type {string} */ this.unit = unit;
 	}
 
 	/**
@@ -234,7 +274,7 @@ export class Value {
 	 * @param {number} value - Numeric value.
 	 * @param {string} unit - Unit enum (`T.units.GROUP.UNIT`).
 	 */
-	setValue(value, unit) {
+	set(value, unit) {
 		this.convertTo(unit);
 		this.value = value;
 	}
@@ -267,9 +307,9 @@ export class GenerationSettings {
 		star_metallicity_mean = consts.UI_STAR_METALLICITY_MEAN_VAL_DEF,
 		star_metallicity_std = consts.UI_STAR_METALLICITY_STD_VAL_DEF,
 
-		// Planets settings
+		star_age_unbound = consts.UI_STAR_AGE_UNBOUND_VAL_DEF,
 
-		planet_amount_multiplier = consts.UI_PLANET_AMOUNT_MULT_VAL_DEF,
+		// Planets orbits settings
 
 		planet_s_type_safety_factor = consts.UI_PLANET_S_TYPE_SAFETY_FACTOR_VAL_DEF,
 		planet_p_type_enabled = consts.UI_PLANET_P_TYPE_ENABLED_VAL_DEF,
@@ -283,9 +323,9 @@ export class GenerationSettings {
 		planet_migration_grand_tack_chance = consts.UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_VAL_DEF,
 		planet_migration_hill_safety_factor = consts.UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF,
 
-		// ---
-
-    	manual = false,
+		// Planets settings
+		planet_amount_multiplier = consts.UI_PLANET_AMOUNT_MULT_VAL_DEF,
+		planet_life_chance = consts.UI_PLANET_LIFE_CHANCE_DEF,
 	) {
 		this.seed_user = seed_user;
 		this.seed = seed;
@@ -304,9 +344,9 @@ export class GenerationSettings {
 		this.star_metallicity_mean = star_metallicity_mean;
 		this.star_metallicity_std = star_metallicity_std;
 
-		// Planets settings
+		this.star_age_unbound = star_age_unbound;
 
-		this.planet_amount_multiplier = planet_amount_multiplier;
+		// Planets orbits settings
 
 		this.planet_s_type_safety_factor = planet_s_type_safety_factor;
 		this.planet_p_type_enabled = planet_p_type_enabled;
@@ -320,9 +360,10 @@ export class GenerationSettings {
 		this.planet_migration_grand_tack_chance = planet_migration_grand_tack_chance;
 		this.planet_migration_hill_safety_factor = planet_migration_hill_safety_factor;
 
-		// ---
+		// Planets settings
 
-        this.manual = manual;
+		this.planet_amount_multiplier = planet_amount_multiplier;
+		this.planet_life_chance = planet_life_chance;
 	}
 }
 
@@ -330,8 +371,13 @@ export class System {
 	constructor(
 		settings = new GenerationSettings()
 	) {
+		/** @type {GenerationSettings} */
 		this.settings = settings;
-		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */ this.bodies = [];
+
+		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */
+		this.bodies = [];
+
+		/** @type {string} */
 		this.type = systemTypes.Single;
 	}
 }
@@ -353,32 +399,30 @@ export const systemTypes = Object.freeze({
 
 export class Body {
 	constructor (parentBody = null, name = 'Spaceball') {
-		/** @type {BinaryPlanet|BinaryStar|Planet|Star|null} */
-		this.parentBody = parentBody;
-		this.name = name;
+		/** @type {BinaryPlanet|BinaryStar|Planet|Star|null} */ this.parentBody = parentBody;
+		/** @type {string} */ this.name = name;
 
-		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */
-		this.bodies = [];
-		this.sma = new Value(1.26, units.Dist.AU);
-		this.eccentricity = -1;
-		this.orbit = new Orbit();
+		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */ this.bodies = [];
+		/** @type {Value} */ this.sma = new Value(1.26, units.Dist.AU);
+		/** @type {number} */ this.eccentricity = -1;
+		/** @type {Orbit} */ this.orbit = new Orbit();
 
-		this.mass = new Value(1.0, units.Mass.kg);
-		this.radius = new Value(1.0, units.Dist.m);
-		this.density = 1.0;
-		this.temperature = new Value(2.73, units.Temp.K);
+		/** @type {Value} */ this.mass = new Value(1.0, units.Mass.kg);
+		/** @type {Value} */ this.radius = new Value(1.0, units.Dist.m);
+		/** @type {Value} */ this.density = new Value(1.0, units.Dens.g_cm3);
+		/** @type {Value} */ this.temperature = new Value(2.73, units.Temp.K);
 	}
 }
 
 export class Orbit {
 	constructor() {
-		this.a = 0;
-		this.e = 0;
-		this.i = 0;
-		this.Omega = 0;
-		this.w = 0;
-		this.M0 = 0;
-		this.n = 0;
+		/** @type {number} */ this.a = 0;
+		/** @type {number} */ this.e = 0;
+		/** @type {number} */ this.i = 0;
+		/** @type {number} */ this.Omega = 0;
+		/** @type {number} */ this.w = 0;
+		/** @type {number} */ this.M0 = 0;
+		/** @type {number} */ this.n = 0;
 	}
 
 	/**
@@ -413,19 +457,19 @@ export class Star extends Body {
 	constructor (parentBody = null, name = 'Sol') {
 		super(parentBody, name);
 
-		this.mass = new Value(1.0, units.Mass.M_Sun);
-		this.radius = new Value(1.0, units.Dist.R_Sun);
-		this.density = 1.409;
-		this.temperature = new Value(consts.PHY_SUN_TEMP, units.Temp.K);
+		/** @type {Value} */ this.mass = new Value(1.0, units.Mass.M_Sun);
+		/** @type {Value} */ this.radius = new Value(1.0, units.Dist.R_Sun);
+		/** @type {Value} */ this.density = new Value(1.409, units.Dens.g_cm3);
+		/** @type {Value} */ this.temperature = new Value(consts.PHY_SUN_TEMP, units.Temp.K);
 
-		this.lifespan = new Value(consts.PHY_SUN_LIFESPAN, units.Time.Gy);
-		this.age = new Value(consts.PHY_SUN_LIFESPAN * 0.46, units.Time.Gy);
-		this.metallicity = 0.0;
-		this.luminosity = 1.0;
-		this.type = 'G2';
-		this.absMag = 4.83;
-		this.bv = 0.046;
-		this.color = '#FFF5DC';
+		/** @type {Value} */ this.lifespan = new Value(consts.PHY_SUN_LIFESPAN, units.Time.Gy);
+		/** @type {Value} */ this.age = new Value(consts.PHY_SUN_LIFESPAN * 0.46, units.Time.Gy);
+		/** @type {number} */ this.metallicity = 0.0;
+		/** @type {number} */ this.luminosity = 1.0;
+		/** @type {string} */ this.type = 'G2';
+		/** @type {number} */ this.absMag = 4.83;
+		/** @type {number} */ this.bv = 0.046;
+		/** @type {string} */ this.color = '#FFF5DC';
 	}
 }
 
@@ -480,21 +524,19 @@ export class Planet extends Body {
 	constructor (parentBody = null, name = 'Terra') {
 		super(parentBody, name);
 
-		this.mass = new Value(1.0, units.Mass.M_Earth);
-		this.radius = new Value(1.0, units.Dist.R_Earth);
-		this.density = consts.PHY_EARTH_DENSITY;
-		this.temperature = new Value(14, units.Temp.C);
+		/** @type {Value} */ this.mass = new Value(1.0, units.Mass.M_Earth);
+		/** @type {Value} */ this.radius = new Value(1.0, units.Dist.R_Earth);
+		/** @type {Value} */ this.density = new Value(consts.PHY_EARTH_DENSITY, units.Dens.g_cm3);
+		/** @type {Value} */ this.temperature = new Value(14, units.Temp.C);
 
-		this.core = new Core();
-		this.envelope = new Envelope();
+		/** @type {Core} */ this.core = new Core();
+		/** @type {Envelope} */ this.envelope = new Envelope();
 
-		this.type = planetTypes.Terrestrial;
-		/** @type {Array<RingSystem>} */
-		this.rings = [];
+		/** @type {string} */ this.type = planetTypes.Terrestrial;
+		/** @type {Array<RingSystem>} */ this.rings = [];
 
-		/** @type {GenData} */
-		this.genData = {};
-		this.hasLife = false;
+		/** @type {GenData} */ this.genData = {};
+		/** @type {boolean} */ this.hasLife = false;
 	}
 }
 
@@ -509,22 +551,23 @@ export class Planet extends Body {
 
 export class Binary extends Body {
 	constructor (
-		/** @type {Planet|Star} */
-		primary = null,
-		/** @type {Planet|Star} */
-		secondary = null,
+		/** @type {Planet|Star|BinaryPlanet|BinaryStar} */ primary,
+		/** @type {Planet|Star|BinaryPlanet|BinaryStar} */ secondary,
 		sma = new Value(1, units.Dist.AU),
 	) {
 		super(null, `${primary.name}-${secondary.name}`);
 
+		/** @type {Planet|Star|BinaryPlanet|BinaryStar} */
 		this.primary = primary;
 		this.primary.parentBody = this;
 		this.primary.sma = sma;
 		
+		/** @type {Planet|Star|BinaryPlanet|BinaryStar} */
 		this.secondary = secondary;
 		this.secondary.parentBody = this;
 		this.secondary.sma = sma;
 
+		/** @type {string} */
 		this.color = '#ffffff';
 	}
 }
@@ -542,23 +585,28 @@ export class BinaryStar extends Binary {
 	
 	combineProperties() {
 		// Combined value
+		/** @type {Value} */
 		this.mass = new Value(
 			this.primary.mass.as(units.Mass.M_Sun) + this.secondary.mass.as(units.Mass.M_Sun), 
 			units.Mass.M_Sun);
 
 		// Max value
+		/** @type {Value} */
 		this.temperature = new Value(Math.max(
 			this.primary.temperature.as(units.Temp.K),
 			this.secondary.temperature.as(units.Temp.K)
 		), units.Temp.K);
 
 		// Equal values, first taken
+		/** @type {Value} */
 		this.age = this.primary.age;
 
 		// Average value
+		/** @type {number} */
 		this.metallicity = (this.primary.metallicity + this.secondary.metallicity) / 2;
 
 		// Combined value
+		/** @type {number} */
 		this.luminosity = this.primary.luminosity + this.secondary.luminosity;
 		
 		// Weighted average value
@@ -571,6 +619,8 @@ export class BinaryStar extends Binary {
 		const blue =  utils.clamp( Math.floor( color_p.b * lumRatio + color_s.b * (1 - lumRatio) ) , 0, 255);
 
 		const toHex = (colorVal) => colorVal.toString(16).padStart(2, '0');
+
+		/** @type {string} */
 		this.color = `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
 	}
 }
@@ -587,17 +637,21 @@ export class BinaryPlanet extends Binary {
 	}
 
 	combineProperties() {
+		/** @type {Value} */
 		this.mass = new Value(
 			this.primary.mass.as(units.Mass.M_Earth) + this.secondary.mass.as(units.Mass.M_Earth), 
 			units.Mass.M_Earth); // Combined value
+		
+		/** @type {GenData} */
 		this.genData = {
 			impacts: this.primary.genData.impacts,
 			sma_init: this.primary.genData.sma_init,
 			parentStar: this.primary.genData.parentStar,
 		};
-		this.radius = this.primary.radius;
-		this.core = this.primary.core;
-		this.rings = [];
+
+		/** @type {Value} */ this.radius = this.primary.radius;
+		/** @type {Core} */ this.core = this.primary.core;
+		/** @type {RingSystem} */ this.rings = [];
 	}
 }
 
@@ -611,18 +665,16 @@ export class BinaryPlanet extends Binary {
 
 export class MassComponent {
 	/**
-	 * 
 	 * @param {Value} mass - Mass component's mass (unit: `Mass`).
 	 */
 	constructor (mass) {
-		this.mass = mass;
-		this.composition = { };
+		/** @type {Value} */ this.mass = mass;
+		/** @type {Object} */ this.composition = { };
 	}
 }
 
 export class Core extends MassComponent {
 	/**
-	 * 
 	 * @param {Value} mass - Core's mass (unit: `Mass`).
 	 * @param {number} f_iron - Iron fraction in the core (0.0-1.0).
 	 * @param {number} f_rock - Rock fraction in the core (0.0-1.0).
@@ -631,21 +683,20 @@ export class Core extends MassComponent {
 	constructor (mass=new Value(1.0, units.Mass.M_Earth), f_iron=0.20, f_rock=0.79, f_ice=0.01) {
 		super(mass);
 		
-		this.composition = new CoreComposition(f_iron, f_rock, f_ice);
+		/** @type {CoreComposition} */ this.composition = new CoreComposition(f_iron, f_rock, f_ice);
 	}
 }
 
 export class CoreComposition {
 	/**
-	 * 
 	 * @param {number} f_iron - Iron fraction in the core (0.0-1.0).
 	 * @param {number} f_rock - Rock fraction in the core (0.0-1.0).
 	 * @param {number} f_ice - Ice fraction in the core (0.0-1.0).
 	 */
 	constructor (f_iron, f_rock, f_ice) {
-		this.iron = f_iron;
-		this.rock = f_rock;
-		this.ice = f_ice;
+		/** @type {number} */ this.iron = f_iron;
+		/** @type {number} */ this.rock = f_rock;
+		/** @type {number} */ this.ice = f_ice;
 	}
 }
 
@@ -659,7 +710,7 @@ export class Envelope extends MassComponent {
 	constructor (mass=new Value(0.0, units.Mass.M_Earth), f_gas=0.9, f_ice=0.1) {
 		super(mass);
 
-		this.composition = new EnvelopeComposition(f_gas, f_ice);
+		/** @type {EnvelopeComposition} */ this.composition = new EnvelopeComposition(f_gas, f_ice);
 	}
 }
 
@@ -670,8 +721,8 @@ export class EnvelopeComposition {
 	 * @param {number} f_ice - Ice fraction in the envelope (0.0-1.0).
 	 */
 	constructor (f_gas, f_ice) {
-		this.gas = f_gas;
-		this.ice = f_ice;
+		/** @type {number} */ this.gas = f_gas;
+		/** @type {number} */ this.ice = f_ice;
 	}
 }
 
@@ -682,10 +733,10 @@ export class RingSystem {
 		originMass = new Value(1.2, units.Mass.M_Moon), 
 		albedo = 0.5
 	) {
-		this.innerRadius = innerRadius;
-		this.outerRadius = outerRadius;
-		this.originMass = originMass;
-		this.albedo = albedo;
+		/** @type {Value} */ this.innerRadius = innerRadius;
+		/** @type {Value} */ this.outerRadius = outerRadius;
+		/** @type {Value} */ this.originMass = originMass;
+		/** @type {number} */ this.albedo = albedo;
 	}
 }
 

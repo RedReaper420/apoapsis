@@ -16,7 +16,6 @@ export default function drawLighting() {
 	const shdctx = rend.shadowCtx;
 	const litctx = rend.lightCtx;
 
-
 	// Getting the list of stars (light sources)
 	const stars = [];
 	const parentStar = this.genData.parentStar;
@@ -55,6 +54,7 @@ export default function drawLighting() {
 	litctx.save();
 		litctx.globalCompositeOperation = 'lighter';
 		let lum_avg = 0;
+		
 		stars.forEach(star => { lum_avg += drawLightCone(litctx, star, this); });
 		lum_avg /= stars.length;
 		this.sim.lum_avg = lum_avg;

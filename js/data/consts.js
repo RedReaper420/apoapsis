@@ -1,32 +1,56 @@
 
 const consts = Object.freeze({
-	PHY_G: 6.6743015e-11, // Gravitational constant
-	PHY_MU_0: 1.2566370612720e-6, // Magnetic constant
-	PHY_R_GAS: 8.31446261815324, // Molar gas constant
-	PHY_SIGMA: 5.670374419e-8, // Stefan-Boltzmann constant
+	/** Gravitational constant */
+	PHY_G: 6.6743015e-11,
+	/** Magnetic constant */
+	PHY_MU_0: 1.2566370612720e-6,
+	/** Molar gas constant */
+	PHY_R_GAS: 8.31446261815324,
+	/** Stefan-Boltzmann constant */
+	PHY_SIGMA: 5.670374419e-8,
 
-	PHY_STAR_MASS_MIN: 0.08, // M☉
+	/** Unit: M☉ */
+	PHY_STAR_MASS_MIN: 0.08,
+	/** Unit: M☉ */
 	PHY_STAR_MASS_MAX: 150,
 	
-	PHY_STAR_METALLICITY_MIN: -3.0, // [Fe/H]
+	/** Unit: [Fe/H] */
+	PHY_STAR_METALLICITY_MIN: -3.0,
+	/** Unit: [Fe/H] */
 	PHY_STAR_METALLICITY_MAX: 2.0,
 
-	PHY_SUN_LIFESPAN: 10, // Gyr
-	PHY_SUN_TEMP: 5772, // K
+	/** Unit: Gyr */
+	PHY_SUN_LIFESPAN: 10,
+	/** Unit: K */
+	PHY_SUN_TEMP: 5772,
 
-	PHY_TEMP_ABSOLUTE_ZERO: -273.15, // C
+	/** Unit: °C */
+	PHY_TEMP_ABSOLUTE_ZERO: -273.15,
 	
-	PHY_DIST_SNOW_LINE: 3.5, // AU☉
+	/** Unit: AU☉ */
+	PHY_DIST_SNOW_LINE: 3.5,
 
-	PHY_EARTH_DENSITY: 5.51, // g/cm^3
-	PHY_EARTH_ESCAPE_VELOCITY: 11186, // m/s
-	PHY_EARTH_TEMP_EQ: 255, // K
-	PHY_EARTH_TEMP_SURF: 288, // K
+	/** Unit: km */
+	PHY_EARTH_RADIUS: 6371,
+	/** Unit: g/cm³ */
+	PHY_EARTH_DENSITY: 5.51,
+	/** Unit: m/s */
+	PHY_EARTH_ESCAPE_VELOCITY: 11186,
+	/** Unit: m/s² */
+	PHY_EARTH_G: 9.80665,
+	/** Unit: K */
+	PHY_EARTH_TEMP_EQ: 255,
+	/** Unit: K */
+	PHY_EARTH_TEMP_SURF: 288,
 
-	DEF_BINARY_PLANET_MASS_RATIO: 0.04, // 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon). ("Lagrange Point test")
-	DEF_SUB_NEPTUNE_MASS_THRESHOLD: 15, // Below 15 M⊕, a gas planet is classified as Mini-Neptune or Gas Dwarf, otherwise as Ice/Gas Giant.
-	DEF_BROWN_DWARF_MASS_THRESHOLD: 4100, // Equal and above 4100 M⊕, a gas giant is classified as Brown Dwarf.
+	/** 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon). ("Lagrange point test") */
+	DEF_BINARY_PLANET_MASS_RATIO: 0.04,
+	/** Below 15 M⊕, a gas planet is classified as Mini-Neptune or Gas Dwarf, otherwise as Ice/Gas Giant. */
+	DEF_SUB_NEPTUNE_MASS_THRESHOLD: 15,
+	/** Equal and above 4100 M⊕, a gas giant is classified as Brown Dwarf. */
+	DEF_BROWN_DWARF_MASS_THRESHOLD: 4100,
 
+	/** Unit: g/mol */
 	PHY_MOLAR_MASSES: Object.freeze({
 		 H2: 2.016,
 		 He: 4.003,
@@ -41,6 +65,7 @@ const consts = Object.freeze({
 		CO2: 44.01,
 		SO2: 64.06,
 		SiO2: 40.0,
+		NaK: 62.09
 	}),
 
 	// ---
@@ -74,11 +99,9 @@ const consts = Object.freeze({
 	UI_STAR_METALLICITY_STD_LIM_MIN: 0.0,
 	UI_STAR_METALLICITY_STD_VAL_DEF: 0.35,
 
-	// Planets settings
+	UI_STAR_AGE_UNBOUND_VAL_DEF: false,
 
-	UI_PLANET_AMOUNT_MULT_LIM_MIN: 0.0,
-	UI_PLANET_AMOUNT_MULT_LIM_MAX: 10.0,
-	UI_PLANET_AMOUNT_MULT_VAL_DEF: 1.0,
+	// Planets orbits settings
 
 	UI_PLANET_S_TYPE_SAFETY_FACTOR_LIM_MIN: 0.1,
 	UI_PLANET_S_TYPE_SAFETY_FACTOR_LIM_MAX: 1.0,
@@ -112,6 +135,15 @@ const consts = Object.freeze({
 	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_LIM_MAX: 15.0,
 	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF: 4.5,
 
+	// Planets settings
+
+	UI_PLANET_AMOUNT_MULT_LIM_MIN: 0.0,
+	UI_PLANET_AMOUNT_MULT_LIM_MAX: 10.0,
+	UI_PLANET_AMOUNT_MULT_VAL_DEF: 1.0,
+
+	UI_PLANET_LIFE_CHANCE_LIM_MIN: 0.0,
+	UI_PLANET_LIFE_CHANCE_LIM_MAX: 1.0,
+	UI_PLANET_LIFE_CHANCE_DEF: 0.8,
 });
 
 export default consts;

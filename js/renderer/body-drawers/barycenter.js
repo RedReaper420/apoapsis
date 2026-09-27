@@ -14,7 +14,6 @@ export default function drawBarycenter() {
 	ctx.beginPath();
 		ctx.arc(coords.x, coords.y, visualRadius, 0, Math.PI * 2);
 	ctx.closePath();
-	ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-	ctx.lineWidth = 5;
-	ctx.stroke();
+	ctx.fillStyle = 'rgba(255,255,255,0.5)';
+	ctx.fill();
 }

@@ -90,8 +90,10 @@ function generatePlanetsForBinary(binary, settings) {
 		const start = getMinimalPTypeOrbit(binary.primary.mass, binary.secondary.mass, binary.primary.sma);
 		const start_safe = start.as(T.units.Dist.AU) * settings.planet_p_type_safety_factor;
 		
-		// Avg. of discarded planets x 0.75
-		const pOrbitPlanetsToGenerate = Math.round( ((discardedPlanetsPrimary + discardedPlanetsSecondary) / 2) * 0.75 );
+		let pOrbitPlanetsToGenerate = (discardedPlanetsPrimary + discardedPlanetsSecondary) / 2;
+		if (pOrbitPlanetsToGenerate > 1)
+			pOrbitPlanetsToGenerate = Math.sqrt(pOrbitPlanetsToGenerate);
+		pOrbitPlanetsToGenerate = Math.round(pOrbitPlanetsToGenerate);
 		generatePlanetsForStar(settings, binary, limit_safe, start_safe, pOrbitPlanetsToGenerate);
 	}
 }
@@ -158,7 +160,7 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
 	if (planetsToGenerate === 0)
 		return 0;
 
-	const startDistance = (Math.max(PLANET_SPAWN_START_DIST, distanceStart) + prng.range(0.0, 0.15)) * Math.sqrt(star.luminosity); // AU
+	const startDistance = (Math.max(PLANET_SPAWN_START_DIST, distanceStart) + 0.3 * Math.pow(prng(), 2)) * Math.sqrt(star.luminosity); // AU
 	let sma = startDistance;
 	let discardedPlanets = 0;
 	for (let planetIndex = 0; planetIndex < planetsToGenerate; planetIndex++) {

@@ -145,8 +145,8 @@ export function simulateMigration(settings, starsArray) {
  */
 function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTackActive) {
 	// Scaled migration constants
-	const TYPE_1_COEFF = settings.planet_migration_type_1_coeff * 0.00000001;
-	const TYPE_2_COEFF = settings.planet_migration_type_2_coeff * 0.00000001;
+	const TYPE_1_COEFF = settings.planet_migration_type_1_coeff * 1e-7;
+	const TYPE_2_COEFF = settings.planet_migration_type_2_coeff * 1e-7;
 	const INNER_DISK_EDGE_AU = 0.05; // Inside boundary normalized to Solar units (AU☉)
 	
 	let migrationRate = 0;
@@ -223,8 +223,8 @@ function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) 
 		let determinedOutcome = OUTCOME_SHIFT;
 
 		if (!isFinalStep) {
-			if		(outcomeRoll < 0.3)	determinedOutcome = OUTCOME_MERGE; // 30% Merging
-			else if (outcomeRoll < 0.5) determinedOutcome = OUTCOME_EJECT; // 20% Ejection
+			if		(outcomeRoll < 0.2)	determinedOutcome = OUTCOME_MERGE; // 20% Merging
+			else if (outcomeRoll < 0.5) determinedOutcome = OUTCOME_EJECT; // 30% Ejection
 			else						determinedOutcome = OUTCOME_SHIFT; // 50% Scattering
 		}
 		else {
@@ -394,8 +394,8 @@ function mergePlanets(recipient, donor) {
  */
 function getRocheLimit(star, planet) {
 	const r_s = star.radius.as(T.units.Dist.m);
-	const rho_s = star.density;
-	const rho_p = planet.density;
+	const rho_s = star.density.as(T.units.Dens.g_cm3);
+	const rho_p = planet.density.as(T.units.Dens.g_cm3);
 
 	const R = 2.44 * r_s * Math.pow(rho_s / rho_p, 1/3);
 	return new T.Value(R, T.units.Dist.m);

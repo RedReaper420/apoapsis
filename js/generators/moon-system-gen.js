@@ -172,8 +172,8 @@ function calculateMaxSafeMass(planet, star, safetyFactor = 4.0) {
  */
 function getRocheLimit(planet, moon) {
 	const r_p = planet.radius.as(T.units.Dist.m);
-	const rho_p = planet.density;
-	const rho_m = moon.density;
+	const rho_p = planet.density.as(T.units.Dens.g_cm3);
+	const rho_m = moon.density.as(T.units.Dens.g_cm3);
 
 	const R = 2.44 * r_p * Math.pow(rho_p / rho_m, 1/3);
 	return new T.Value(R, T.units.Dist.m);
@@ -315,7 +315,7 @@ function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartO
 	
 	// Picking SMA for the first moon
 	const planetRadius_AU = planet.radius.as(T.units.Dist.AU);
-	const moonSmaStart_AU = planetRadius_AU * (10**prng.range(0.25, 0.75));
+	const moonSmaStart_AU = planetRadius_AU * (10 ** prng.range(0.25, 1.0));
 	const moonSmaMax_AU = new T.Value(moonSmaMax_REarth, T.units.Dist.R_Earth).as(T.units.Dist.AU);
 
 	let sma = moonSmaStart_AU + moonSmaStartOffset_AU;

@@ -5,9 +5,9 @@ import consts from "../data/consts.js";
 
 export class PlanetEvolution {
 	/**
-	 * An object that models planet's evolution. Modeled properties:
+	 * An integrator object that partially models evolution of the planet. Modeled properties:
 	 * - Rotation (tidal locking with the parent body)
-	 * - Magnetosphere (modeling from planet's composition and internal heat)
+	 * - Magnetosphere (modeled from planet's composition and internal heat)
 	 * - Atmosphere (dissipation by solar wind and radiation)
 	 * 
 	 * @param {T.GenerationSettings} settings 
@@ -140,7 +140,7 @@ function getTidalLockTime(planet, parent) {
 	const Q = calculateTidalQ(planet); // Satellite's dissipation function value
 	const k2 = calculateLoveNumber(planet); // Satellite's tidal Love number 
 
-	const t = (w * (a**6) * I * Q) / (3 * consts.PHY_G * (m_p**2) * k2 * (R**5)); // Approximate satellite's tidal locking time
+	const t = (w * (a ** 6) * I * Q) / (3 * consts.PHY_G * (m_p ** 2) * k2 * (R ** 5)); // Approximate satellite's tidal locking time
 	return new T.Value(t, T.units.Time.s);
 }
 
@@ -230,7 +230,7 @@ export function calculateLoveNumber(planet) {
 	const totalMass = planet.mass.as(T.units.Mass.kg);
 	const R = planet.radius.as(T.units.Dist.m); // Planets's radius
 
-	const rho = planet.density * 1000; // Planets's density, kg/m^3
+	const rho = planet.density.as(T.units.Dens.kg_m3); // Planets's density, kg/m^3
 	const g = consts.PHY_G * totalMass / (R**2); // Planets's surface gravity
 
 	const coreIce = planet.core.composition.ice * planet.core.mass.as(T.units.Mass.kg);
@@ -470,7 +470,7 @@ class DissipationManager {
 		
 		this.v_esc = consts.PHY_EARTH_ESCAPE_VELOCITY * Math.sqrt(this.planetMass_ME / this.planetRadius_RE);
 
-		const atmosphereMass_MEarthAtm = (this.planet.atmosphere.pressure) * (this.planetRadius_RE ** 4) / this.planetMass_ME;
+		const atmosphereMass_MEarthAtm = this.planet.atmosphere.pressure.as(T.units.Press.atm) * (this.planetRadius_RE ** 4) / this.planetMass_ME;
 		this.atmosphereMass_kg = new T.Value(atmosphereMass_MEarthAtm, T.units.Mass.M_Earth_atm).as(T.units.Mass.kg);
 		this.atmosphereMass_init_kg = this.atmosphereMass_kg;
 
@@ -548,18 +548,20 @@ class DissipationManager {
 		if (this.atmosphereMass_kg === 0) {
 			this.planet.atmosphere = {
 				composition: {},
-				pressure: 0,
-				scaleHeight: 0,
+				pressure: new T.Value(0, T.units.Press.Pa),
+				mass: new T.Value(0, T.units.Mass.kg),
+				scaleHeight: new T.Value(0, T.units.Dist.m),
 				mu: 0,
 			}
-			this.planet.atmosphere.composition = {};
 			this.planet.temperature = new T.Value(this.planet.temperature_eff.value, this.planet.temperature_eff.unit);
 
 			return;
 		}
 
-		const atmosphereMass = new T.Value(this.atmosphereMass_kg, T.units.Mass.kg).as(T.units.Mass.M_Earth_atm);
-		const P_surf = (atmosphereMass * this.planetMass_ME) / (this.planetRadius_RE**4);
-		this.planet.atmosphere.pressure = P_surf;
+		const atmosphereMass = new T.Value(this.atmosphereMass_kg, T.units.Mass.kg);
+		const P_surf = (atmosphereMass.as(T.units.Mass.M_Earth_atm) * this.planetMass_ME) / (this.planetRadius_RE**4);
+
+		this.planet.atmosphere.pressure = new T.Value(P_surf, T.units.Press.atm);
+		this.planet.atmosphere.mass = atmosphereMass;
 	}
 }

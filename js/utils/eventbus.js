@@ -54,22 +54,27 @@ export const events = Object.freeze({
 				MetallicityGaussian:	'settings_star_metallicity_gaussian',
 				MetallicityMean:		'settings_star_metallicity_mean',
 				MetallicityStD:			'settings_star_metallicity_std',
+
+				AgeUnbound:				'settings_star_age_unbound'
+			}),
+
+			PlanetOrbit: Object.freeze({
+				sTypeSafetyFactor:		'settings_planet_orbit_s_type_safety_factor',
+				pTypeSafetyFactor:		'settings_planet_orbit_p_type_safety_factor',
+				pTypeEnabled:			'settings_planet_orbit_p_type_enabled',
+				
+				type1MigrationEnabled:	'settings_planet_orbit_migration_type_1_enabled',
+				type1MigrationCoeff:	'settings_planet_orbit_migration_type_1_coeff',
+				type2MigrationEnabled:	'settings_planet_orbit_migration_type_2_enabled',
+				type2MigrationCoeff:	'settings_planet_orbit_migration_type_2_coeff',
+				migrationInterpolated:	'settings_planet_orbit_migration_interpolated',
+				grandTackChance:		'settings_planet_orbit_migration_grand_tack_chance',
+				hillSafetyFactor:		'settings_planet_orbit_migration_hill_safety_factor',
 			}),
 
 			Planet: Object.freeze({
 				amountMultiplier:		'settings_planet_amount_multiplier',
-
-				sTypeSafetyFactor:		'settings_planet_s_type_safety_factor',
-				pTypeSafetyFactor:		'settings_planet_p_type_safety_factor',
-				pTypeEnabled:			'settings_planet_p_type_enabled',
-				
-				type1MigrationEnabled:	'settings_planet_migration_type_1_enabled',
-				type1MigrationCoeff:	'settings_planet_migration_type_1_coeff',
-				type2MigrationEnabled:	'settings_planet_migration_type_2_enabled',
-				type2MigrationCoeff:	'settings_planet_migration_type_2_coeff',
-				migrationInterpolated:	'settings_planet_migration_interpolated',
-				grandTackChance:		'settings_planet_migration_grand_tack_chance',
-				hillSafetyFactor:		'settings_planet_migration_hill_safety_factor',
+				lifeChance:				'settings_planet_life_chance',
 			}),
 		}),
 	}),

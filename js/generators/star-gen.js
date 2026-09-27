@@ -66,8 +66,8 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	star.radius = radius;
 
 	// Density computation: mass (kg) / volume (m³) converted from kg/m³ to g/cm³ (/1000)
-	const volumeM3 = (4 / 3) * Math.PI * Math.pow(radius.as(T.units.Dist.m), 3);
-	star.density = (star.mass.as(T.units.Mass.kg) / volumeM3) / 1000;
+	const volume_m3 = (4 / 3) * Math.PI * Math.pow(radius.as(T.units.Dist.m), 3);
+	star.density = new T.Value(star.mass.as(T.units.Mass.kg) / volume_m3, T.units.Dens.kg_m3);
 
 	star.temperature = getTemperature(star.luminosity, star.radius);
 	star.type = getType(star.temperature);
@@ -84,7 +84,7 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 		const randomAgeFraction = prng.range(0.2, 0.6);
 		const fractionAge_Gy = star.lifespan.as(T.units.Time.Gy) * randomAgeFraction;
 		
-		const flatAge_Gy = prng.range(1.5, 15.0);
+		const flatAge_Gy = settings.star_age_unbound ? Infinity : prng.range(1.5, 15.0);
 
 		star.age = new T.Value(Math.min(fractionAge_Gy, flatAge_Gy), T.units.Time.Gy);
 	} else {

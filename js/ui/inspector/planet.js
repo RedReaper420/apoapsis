@@ -109,7 +109,7 @@ export default function generatePlanetProfile(body) {
 
 	// DENSITY
 	const density = planet.querySelector('#density');
-	density.innerText = body.density.toFixed(3) + ' g/cm³';
+	density.innerText = (body.density.as(T.units.Dens.g_cm3)).toFixed(3) + ' g/cm³';
 
 	// SURFACE GRAVITY
 	const surfaceGravity = planet.querySelector('#surfaceGravity');
@@ -118,6 +118,28 @@ export default function generatePlanetProfile(body) {
 	// ESCAPE VELOCITY
 	const escapeVelocity = planet.querySelector('#escapeVelocity');
 	escapeVelocity.innerText = body.v_esc.as(T.units.Spd.km_s).toFixed(2) + ' km/s';
+
+	// ESI
+	const ESI = planet.querySelector('#esi');
+	const ESIBar = planet.querySelector('#esiBar');
+	ESI.innerText = (body.esi * 100).toFixed(1) + '%';
+	ESIBar.style = `width: ${ESI.innerText};`;
+
+	// LIFE
+	const life = planet.querySelector('#life');
+	const getLifePrompt = (life) => {
+		switch (life) {
+			case 1: return 'Abiotic';
+			case 2: return 'Prokaryotic';
+			case 3: return 'Multicellular';
+			case 4: return 'Complex';
+			case 5: return 'Civilization';
+
+			default: return 'No life';
+		}
+	};
+	const lifePrompt = getLifePrompt(body.life);
+	life.innerText = lifePrompt;
 
 	// ====== OCEAN ======
 
@@ -129,8 +151,11 @@ export default function generatePlanetProfile(body) {
 
 		// OCEAN COVER
 		const oceanCover = planet.querySelector('#oceanCover');
+		const oceanCoverBar = planet.querySelector('#oceanCoverBar');
 		const oceanCoverPercent = body.oceanCover * 100;
 		oceanCover.innerText = (oceanCoverPercent < 100 ? oceanCoverPercent.toPrecision(2) : oceanCoverPercent.toFixed(0)) + '%';
+		oceanCoverBar.style = `width: ${oceanCover.innerText};`;
+
 
 		// OCEAN DEPTH
 		const oceanDepth = planet.querySelector('#oceanDepth');
@@ -278,13 +303,36 @@ export default function generatePlanetProfile(body) {
 	const illumination = 1 / (body.genData.sma_norm ** 2) * 100;
 	lightIntensity.innerText = (illumination > 100 ? illumination.toFixed(1) : illumination.toPrecision(3)) + '%';
 
+	const starDistance2 = planet.querySelector('#starDistance2');
+	const starDistanceEff2 = planet.querySelector('#starDistanceEff2');
+	const lightIntensity2 = planet.querySelector('#lightIntensity2');
+
+	if (body.genData.secondStar !== null) {
+		starDistance2.innerText = (body.genData.secondStarSmaNorm * Math.sqrt(body.genData.secondStar.luminosity)).toPrecision(3) + ' AU';
+
+		starDistanceEff2.innerText = (body.genData.secondStarSmaNorm).toPrecision(3) + ' AU☉';
+
+		const illumination2 = 1 / (body.genData.secondStarSmaNorm ** 2) * 100;
+		lightIntensity2.innerText = (illumination2 > 100 ? illumination2.toFixed(1) : illumination2.toPrecision(3)) + '%';
+	}
+	else {
+		starDistance2.parentNode.parentNode.remove();
+		starDistanceEff2.parentNode.parentNode.remove();
+		lightIntensity2.parentNode.parentNode.remove();
+	}
+
 	// ====== ATMOSPHERE ======
 	const atmosphereSection = planet.querySelector('#atmosphereSection');
 	if (body.type === T.planetTypes.Terrestrial) {
-		if (body.atmosphere.pressure > 0) {
+		if (body.atmosphere.pressure.value > 0) {
 			// ATMOSPHERE PRESSURE
-			const atmospherePressure = planet.querySelector('#atmospherePressure');
-			atmospherePressure.innerText = (body.atmosphere.pressure).toPrecision(2) + ' atm';
+			const atmospherePressureAtm = planet.querySelector('#atmospherePressureAtm');
+			const atm = body.atmosphere.pressure.as(T.units.Press.atm);
+			atmospherePressureAtm.innerText = (atm < 1 ? atm.toPrecision(2) : atm.toFixed(2)) + ' atm';
+
+			const atmospherePressurePa = planet.querySelector('#atmospherePressurePa');
+			const pa = body.atmosphere.pressure.as(T.units.Press.Pa);
+			atmospherePressurePa.innerText = (pa < 1 ? pa.toPrecision(2) : pa.toFixed(2)) + ' Pa';
 
 			// ATMOSPHERE MASS
 			const atmosphereMass = planet.querySelector('#atmosphereMass');
@@ -295,21 +343,33 @@ export default function generatePlanetProfile(body) {
 
 			// SCALE HEIGHT
 			const scaleHeight = planet.querySelector('#scaleHeight');
-			scaleHeight.innerText = body.atmosphere.scaleHeight.toFixed(1) + ' km';
-
-			// CLOUD COVER
-			const cloudCover = planet.querySelector('#cloudCover');
-			const cloudCoverPercent = body.atmosphere.cloudCover * 100
-			cloudCover.innerText = (cloudCoverPercent < 100 ? cloudCoverPercent.toPrecision(2) : cloudCoverPercent.toFixed(0)) + '%';
-
+			scaleHeight.innerText = (body.atmosphere.scaleHeight.as(T.units.Dist.km)).toFixed(1) + ' km';
+			
 			// ATMOSPHERE COMPOSITION
 			const compositionAtmosphere = planet.querySelector('#compositionAtmosphere');
 			const tableHeader = document.createElement('tr');
 			tableHeader.innerHTML = '<th colspan="2">Atmosphere composition</th>';
 			compositionAtmosphere.appendChild(tableHeader);
 
+			const compositionBarRow = document.createElement('tr');
+			compositionAtmosphere.appendChild(compositionBarRow);
+
+			const compositionBarCell = document.createElement('td');
+			compositionBarCell.setAttribute('colspan', '2');
+			compositionBarRow.appendChild(compositionBarCell);
+
+			const compositionBar = document.createElement('span');
+			compositionBar.classList.add('progressbar');
+			compositionBar.style = 'width: 100%;';
+			compositionBarCell.appendChild(compositionBar);
+
+			let gasCount = 0;
+			const gasesNumber = Object.keys(body.atmosphere.composition).length;
 			for (const gas in body.atmosphere.composition) {
+				const col = ((gasesNumber - gasCount) / gasesNumber * 360).toFixed(0);
+
 				const row = document.createElement('tr');
+				row.style.backgroundColor = `hsl(${col}deg, 50%, 50%, 50%)`;
 				compositionAtmosphere.appendChild(row);
 
 				const header = document.createElement('th');
@@ -324,6 +384,14 @@ export default function generatePlanetProfile(body) {
 				
 				header_span.innerText = gas;
 				cell_span.innerText = (body.atmosphere.composition[gas] * 100).toPrecision(2) + '%';
+
+				const barComponent = document.createElement('span');
+				barComponent.classList.add('progressbar-fill');
+				barComponent.style.width = `${cell_span.innerText}`;
+				barComponent.style.backgroundColor = `hsl(${col}deg, 67%, 67%)`;
+				compositionBar.appendChild(barComponent);
+
+				gasCount++;
 			}
 
 			const molarMassRow = document.createElement('tr');
@@ -411,7 +479,7 @@ export default function generatePlanetProfile(body) {
 	const magneticFieldLost = planet.querySelector('#magneticFieldLost');
 	if (body.magnetosphereLost.value !== Infinity) {
 		const lossMomentFit = utils.getFittingValue(
-			new T.Value(body.age.as(T.units.Time.y) - body.magnetosphereLost.as(T.units.Time.y), T.units.Time.y) ,
+			new T.Value(body.age.as(T.units.Time.y) - body.magnetosphereLost.as(T.units.Time.y), T.units.Time.y),
 			T.units.Time.s,
 			[
 				T.units.Time.y, 
@@ -429,6 +497,39 @@ export default function generatePlanetProfile(body) {
 	}
 	else {
 		magneticFieldLost.remove();
+	}
+
+	const history = planet.querySelector('#history');
+	const lifeHistory = planet.querySelector('#lifeHistory');
+	if (body.lifeHistory.size > 0) {
+		for (const [stage, moment] of body.lifeHistory) {
+			const historyRow = document.createElement('tr');
+
+			const lifeStage = document.createElement('th');
+			lifeStage.innerText = stage;
+			historyRow.appendChild(lifeStage);
+
+			const timestamp = document.createElement('td');
+			const lifeEmergence = new T.Value(body.age.as(T.units.Time.My) - moment, T.units.Time.My);
+			const lifeEmergenceFit = utils.getFittingValue(
+				lifeEmergence,
+				T.units.Time.s,
+				[
+					T.units.Time.y, 
+					T.units.Time.My, 
+					T.units.Time.Gy,
+					T.units.Time.Ty
+				],
+				0.5
+			);
+			timestamp.innerText = `${lifeEmergenceFit.value.toFixed(2)} ${lifeEmergenceFit.unit} ago`;
+			historyRow.appendChild(timestamp);
+
+			history.appendChild(historyRow);
+		}
+	}
+	else {
+		lifeHistory.remove();
 	}
 
 	// ---------

@@ -1,6 +1,7 @@
 
 import {events, eventBus} from "../utils/eventbus.js";
 import * as settings from "./settings.js";
+import {saveDocument} from "./document.js";
 
 const tabContent = document.querySelectorAll('.tabContent');
 const tabButtons = document.querySelectorAll('.tabButton');
@@ -57,6 +58,21 @@ function handleButtonClick(button) {
 			break;
 		}
 
+		case 'document': {
+			saveDocument();
+			break;
+		}
+
+		case 'save': {
+
+			break;
+		}
+
+		case 'load': {
+
+			break;
+		}
+
 		case 'navigation': 
 		case 'inspector': {
 			button.innerHTML = button.classList.contains('on')
@@ -78,20 +94,46 @@ function handleButtonClick(button) {
 		case 'setting_showStarsCorona':
 		case 'setting_trueStarsRotation':
 		case 'setting_applyScaling':
-		case 'setting_showMarkers':
 		case 'setting_keepUIVisibile': {
 			eventBus.emit('UI:SettingToggle', { setting: button.name, value: button.classList.contains('on') });
+			break;
+		}
+		
+		case 'setting_showMarkers': {
+			switch (Number(button.dataset.currentSetting)) {
+				case 0: button.innerHTML = '⚫'; break;
+				case 1: button.innerHTML = '📃'; break;
+				case 2: button.innerHTML = '🏷️'; break;
+			}
+			eventBus.emit('UI:SettingToggle', { setting: button.name, value: Number(button.dataset.currentSetting) });
 			break;
 		}
 
 		case 'setting_drawTrails': {
 			switch (Number(button.dataset.currentSetting)) {
-				case 0: button.innerHTML = '💫'; break;
-				case 1: button.innerHTML = '🌠'; break;
-				case 2: button.innerHTML = '⚫'; break;
+				case 0: button.innerHTML = '⚫'; break;
+				case 1: button.innerHTML = '💫'; break;
+				case 2: button.innerHTML = '🌠'; break;
 			}
 			eventBus.emit('UI:SettingToggle', { setting: button.name, value: Number(button.dataset.currentSetting) });
 			break;
 		}
 	}
 }
+
+const defaultUrl = `https://github.com/RedReaper420/apoapsis`;
+
+const outboundUrlPrompt = document.getElementById('outboundPage');
+const outboundButton = document.getElementById('outboundButton');
+
+const req = new Request('../../home_url.txt');
+window.fetch(req)
+.then(response => {
+	return response.ok
+		? response.text()
+		: defaultUrl;
+})
+.then(response => {
+	outboundUrlPrompt.innerText = response;
+	outboundButton.href = response;
+});

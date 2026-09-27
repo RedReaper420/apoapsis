@@ -56,7 +56,7 @@ export default function generateStarProfile(body) {
 
 	// DENSITY
 	const density = star.querySelector('#density');
-	density.innerText = body.density.toFixed(3) + ' g/cm³';
+	density.innerText = (body.density.as(T.units.Dens.g_cm3)).toFixed(3) + ' g/cm³';
 
 	// ROTATION PERIOD
 	const rotationPeriodValue = star.querySelector('#rotationPeriodValue');
@@ -150,8 +150,10 @@ export default function generateStarProfile(body) {
 
 	// LIVED FRACTION
 	const livedFraction = star.querySelector('#livedFraction');
+	const livedFractionBar = star.querySelector('#livedFractionBar');
 	const livedPercent = body.age.as(T.units.Time.s) / body.lifespan.as(T.units.Time.s) * 100;
 	livedFraction.innerText = livedPercent.toFixed(2) + '%';
+	livedFractionBar.style = `width: ${livedFraction.innerText};`;
 
 	// METALLICITY
 	const metallicity = star.querySelector('#metallicity');

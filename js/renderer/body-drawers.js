@@ -1,9 +1,9 @@
 
 import * as T from "../data/types.js";
-import * as utils from "../utils/utils.js";
 
 import drawTrail from "./body-drawers/trail.js";
 import drawOrbit from "./body-drawers/orbit.js";
+import drawHint from "./body-drawers/hint.js";
 
 import drawHabitableZone from "./body-drawers/habitable-zone.js";
 import drawMagneticField from "./body-drawers/magnetic-field.js";
@@ -51,7 +51,7 @@ function drawBody() {
 	this.sim.radius_vis = this.sim.radius / rend.metersPerPixel;
 	this.sim.radius_atm_vis = this.sim.radius_atm / rend.metersPerPixel;
 	this.sim.system_vis = this.systemRadius / rend.metersPerPixel;
-	this.sim.radius_vis_scaled = Math.log10(1.0 + (this.sim.radius / 1000) * 0.1);
+	this.sim.radius_vis_scaled = this instanceof T.Binary ? 0.5 : Math.log10(1.0 + (this.sim.radius / 1000) * 0.1);
 
 	if (!rend.setting_showAtmospheres)
 		this.sim.radius_atm_vis = (this.sim.radius + 1) / rend.metersPerPixel;
@@ -61,15 +61,15 @@ function drawBody() {
 
 	switch (rend.setting_drawTrails) {
 		case 0:
+			// No orbit, no trail
+			break;
+		case 1:
 			// Orbit
 			this.drawOrbit();
 			break;
-		case 1:
+		case 2:
 			// Trail
 			this.drawTrail();
-			break;
-		case 2:
-			// No orbit, no trail
 			break;
 	}
 
@@ -113,13 +113,16 @@ function drawBody() {
 	/*
 	// System outline
 	if (this.sim.isSystem) {
-		const opacity = 0.1 + 0.4 * Math.min(1, rend.metersPerPixel / (rend.systemBroadViewScale * 2));
-		ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
-		ctx.lineWidth = 1;
-		ctx.beginPath();
-			ctx.arc(coords.x, coords.y, this.sim.system_vis * 1.25, 0, Math.PI * 2);
-		ctx.closePath();
-		ctx.stroke();
+		ctx.save();
+			ctx.setLineDash([5, 5]);
+			const opacity = 0.1 + 0.4 * Math.min(1, rend.metersPerPixel / (rend.systemBroadViewScale * 2));
+			ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+			ctx.lineWidth = 1;
+			ctx.beginPath();
+				ctx.arc(coords.x, coords.y, this.sim.system_vis * 1.25, 0, Math.PI * 2);
+			ctx.closePath();
+			ctx.stroke();
+		ctx.restore();
 	}
 	*/
 
@@ -127,7 +130,7 @@ function drawBody() {
 	const visualRadius = Math.max(this.sim.radius_vis, this.sim.radius_vis_scaled);
 	ctx.save();
 		if ((rend.trackedBody === this) || (this.sim.hover)) {
-			ctx.setLineDash(((rend.trackedBody === this) < (this.sim.hover)) ? [3, 3] : []);
+			ctx.setLineDash(((rend.trackedBody === this) < this.sim.hover) ? [3, 3] : []);
 			ctx.strokeStyle = 'rgba(255,255,255,0.4)';
 			ctx.lineWidth = 1;
 			ctx.beginPath();
@@ -138,59 +141,4 @@ function drawBody() {
 	ctx.restore();
 
 	this.drawHint();
-}
-
-function drawHint() {
-	const coords = this.position.screen;
-	const rend = this.renderer;
-	const canvas = rend.canvas;
-	const ctx = rend.ctx;
-
-	if ((this.sim.hover === false) && (rend.trackedBody !== this))
-		return;
-	
-	ctx.fillStyle = 'rgba(15, 15, 25, 0.85)';
-	ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-	ctx.lineWidth = 1;
-	
-	const hintX = coords.x + Math.max(this.sim.radius_vis_scaled, this.sim.radius_vis) + 30;
-	const hintY = coords.y - 30;
-	const width = 160;
-	const height = 62;
-
-	ctx.fillRect(hintX, hintY, width, height);
-	ctx.strokeRect(hintX, hintY, width, height);
-
-	ctx.fillStyle = '#fff';
-	ctx.font = 'bold 12px sans-serif';
-	ctx.fillText(this.name, hintX + 8, hintY + 18);
-
-	ctx.fillStyle = '#aaa';
-	ctx.font = '10px sans-serif';
-	ctx.fillText(`Class: ${this.type}`, hintX + 8, hintY + 34);
-	
-	const getUnit = (body) => {
-		if (body instanceof T.Binary)
-			return getUnit(body.primary);
-
-		if (body instanceof T.Star)
-			return { unit: T.units.Mass.M_Sun, char: '☉' };
-		else {
-			if (body.genData.isMoon) {
-				if (body.genData.moonType !== T.moonTypes.Binary) {
-					return { unit: T.units.Mass.M_Moon, char: '☾' };
-				}
-			}
-			
-			if (body.mass.as(T.units.Mass.M_Earth) < 60)
-				return { unit: T.units.Mass.M_Earth, char: '⊕' };
-			else
-				return { unit: T.units.Mass.M_Jupiter, char: '♃' };
-		}
-	};
-	const unit = getUnit(this);
-	const mass = this.mass.as(unit.unit);
-	const massString = `${mass.toFixed(mass < 0.01 ? 3 : 2)} M${unit.char}`;
-	
-	ctx.fillText(`Mass: ${massString}`, hintX + 8, hintY + 48);
 }

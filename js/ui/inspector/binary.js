@@ -58,8 +58,10 @@ export default function generateBinaryProfile(body) {
 
 	// BINARY MASS RATIO
 	const binaryMassRatio = binary.querySelector('#binaryMassRatio');
+	const binaryMassRatioBar = binary.querySelector('#binaryMassRatioBar');
 	const binaryRatio = body.primary.mass.as(T.units.Mass.kg) / body.mass.as(T.units.Mass.kg) ;
 	binaryMassRatio.innerText = binaryRatio.toFixed(2) + '+' + (1 - binaryRatio).toFixed(2);
+	binaryMassRatioBar.style.width = (binaryRatio * 100).toFixed(2) + '%';
 	
 	// ====== ORBIT ======
 

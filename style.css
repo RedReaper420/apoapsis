@@ -2,7 +2,7 @@
 :root {
     --col-main: hsl(41, 100%, 87%);
 	--col-main-dim: hsl(41, 62%, 70%, 50%);
-	--col-alt: hsl(0, 0%, 100%);
+	--col-alt: hsl(41, 100%, 95%);
     --col-background: #0808087f;
 
 	--transition-speed-fast:   0.25s;
@@ -44,6 +44,8 @@ html {
 	color: var(--col-main);
 
     background-color: #090909;
+	
+	scrollbar-color: var(--col-main) var(--col-background);
 
 	scroll-behavior: smooth;
 	box-sizing: border-box;
@@ -545,7 +547,6 @@ button {
 .tabContent {
 	display: none;
 	padding: 0.5em 1em;
-	text-align: center;
 
 	background-color: var(--col-background);
 	border: 1px solid var(--col-main-dim);
@@ -562,7 +563,7 @@ button {
 hr {
 	height: 1px;
 	border: none;
-	margin: 0.5em 0;
+	margin: 1em 0;
 	background: linear-gradient(to right, transparent 0%, var(--col-main) 50%, transparent 100%);
 }
 
@@ -617,4 +618,89 @@ button,
 		cursor: pointer;
 		filter: brightness(1.25);
 	}
+}
+
+a {
+	color: var(--col-alt);
+}
+
+dialog {
+	color: var(--col-main);
+
+	background-color: var(--col-background);
+
+	border: 1px solid var(--col-main);
+	border-radius: var(--corner-radius-big);
+
+	&::backdrop {
+		background-color: rgba(0, 0, 0, 50%);
+	}
+}
+
+.dialog-title {
+	font-size: large;
+	font-weight: bold;
+	text-align: center;
+}
+
+.dialog-body {
+	text-align: center;
+}
+
+.dialog-buttons {
+	display: flex;
+	gap: 3em;
+	align-items: center;
+	align-content: center;
+	justify-content: center;
+}
+
+#outboundPage {
+	font-family: 'Courier New', Courier, monospace;
+	color: var(--col-alt);
+	background-color: hsl(0, 0%, 20%);
+}
+
+.progressbar {
+	display: inline-flex;
+	justify-content: space-between;
+	overflow: hidden;
+	width: 50%;
+	height: 0.5em;
+	background-color: var(--col-background);
+	border: 1px solid var(--col-main);
+	border-radius: var(--corner-radius);
+}
+
+.progressbar-fill {
+	width: 0%;
+	background-color: var(--col-main);
+}
+
+.reset {
+	font-size: 80%;
+}
+
+input[type="number"], input[type="text"]
+{
+	width: 9em;
+
+	color: var(--col-main);
+	background-color: var(--col-background);
+
+	border: 1px solid var(--col-main-dim);
+	border-radius: var(--corner-radius);
+
+	transition: var(--transition-speed-fast);
+
+	&:hover {
+		border-color: var(--col-alt);
+	}
+}
+
+.setting-container {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	margin: 0.5em 0;
 }

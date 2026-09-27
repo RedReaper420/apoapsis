@@ -32,21 +32,31 @@ class Renderer {
 		this.simTimeSeconds = 0;
 		this.timeMultiplier = 86400;
 		this.pause = false;
+
 		this.currentSystem = null;
 		this.bodyList = [];
 		this.systemMaxRadius = 0;
 
+		window.apoapsis_system = null;
+
 		// -- Camera / Interaction State --
 		this.trackedBody = null;
+
 		this.cameraPosition = { x: 0, y: 0, z: 0, }
 		this.targetCameraPosition = { x: 0, y: 0, z: 0, }
 		this.cameraPositionTransition = 0;
+
 		this.systemBroadViewScale = 1;
 		this.metersPerPixel = 1;
 		this.targetMetersPerPixel = 1;
+
 		this.hoverThreshold = 30;
 		this.cursorX = Infinity;
 		this.cursorY = Infinity;
+
+		this.uiElements = Array.from(document.getElementsByClassName('ui'));
+		this.idle = 0;
+		this.idleMax = 1.0;
 
 		this.setting_enableLighting = true;
 		this.setting_applyHDR = true;
@@ -57,15 +67,10 @@ class Renderer {
 		this.setting_trueStarsRotation = true;
 		this.setting_showGrid = false;
 		this.setting_applyScaling = true;
-		this.setting_showMarkers = true;
-
-		this.setting_drawTrails = 0;
-
 		this.setting_keepUIVisibile = true;
-		this.idle = 0;
-		this.idleMax = 1.0;
 
-		this.uiElements = Array.from(document.getElementsByClassName('ui'));
+		this.setting_showMarkers = 1;
+		this.setting_drawTrails = 1;
 
 		// --- System Generation ---
 		eventBus.on(events.Generator.Generation.Completed, (cb) => {
@@ -84,16 +89,6 @@ class Renderer {
 		// --- Interaction / Click Event ---
 		this.canvas.addEventListener('click', (e) => { this.handleClick(e) });
 
-		// --- Mouse Scroll Zoom Feature ---
-		this.canvas.addEventListener('wheel', (e) => { this.handleWheel(e) }, { passive: false });
-		this.canvas.addEventListener('mousemove', (e) => { this.onMouseMove(e) });
-
-		// --- Main Animation Frame Engine ---
-		this.lastRealTime = 0;
-		// Start sequence
-		this.updateWarpSpeed();
-		requestAnimationFrame((timestamp) => this.loop(timestamp));
-
 		eventBus.on('UI:SettingToggle', (cb) => { 
 			this[cb.setting] = cb.value; 
 		});
@@ -111,21 +106,34 @@ class Renderer {
 
 		});
 		this.trackedBodyElement = null;
+
+		// --- Mouse Scroll Zoom Feature ---
+		this.canvas.addEventListener('wheel', (e) => { this.handleWheel(e) }, { passive: false });
+		this.canvas.addEventListener('mousemove', (e) => { this.onMouseMove(e) });
+
+		// --- Main Animation Frame Engine ---
+		this.lastRealTime = 0;
+
+		// Start sequence
+		this.updateWarpSpeed();
+		requestAnimationFrame((timestamp) => this.loop(timestamp));
 	}
-
-
-
+	
 	// --- System Generation ---
 	generateSystem(system) {
+		// System reset
 		this.simTimeSeconds = 0;
 		this.currentSystem = system;
 		this.bodyList.length = 0;
 		this.trackedBody = null;
 		this.trackedBodyElement = null;
+		window.apoapsis_system = this.currentSystem;
 
+		// Inspector flush
 		const inspectorEl = document.getElementById('inspector');
 		inspectorEl.innerHTML = '';
 
+		// Recursive function that calculates the system's radius
 		const scan = (body) => {
 			let sma_max = 0;
 
@@ -149,29 +157,33 @@ class Renderer {
 			return sma_max;
 		}
 
+		// Setting the system's total radius
 		const minRadius = this.currentSystem.bodies[0].radius.as(T.units.Dist.m) * 10;
 		this.systemMaxRadius = Math.max(minRadius, scan(this.currentSystem.bodies[0]));
 
+		// Setting the scale
 		const minScreenDimension = Math.min(this.canvas.width, this.canvas.height);
-		let bodyCount = 0;
 		this.systemBroadViewScale = (this.systemMaxRadius * 2 * 1.25) / minScreenDimension;
 		this.targetMetersPerPixel = this.systemBroadViewScale;
 		this.metersPerPixel = this.systemBroadViewScale;
 
-		let bodyIdCount = 0;
-		const initBodies = (body) => {
+		let bodyCount = 0; // Body counter for user to show: not includes binary containers
+		let bodyIdCount = 0; // Body counter for internal use: counts all bodies, including binary containers
 
+		// Recursive function that prepares bodies for rendering, generates profiles, and makes a navigation list
+		const initBodies = (body) => {
 			body.position = {
 				local: { x: 0, y: 0, z: 0 },
 				absolute: { x: 0, y: 0, z: 0 },
 				relative: { x: 0, y: 0, z: 0 },
 				screen: { x: 0, y: 0, z: 0 }
 			}
+
 			body.sim = {
 				radius: body.radius.as(T.units.Dist.m),
 				radius_atm: (body instanceof T.Planet)
 					? Math.max(
-							body.radius.as(T.units.Dist.m) + (body.atmosphere.scaleHeight * 3.5 * 1000),
+							body.radius.as(T.units.Dist.m) + (body.atmosphere.scaleHeight.as(T.units.Dist.m) * 3.5),
 							body.radius.as(T.units.Dist.m) + 1
 						)
 					: 0,
@@ -182,10 +194,10 @@ class Renderer {
 				isSystem: false,
 				islandMap: generateIslandMap(body.oceanColor || '#00000000', body.color, body.oceanCoverVisual || '0', body.landscape || undefined),
 			}
+
 			setDrawFunctions(body, this);
 
 			const listItem = document.createElement('li');
-
 			const bodyMark = document.createElement('span');
 			bodyMark.classList.add('body', body instanceof T.Binary
 				? 'binary'
@@ -198,6 +210,7 @@ class Renderer {
 			bodyMark.innerText = `${body.name}`;
 			listItem.appendChild(bodyMark);
 
+			// Recursive calls for a body's children and a sublist construction
 			if ((body instanceof T.Binary) || (body.bodies.length > 0)) {
 				const listHolder = document.createElement('ul');
 				listItem.appendChild(listHolder);
@@ -217,24 +230,25 @@ class Renderer {
 				
 				body.bodies.forEach(child => listHolder.appendChild(initBodies(child)));
 			}
-			
-			if (!(body instanceof T.Binary))
-				bodyCount++;
-
-			this.bodyList.push(body);
 
 			bodyMark.dataset.id = String(bodyIdCount);
-			bodyIdCount++;
 			body.sim.navMark = bodyMark;
-
 			body.sim.profile = inspector.generateProfile(body);
+			
+			// ID incrementation
+			if (!(body instanceof T.Binary)) bodyCount++;
+			bodyIdCount++;
+
+			this.bodyList.push(body);
 
 			return listItem;
 		}
 
+		// Preparing bodies for rendering and making the navigation list
 		this.bodyListElement.innerHTML = '';
 		this.bodyListElement.appendChild(initBodies(this.currentSystem.bodies[0]));
 
+		// System general info fill in
 		document.getElementById('systemType').innerText = system.type;
 		document.getElementById('systemTotalBodies').innerText = bodyCount;
 		document.getElementById('systemMaxRadius').innerText = new T.Value(this.systemMaxRadius, T.units.Dist.m).as(T.units.Dist.AU).toFixed(1);
@@ -338,15 +352,6 @@ class Renderer {
 	 * @param {PointerEvent} e 
 	 */
 	handleClick(e) {
-		// Check if clicked element was inside UI panel bounding rect
-		/*
-		const uiPanel = document.getElementById('ui-panel');
-		const rect = uiPanel.getBoundingClientRect();
-		if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-			return; 
-		}
-		*/
-
 		let clickedBody = null;
 		let closestDist = this.hoverThreshold; // Click selection radius in pixels
 
@@ -382,6 +387,7 @@ class Renderer {
 	focusOnBody(body, refocus = false) {
 		if (this.trackedBodyElement !== null)
 			this.trackedBodyElement.classList.remove('active');
+		
 		this.trackedBodyElement = body.sim.navMark;
 		this.trackedBodyElement.classList.add('active');
 
@@ -422,11 +428,11 @@ class Renderer {
 		const zoomFactor = e.deltaY < 0 ? 0.97 : 1.03;
 		
 		// Scale the target metric
-		let nextZoom = this.targetMetersPerPixel ** zoomFactor;
+		let nextZoom = Math.pow(this.targetMetersPerPixel, zoomFactor);
 
-		// Boundary constraints: Prevents scrolling infinitely outwards or breaking floating math limit boundaries
-		const maxZoomOut = this.systemBroadViewScale * 4;
+		// Boundary constraints
 		const maxZoomIn = 10 * 1000; 
+		const maxZoomOut = this.systemBroadViewScale * 4;
 
 		this.targetMetersPerPixel = utils.clamp(nextZoom, maxZoomIn, maxZoomOut);
 	}
@@ -453,6 +459,72 @@ class Renderer {
 		this.cameraPosition.z += (this.targetCameraPosition.z - this.cameraPosition.z) * this.cameraPositionTransition;
 	}
 
+	drawGrid() {
+		if (this.idle === this.idleMax)
+			return;
+
+		this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+		const cellSize = 100;
+		const cam_x = (-this.cameraPosition.x / this.metersPerPixel) % cellSize;
+		const cam_y = (this.cameraPosition.y / this.metersPerPixel) % cellSize;
+
+		if (this.setting_showGrid) {
+			// Vertical lines
+			for (let i = -Math.ceil(this.canvas.width / cellSize / 2); i <= Math.ceil(this.canvas.width / cellSize / 2); i++) {
+				this.ctx.beginPath();
+				const pos_x = this.canvas.width / 2 + i * cellSize + cam_x;
+				const pos_y1 = -this.canvas.height / 2 + -cellSize + cam_y;
+				const pos_y2 = this.canvas.height + cellSize + cam_y;
+				this.ctx.moveTo(pos_x, pos_y1);
+				this.ctx.lineTo(pos_x, pos_y2);
+				this.ctx.stroke();
+			}
+
+			// Horizontal lines
+			for (let j = -Math.ceil(this.canvas.height / cellSize / 2); j <= Math.ceil(this.canvas.height / cellSize / 2); j++) {
+				this.ctx.beginPath();
+				const pos_x1 = -this.canvas.width / 2 + -cellSize + cam_x;
+				const pos_x2 = this.canvas.width + cellSize + cam_x;
+				const pos_y = this.canvas.height / 2 + j * cellSize + cam_y;
+				this.ctx.moveTo(pos_x1, pos_y);
+				this.ctx.lineTo(pos_x2, pos_y);
+				this.ctx.stroke();
+			}
+		}
+		else {
+			// Bar of short vertical lines
+			for (let i = -Math.ceil(this.canvas.width / cellSize / 2); i <= Math.ceil(this.canvas.width / cellSize / 2); i++) {
+				this.ctx.beginPath();
+				const pos_x = this.canvas.width / 2 + i * cellSize + cam_x;
+				const pos_y1 = this.canvas.height * 0.025;
+				const pos_y2 = this.canvas.height * 0.050;
+				this.ctx.moveTo(pos_x, pos_y1);
+				this.ctx.lineTo(pos_x, pos_y2);
+				this.ctx.stroke();
+			}
+		}
+	}
+
+	updateCellScaleHint() {
+		const fittingCellScale = utils.getFittingValue(
+			new T.Value(this.metersPerPixel, T.units.Dist.m),
+			T.units.Dist.m,
+			[
+				T.units.Dist.m, 
+				T.units.Dist.km, 
+				T.units.Dist.AU, 
+				T.units.Dist.ly
+			],
+			(1/100) * 0.1
+		);
+
+		const cellValue = document.getElementById('cellValue');
+		cellValue.innerText = (fittingCellScale.value * 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+		const cellUnit = document.getElementById('cellUnit');
+		cellUnit.innerText = fittingCellScale.unit;
+	}
+
 	loop(timestamp) {
 		if (!this.lastRealTime) this.lastRealTime = timestamp;
 		let realDt = (timestamp - this.lastRealTime) / 1000;
@@ -462,9 +534,7 @@ class Renderer {
 		const simDt = realDt * this.timeMultiplier;
 		this.simTimeSeconds += simDt * (!this.pause);
 
-		if (this.setting_keepUIVisibile) this.idle = 0;
-		else this.idle = Math.min(this.idleMax, this.idle + realDt);
-
+		this.idle = this.setting_keepUIVisibile ? 0 : Math.min(this.idleMax, this.idle + realDt);
 		if (this.idle === this.idleMax)
 			this.uiElements.forEach(el => { el.classList.add('hidden'); });
 		else
@@ -473,10 +543,11 @@ class Renderer {
 		this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
 		
 		this.updateAbsolutePositions();
-
 		this.updateCamera(realDt);
-
 		this.updateRelativePositions();
+		
+		this.drawGrid();
+		this.updateCellScaleHint();
 
 		let closestDist = this.hoverThreshold; // Click selection radius in pixels
 		let hoveredBody = null;
@@ -498,56 +569,8 @@ class Renderer {
 			this.bodyList.forEach(body => {
 			body.drawBody();
 		});
-
-		if (this.setting_showGrid)
-			this.drawGrid();
-
-		const fittingCellScale = utils.getFittingValue(
-			new T.Value(this.metersPerPixel, T.units.Dist.m),
-			T.units.Dist.m,
-			[
-				T.units.Dist.m, 
-				T.units.Dist.km, 
-				T.units.Dist.AU, 
-				T.units.Dist.ly
-			],
-			(1/100) * 0.1
-		);
-
-		const cellValue = document.getElementById('cellValue');
-		cellValue.innerText = (fittingCellScale.value * 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-
-		const cellUnit = document.getElementById('cellUnit');
-		cellUnit.innerText = fittingCellScale.unit;
 		
 		requestAnimationFrame((timestamp) => this.loop(timestamp));
-	}
-
-	drawGrid() {
-		this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-		const cellSize = 100;
-		const cam_x = (-this.cameraPosition.x / this.metersPerPixel) % cellSize;
-		const cam_y = (this.cameraPosition.y / this.metersPerPixel) % cellSize;
-		
-		for (let i = -Math.ceil(this.canvas.width / cellSize / 2); i <= Math.ceil(this.canvas.width / cellSize / 2); i++) {
-			this.ctx.beginPath();
-			const pos_x = this.canvas.width / 2 + i * cellSize + cam_x;
-			const pos_y1 = -this.canvas.height / 2 + -cellSize + cam_y;
-			const pos_y2 = this.canvas.height + cellSize + cam_y;
-			this.ctx.moveTo(pos_x, pos_y1);
-			this.ctx.lineTo(pos_x, pos_y2);
-			this.ctx.stroke();
-		}
-		
-		for (let j = -Math.ceil(this.canvas.height / cellSize / 2); j <= Math.ceil(this.canvas.height / cellSize / 2); j++) {
-			this.ctx.beginPath();
-			const pos_x1 = -this.canvas.width / 2 + -cellSize + cam_x;
-			const pos_x2 = this.canvas.width + cellSize + cam_x;
-			const pos_y = this.canvas.height / 2 + j * cellSize + cam_y;
-			this.ctx.moveTo(pos_x1, pos_y);
-			this.ctx.lineTo(pos_x2, pos_y);
-			this.ctx.stroke();
-		}
 	}
 }
 
