@@ -29,7 +29,7 @@ export default function drawPlanet(simTime = 0) {
 			const rotation = simTime * rotationSpeed;
 			ctx.rotate(rotation % (Math.PI * 2));
 
-			const scale = (2 * this.sim.radius_vis / this.sim.islandMap.width);
+			const scale = (2.1 * this.sim.radius_vis / this.sim.islandMap.width);
 			ctx.scale(scale, scale);
 
 			ctx.globalCompositeOperation = 'source-atop';

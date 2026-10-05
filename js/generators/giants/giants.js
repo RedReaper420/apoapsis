@@ -39,7 +39,10 @@ export function makeGasGiant(planet) {
 	if (coreToCritRatio >= 0.5) {
 		if (prng() < giantProbability) {
 			if (planet.genData.isMoon) {
-				if (isIceGiant !== (planet.parentBody.type === T.planetTypes.IceGiant)) {
+				const parentType = planet.genData.moonType === T.moonTypes.Binary
+					? planet.genData.companion.type
+					: planet.parentBody.type;
+				if (isIceGiant !== (parentType === T.planetTypes.IceGiant)) {
 					// Converting a binary companion to the same giant type as the host with a 50% chance.
 					if (prng() < 0.5) isIceGiant = !isIceGiant;
 				}
@@ -101,7 +104,7 @@ export function makeGasGiant(planet) {
 	
 	let envelopeIceFraction = isIceGiant
 		? prng.range(0.65, 0.85)
-		: prng.range(0.05, 0.15);
+		: prng.range(0.05, 0.15) * Math.pow(Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) / consts.PHY_DIST_SNOW_LINE, 2);
 	
 	if (envelopeMass > 0) {
 		if ((coreMass + envelopeMass) >= consts.DEF_BROWN_DWARF_MASS_THRESHOLD) {
@@ -207,7 +210,7 @@ export function assumeAlbedo(planet) {
 export function setDummyAtmosphere(planet) {
 	planet.atmosphere = {
 		scaleHeight: new T.Value(planet.radius.value * 0.05, planet.radius.unit),
-		pressure: new T.Value(0.5, T.units.Press.atm),
+		pressure: new T.Value(1, T.units.Press.atm),
 		composition: { }
 	}
 	planet.temperature_eff = new T.Value(planet.temperature.value, planet.temperature.unit);
@@ -258,7 +261,6 @@ export function setColor(planet) {
 				CH4: 0.10,
 				NH3: 0.05,
 			};
-			planet.atmosphere.pressure.value *= 0.5;
 		}
 		else if (temp >= 150) {
 			planet.atmosphere.composition = {

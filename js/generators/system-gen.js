@@ -1,7 +1,11 @@
 
-import {events, eventBus} from "../utils/eventbus.js";
+import "../dependencies/cycle.js";
+
+import eventBus from "../dependencies/event-bus.js";
+import events from "../data/events.js";
 
 import prng from "../utils/prng.js";
+import * as utils from "../utils/utils.js";
 import * as T from "../data/types.js";
 import consts from "../data/consts.js";
 
@@ -11,22 +15,41 @@ import * as migrationSim from "./migration-sim.js";
 import * as planetGen from "./planet-gen.js";
 import * as moonSystemGen from "./moon-system-gen.js";
 
+const seedInput = document.getElementById('gen_seed');
+
 class SystemGenerator {
 	constructor(
-		settings = new T.GenerationSettings()
+		settings = new T.GeneratorSettings()
 	) {
 		this.settings = settings;
 
+		// Fallback seed generation setup
+		this.fallbackSeed = false;
+		try {
+			// window.crypto.randomUUID() is available only with a secure connection
+			const seedTest = window.crypto.randomUUID();
+		}
+		catch (error) {
+			this.fallbackSeed = true;
+			console.error(error);
+			console.warn('Unable to generate seeds normally, switching to fallback method.');
+		}
+		this.feedback = ['🔺', '🟡', '🔷'];
+		this.feedbackId = 0;
+
 		this.#subscribe();
-		//this.settings.seed_user = '1d425c6f-aebe-4e2e-acb4-ddc9f4bdcfab';
 	}
 
 	generate() {
-		this.settings.seed = !this.settings.seed_user ? window.crypto.randomUUID() : this.settings.seed_user;
+		const generateSeed = () => { 
+			return !this.fallbackSeed 
+				? window.crypto.randomUUID() 
+				: utils.generateFallbackSeed();
+		}
+
+		this.settings.seed = this.settings.seed_user ? this.settings.seed_user : generateSeed();
 		prng.seed(this.settings.seed);
 		this.system = new T.System(this.settings);
-
-		console.log(this.settings.seed);
 
 		/** @type {Array<T.Star|T.BinaryStar>} */
 		const stars = []; // Single stars and binary stars list
@@ -163,10 +186,8 @@ class SystemGenerator {
 			if (body.parentBody !== null) {
 				let host = body.parentBody;
 				if (body.parentBody instanceof T.Binary) {
-					if (body.parentBody.primary === body)
-						host = body.parentBody.secondary;
-					else if (body.parentBody.secondary === body)
-						host = body.parentBody.primary;
+					if (body.companion)
+						host = body.companion;
 				}
 
 				const a = body.sma.as(T.units.Dist.m);
@@ -191,40 +212,80 @@ class SystemGenerator {
 		}
 		this.system.bodies.forEach(body => { calculateOrbitalPeriodAndSpeed(body) });
 
-		const filter = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
-			if (body instanceof T.Planet) {
-				if (body.life > 3)
-					eventBus.emit('shtap');
-			}
-
-			// ---
+		const calculateSynodicDaysAndMinMaxTemps = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
+			if (!(body instanceof T.Binary)) {
+				if (body instanceof T.Planet) {
+					body.synodicDay = planetGen.calculateSynodicDay(body);
+					planetGen.setMinMaxTemperature(body);
+				}
+			} 
 
 			if (body instanceof T.Binary) {
-				filter(body.primary);
-				filter(body.secondary);
+				calculateSynodicDaysAndMinMaxTemps(body.primary);
+				calculateSynodicDaysAndMinMaxTemps(body.secondary);
 			}
 			body.bodies.forEach(child => { 
-				filter(child) 
+				calculateSynodicDaysAndMinMaxTemps(child) 
 			});
 		}
-		this.system.bodies.forEach(body => { filter(body) });
-		
-		console.log(this.system);
-		console.log('--------------------')
+		this.system.bodies.forEach(body => { calculateSynodicDaysAndMinMaxTemps(body) });
 	}
 
 	startGeneration() {
-		let gen = true;
-		let attempts = 0+999*1;
-		eventBus.on('shtap', () => { gen = false });
+		const isFilterOn = document.getElementById('enable_filter').checked;
+		const genStatus = document.getElementById('genStatus');
+		const pregen = document.getElementById('pregen').value;
+		const predicate = document.getElementById('predicate').value;
+		const postgen = document.getElementById('postgen').value;
 
-		while (gen && (attempts < 1000)) {
+		let attemptsLimit = 1000;
+		let gen = true;
+		let attempts = isFilterOn ? 0 : attemptsLimit - 1;
+		let status = false;
+
+		const finish = () => { gen = false; status = true; }
+
+		if (isFilterOn)
+			eval(pregen);
+
+		while (gen && (attempts < attemptsLimit)) {
 			this.generate();
 			attempts++;
-		}
-		console.log(attempts, gen);
 
-		eventBus.emit(events.Generator.Generation.Completed, { data: this.system });
+			const filter = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
+				eval(predicate);
+
+				// ---
+
+				if (body instanceof T.Binary) {
+					filter(body.primary);
+					filter(body.secondary);
+				}
+				body.bodies.forEach(child => { 
+					filter(child);
+				});
+			}
+			this.system.bodies.forEach(body => { filter(body) });
+		}
+
+		if (isFilterOn) {
+			genStatus.innerText = `${status ? '✅' : '❌'} (${attempts}/${attemptsLimit} attempts)`;
+
+			eval(postgen);
+		}
+		else {
+			genStatus.innerText = '✓ (no filter)';
+		}
+
+		this.feedbackId++;
+		genStatus.innerText += ` | ${this.feedback[this.feedbackId % this.feedback.length]} | ${(new Date()).toISOString()}`;
+
+		seedInput.placeholder = this.system.settings.seed;
+
+		eventBus.emit(events.Generator.Generation.Completed, { 
+			data: this.system, 
+			status: isFilterOn ? (status ? 'found' : 'not_found') : null 
+		});
 	}
 
 	// -------------------------------------------------
@@ -263,7 +324,7 @@ class SystemGenerator {
 			this.settings.star_metallicity_max = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.Star.MetallicityGaussian, (cb) => {
-			this.settings.star_metallicity_gaussian = cb.data;
+			this.settings.star_metallicity_use_gaussian = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.Star.MetallicityMean, (cb) => {
 			this.settings.star_metallicity_mean = cb.data;
@@ -279,41 +340,50 @@ class SystemGenerator {
 		// Planet orbit settings
 
 		eventBus.on(events.Generator.Settings.PlanetOrbit.sTypeSafetyFactor, (cb) => {
-			this.settings.planet_s_type_safety_factor = cb.data;
+			this.settings.planet_orbit_s_type_safety_factor = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.pTypeEnabled, (cb) => {
-			this.settings.planet_p_type_enabled = cb.data;
+			this.settings.planet_orbit_p_type_enabled = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.pTypeSafetyFactor, (cb) => {
-			this.settings.planet_p_type_safety_factor = cb.data;
+			this.settings.planet_orbit_p_type_safety_factor = cb.data;
 		});
 
 		eventBus.on(events.Generator.Settings.PlanetOrbit.type1MigrationEnabled, (cb) => {
-			this.settings.planet_migration_type_1_enabled = cb.data;
+			this.settings.planet_orbit_migration_type_1_enabled = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.type1MigrationCoeff, (cb) => {
-			this.settings.planet_migration_type_1_coeff = cb.data;
+			this.settings.planet_orbit_migration_type_1_coeff = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.type2MigrationEnabled, (cb) => {
-			this.settings.planet_migration_type_2_enabled = cb.data;
+			this.settings.planet_orbit_migration_type_2_enabled = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.type2MigrationCoeff, (cb) => {
-			this.settings.planet_migration_type_2_coeff = cb.data;
+			this.settings.planet_orbit_migration_type_2_coeff = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.migrationInterpolated, (cb) => {
-			this.settings.planet_migration_interpolated = cb.data;
+			this.settings.planet_orbit_migration_interpolated = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.grandTackChance, (cb) => {
-			this.settings.planet_migration_grand_tack_chance = cb.data;
+			this.settings.planet_orbit_migration_grand_tack_chance = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.PlanetOrbit.hillSafetyFactor, (cb) => {
-			this.settings.planet_migration_hill_safety_factor = cb.data;
+			this.settings.planet_orbit_migration_hill_safety_factor = cb.data;
 		});
 
 		// Planet settings
 		
 		eventBus.on(events.Generator.Settings.Planet.amountMultiplier, (cb) => {
 			this.settings.planet_amount_multiplier = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.Planet.bonusGiantImpactChance, (cb) => {
+			this.settings.planet_bonus_giant_impact_chance = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.Planet.maxBonusGiantImpacts, (cb) => {
+			this.settings.planet_max_bonus_giant_impacts = cb.data;
+		});
+		eventBus.on(events.Generator.Settings.Planet.binaryChance, (cb) => {
+			this.settings.planet_binary_chance = cb.data;
 		});
 		eventBus.on(events.Generator.Settings.Planet.lifeChance, (cb) => {
 			this.settings.planet_life_chance = cb.data;
@@ -322,4 +392,6 @@ class SystemGenerator {
 }
 
 const systemGenerator = new SystemGenerator();
+window.apoapsis_generator = systemGenerator;
+
 export default systemGenerator;

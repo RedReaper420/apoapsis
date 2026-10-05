@@ -1,38 +1,5 @@
 
-// Originally by Mohsen Fallahnejad (GitHub@mohsenfallahnjd)
-class EventBus {
-	constructor() { this.map = Object.create(null); }
-
-	on(event, cb) {
-		(this.map[event] ||= new Set()).add(cb);
-		return () => this.off(event, cb);       // unsubscribe helper
-	}
-
-	once(event, cb) {
-		const off = this.on(event, (p) => { off(); cb(p) });
-		return off;
-	}
-
-	off(event, cb) {
-		const set = this.map[event]; if (!set) return;
-		set.delete(cb); if (set.size === 0) delete this.map[event];
-	}
-
-	emit(event, payload) {
-		const call = (set) => set && set.forEach(fn => fn(payload));
-		// direct
-		call(this.map[event]);
-		// simple wildcard: "user:*" matches "user:login"
-		const star = event.split(':')[0] + ':*';
-		call(this.map[star]);
-	}
-}
-
-//-----------------------------------------------------------
-
-export const eventBus = new EventBus();
-
-export const events = Object.freeze({
+const events = Object.freeze({
 	Generator: Object.freeze({
 		Generation: Object.freeze({
 			Start:			'generator:generation_start',
@@ -51,7 +18,7 @@ export const events = Object.freeze({
 
 				MetallicityMin:			'settings_star_metallicity_min',
 				MetallicityMax:			'settings_star_metallicity_max',
-				MetallicityGaussian:	'settings_star_metallicity_gaussian',
+				MetallicityGaussian:	'settings_star_metallicity_use_gaussian',
 				MetallicityMean:		'settings_star_metallicity_mean',
 				MetallicityStD:			'settings_star_metallicity_std',
 
@@ -74,8 +41,23 @@ export const events = Object.freeze({
 
 			Planet: Object.freeze({
 				amountMultiplier:		'settings_planet_amount_multiplier',
+				bonusGiantImpactChance:	'settings_planet_giant_impact_chance',
+				maxBonusGiantImpacts:	'settings_planet_max_bonus_giant_impacts',
+				binaryChance: 			'settings_planet_binary_chance',
 				lifeChance:				'settings_planet_life_chance',
 			}),
 		}),
 	}),
+
+	Load: Object.freeze({
+		Settings:	'load_settings',
+		System:		'load_system',
+	}),
+
+	UI: Object.freeze({
+		ButtonClick:	'ui_button_click',
+		SettingToggle:	'ui_setting_toggle',
+	}),
 });
+
+export default events;

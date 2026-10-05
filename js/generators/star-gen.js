@@ -9,7 +9,7 @@ import * as nameGen from "./name-gen.js";
 /**
  * Generates a completely initialized Star object instance.
  * 
- * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {T.GeneratorSettings} settings - Generation settings configuration.
  * @param {T.Star|T.BinaryStar|null} constraint - Optional star instance to inherit baseline parameters from.
  * @param {number} constraintMassMult  - *[default: 1.0]* Mass modifier factor used to prevent sub-threshold star system generation (see `star-system-gen.js` -> `generateStarFormation()`).
  * 
@@ -76,7 +76,8 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 	star.color = temperatureToColor(star.temperature);
 
 	// Rotational period
-	star.rotationPeriod = getRotation(star.radius, star.mass);
+	const preliminaryAge = getLifespan(star.mass, star.luminosity, star.radius, new T.Value(28, T.units.Time.d));
+	star.rotationPeriod = getRotation(star.radius, star.mass, preliminaryAge);
 	
 	// --- 5. Lifespan & Age Progression ---
 	star.lifespan = getLifespan(star.mass, star.luminosity, star.radius, star.rotationPeriod);
@@ -84,12 +85,13 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
 		const randomAgeFraction = prng.range(0.2, 0.6);
 		const fractionAge_Gy = star.lifespan.as(T.units.Time.Gy) * randomAgeFraction;
 		
-		const flatAge_Gy = settings.star_age_unbound ? Infinity : prng.range(1.5, 15.0);
+		const flatAge_Gy = settings.star_age_unbound ? Infinity : prng.range(1.0, 10.0);
 
 		star.age = new T.Value(Math.min(fractionAge_Gy, flatAge_Gy), T.units.Time.Gy);
 	} else {
 		star.age = constraint.age;
 	}
+
 
 	// --- 6. Identity ---
 	star.name = nameGen.generate();
@@ -311,22 +313,30 @@ function getAbsMagnitude(starLuminosity) {
 }
 
 /**
- * Estimates the B-V (Blue minus Visual) color index from temperature.
- * 
+ * Estimates the B-V (Blue minus Visual) color index from temperature
+ * using Ballesteros' (2012) analytic blackbody approximation.
+ *
  * @param {T.Value} starTemperature - The effective temperature (unit: `Temp`).
  * 
  * @returns {number} B-V color index.
  */
 function getBV(starTemperature) {
-	// Ballesteros 2012 approximation inverted (T -> B-V)
-	const temperature = starTemperature.as(T.units.Temp.K);
-	
-	if (temperature >= 10000)
-		return -0.35 + (10000 - temperature) * 0.00004; // Very blue stars
+	const temp = starTemperature.as(T.units.Temp.K);
 
-	// Polynomial fit for 2300K - 10000K
-	const logT = Math.log10(temperature);
-	return 6.014 - 5.606 * logT + 1.866 * (logT**2) - 0.212 * (logT**3);
+	if (temp >= 40000) return -0.40; // Limit derived from Rayleigh-Jeans law
+
+	const C = temp / 4600.0;
+	const a = C;
+	const b = 2.32 * C - 2.0;
+	const c = 1.054 * C - 2.32;
+
+	const discriminant = (b ** 2) - 4 * a * c;
+	if (discriminant < 0) return -0.40;
+
+	const y = (-b + Math.sqrt(discriminant)) / (2 * a);
+	const bv = y / 0.92;
+	
+	return Math.max(-0.40, bv);
 }
 
 /**
@@ -384,36 +394,6 @@ export function temperatureToColor(starTemperature) {
 }
 
 /**
- * Calculates a star's rotational period based on its radius and mass.
- * 
- * @param {T.Value} starRadius - The radius of the star (unit: `Dist`).
- * @param {T.Value} starMass - The mass of the star (unit: `Mass`).
- * @returns {T.Value} The rotational period of the star (unit: `Time`).
- */
-function getRotation(starRadius, starMass) {
-	const R_Sun = starRadius.as(T.units.Dist.R_Sun);
-	const R_m = starRadius.as(T.units.Dist.m);
-	const M_m = starMass.as(T.units.Mass.kg);
-
-	// Rotational velocity approximation (km/s)
-	// Logistic function centered around the Kraft Break (R = 1.3 R☉)
-	const v_base = 2.5 + (190 / (1 + Math.exp(-9 * (R_Sun - 1.3))));
-	const randomFactor = Math.exp( utils.clamp(utils.gaussianRandom(), -3, 3) );
-
-	// Calculating critical rotational velocity while accounting flattening (Roche model)
-	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_m) / R_m); 
-
-	// Rotational velocity can't exceed 90% of critical value
-	const v_e = Math.min(v_base * randomFactor, v_crit * 0.9); 
-
-	// Calculating rotation period.
-	// v = W * R = 2piR / P
-	const P = (2 * Math.PI * R_m) / (v_e * 1000);
-
-	return new T.Value(P, T.units.Time.s);
-}
-
-/**
  * Calculates a star's lifespan based on its mass, luminosity, radius, and rotational period.
  * 
  * @param {T.Value} starMass - The mass of the star (unit: `Mass`).
@@ -425,7 +405,7 @@ function getRotation(starRadius, starMass) {
  */
 function getLifespan(starMass, starLuminosity, starRadius, starRotation) {
 	const M_Sun = starMass.as(T.units.Mass.M_Sun);
-	const M_m = starMass.as(T.units.Mass.kg);
+	const M_kg = starMass.as(T.units.Mass.kg);
 	const R_m = starRadius.as(T.units.Dist.m);
 	const P = starRotation.as(T.units.Time.s);
 
@@ -439,10 +419,51 @@ function getLifespan(starMass, starLuminosity, starRadius, starRotation) {
 	const lifespan_base = consts.PHY_SUN_LIFESPAN * (M_Sun / starLuminosity);
 
 	const v = (2 * Math.PI * R_m) / P;
-	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_m) / R_m); 
+	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_kg) / R_m); 
 	const rotationFactor = 1 + 0.2 * Math.pow(v / v_crit, 2);
 
 	const lifespan = lifespan_base * rotationFactor;
 
 	return new T.Value(lifespan, T.units.Time.Gy);
+}
+
+/**
+ * Calculates a star's rotational period based on its radius and mass.
+ * 
+ * @param {T.Value} starRadius - The radius of the star (unit: `Dist`).
+ * @param {T.Value} starMass - The mass of the star (unit: `Mass`).
+ * @param {T.Value} starAge - The age of the star (unit: `Time`).
+ * @returns {T.Value} The rotational period of the star (unit: `Time`).
+ */
+function getRotation(starRadius, starMass, starAge) {
+	const R_Sun = starRadius.as(T.units.Dist.R_Sun);
+	const R_m = starRadius.as(T.units.Dist.m);
+	const M_kg = starMass.as(T.units.Mass.kg);
+	const T_Gy = starAge.as(T.units.Time.Gy);
+
+	// Rotational velocity approximation (km/s)
+	// Logistic function centered around the Kraft Break (R = 1.35 R☉)
+	// Velocity at ZAMS
+	const v_base = 25 + (175 / (1 + Math.exp(-9 * (R_Sun - 1.35))));
+
+	// Calculating Skumanich magnetic brake
+	const tau_0 = 0.1; // Gy
+	const skumanichBrake = Math.sqrt(tau_0 / (tau_0 + T_Gy));
+	const convectionFactor = 1 / (1 + Math.exp(12 * (R_Sun - 1.35)));
+	const brakeFactor = (1 - convectionFactor) + (convectionFactor * skumanichBrake);
+
+	// Random deviation
+	const randomFactor = Math.exp( utils.clamp(utils.gaussianRandom(), -1.5, 1.5) );
+
+	// Calculating critical rotational velocity (Roche model)
+	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_kg) / R_m); 
+
+	// Calculating final rotational velocity
+	const v_e = Math.min(v_base * brakeFactor * randomFactor, v_crit * 0.9); 
+
+	// Calculating rotation period.
+	// v = W * R = 2piR / P  -->  P = 2piR / v
+	const P = (2 * Math.PI * R_m) / (v_e * 1000);
+
+	return new T.Value(P, T.units.Time.s);
 }

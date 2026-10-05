@@ -10,7 +10,7 @@ const GIANT_MASS = 60; // M⊕, mass threshold above which a planet is being acc
  * Simulates multi-body planetary migration and dynamic scattering within a decaying protoplanetary gas disk.
  * Modifies orbits, handles planetary collisions, and ejects unstable bodies.
  * 
- * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {T.GeneratorSettings} settings - Generation settings configuration.
  * @param {Array<T.Star|T.BinaryStar>} starsArray - List of tracking stars in the generated cluster.
  */
 export function simulateMigration(settings, starsArray) {
@@ -34,7 +34,7 @@ export function simulateMigration(settings, starsArray) {
 		const initialDiskDensity = 1 * Math.pow(10, star.metallicity * 0.2) * Math.pow(10, utils.randomRangeGaussian(-0.5, 0.5));
 		
 		let activeGiantsCount = 0;
-		const canActivateGrandTack = prng() < settings.planet_migration_grand_tack_chance;
+		const canActivateGrandTack = prng() < settings.planet_orbit_migration_grand_tack_chance;
 		let isGrandTackTriggered = false;
 		
 		const starAgeYears = star.age.as(T.units.Time.y);
@@ -77,7 +77,7 @@ export function simulateMigration(settings, starsArray) {
 					}
 
 					if (validNextPlanet !== null) {
-						const isLastSimulationStep = (step === totalDiscreteSteps - 1);
+						const isLastSimulationStep = step === (totalDiscreteSteps - 1);
 						resolveCloseEncounter(settings, planet, validNextPlanet, star, isLastSimulationStep);
 					}
 				}
@@ -137,7 +137,7 @@ export function simulateMigration(settings, starsArray) {
 /**
  * Applies orbital migration forces (Type I / Type II) to a single planet over a time step.
  * 
- * @param {T.GenerationSettings} settings - Generation configuration settings.
+ * @param {T.GeneratorSettings} settings - Generation configuration settings.
  * @param {T.Planet} planet - The target planet undergoing migration.
  * @param {number} diskDensity - The current density of the protoplanetary gas disk.
  * @param {number} timeStepYears - Time step duration in years (Δt).
@@ -145,18 +145,18 @@ export function simulateMigration(settings, starsArray) {
  */
 function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTackActive) {
 	// Scaled migration constants
-	const TYPE_1_COEFF = settings.planet_migration_type_1_coeff * 1e-7;
-	const TYPE_2_COEFF = settings.planet_migration_type_2_coeff * 1e-7;
+	const TYPE_1_COEFF = settings.planet_orbit_migration_type_1_coeff * 1e-7;
+	const TYPE_2_COEFF = settings.planet_orbit_migration_type_2_coeff * 1e-7;
 	const INNER_DISK_EDGE_AU = 0.05; // Inside boundary normalized to Solar units (AU☉)
 	
 	let migrationRate = 0;
 
 	// Calculate base rates (negative indicates inward migration toward the star)
-	const type1Rate = settings.planet_migration_type_1_enabled 
+	const type1Rate = settings.planet_orbit_migration_type_1_enabled 
 		? -TYPE_1_COEFF * diskDensity * planet.mass.value * timeStepYears 
 		: 0;
 		
-	const type2Rate = settings.planet_migration_type_2_enabled 
+	const type2Rate = settings.planet_orbit_migration_type_2_enabled 
 		? -TYPE_2_COEFF * diskDensity * timeStepYears 
 		: 0;
 
@@ -167,7 +167,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 	else {
 		const MASS_THRESHOLD_TYPE_1 = 15; // Planets under 15 M⊕ are strictly Type I
 
-		if (settings.planet_migration_interpolated) {
+		if (settings.planet_orbit_migration_interpolated) {
 			const MASS_THRESHOLD_TYPE_2 = 120; // Planets over 120 M⊕ (~0.4 M♃) are strictly Type II
 			
 			const migrationTypeRatio = utils.clamp(
@@ -201,7 +201,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 /**
  * Resolves close gravitational encounters, leading to mergers, ejections, or orbital shifts.
  * 
- * @param {T.GenerationSettings} settings - Context generation configuration.
+ * @param {T.GeneratorSettings} settings - Context generation configuration.
  * @param {T.Planet} planet - The primary interacting planet.
  * @param {T.Planet} nextPlanet - The adjacent encountering planet.
  * @param {T.Star|T.BinaryStar} star - Host center of gravity.
@@ -209,71 +209,71 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
  */
 function resolveCloseEncounter(settings, planet, nextPlanet, star, isFinalStep) {
 	const mutualHillSphere = getMutualHillSphere(planet, nextPlanet, star);
-	const orbitalDistanceAU = Math.abs(planet.sma.as(T.units.Dist.AU) - nextPlanet.sma.as(T.units.Dist.AU));
-	const safetyThresholdAU = mutualHillSphere.as(T.units.Dist.AU) * settings.planet_migration_hill_safety_factor;
+	const orbitalDistanceAU = Math.abs(planet.sma.as(T.units.Dist.m) - nextPlanet.sma.as(T.units.Dist.m));
+	const k = orbitalDistanceAU / mutualHillSphere.as(T.units.Dist.m);
 	
-	// If two planets are getting dangerously close, then close encounter resolving is being triggered
-	if (orbitalDistanceAU < safetyThresholdAU) {
-		const massRatio = planet.mass.as(T.units.Mass.M_Earth) / nextPlanet.mass.as(T.units.Mass.M_Earth);
-		
-		const outcomeRoll = prng();
-		const OUTCOME_MERGE = 'Merge';
-		const OUTCOME_EJECT = 'Eject';
-		const OUTCOME_SHIFT = 'Shift';
-		let determinedOutcome = OUTCOME_SHIFT;
+	if (k > settings.planet_orbit_migration_hill_safety_factor)
+		return;
 
-		if (!isFinalStep) {
-			if		(outcomeRoll < 0.2)	determinedOutcome = OUTCOME_MERGE; // 20% Merging
-			else if (outcomeRoll < 0.5) determinedOutcome = OUTCOME_EJECT; // 30% Ejection
-			else						determinedOutcome = OUTCOME_SHIFT; // 50% Scattering
-		}
-		else {
-			// Forced catastrophic finalization on the last step to ensure long-term system stability
-			determinedOutcome = outcomeRoll < 0.5 ? OUTCOME_MERGE : OUTCOME_EJECT;
-		}
+	const massRatio = planet.mass.as(T.units.Mass.M_Earth) / nextPlanet.mass.as(T.units.Mass.M_Earth);
+	
+	const outcomeRoll = prng();
+	const OUTCOME_MERGE = 'Merge';
+	const OUTCOME_EJECT = 'Eject';
+	const OUTCOME_SHIFT = 'Shift';
+	let determinedOutcome = OUTCOME_SHIFT;
 
-		switch (determinedOutcome) {
-			case OUTCOME_MERGE:
-				mergePlanets(planet, nextPlanet);
-				break;
+	if (!isFinalStep) {
+		if		(outcomeRoll < 0.2)	determinedOutcome = OUTCOME_MERGE; // 20% Merging
+		else if (outcomeRoll < 0.5) determinedOutcome = OUTCOME_EJECT; // 30% Ejection
+		else						determinedOutcome = OUTCOME_SHIFT; // 50% Scattering
+	}
+	else {
+		// Forced catastrophic finalization on the last step to ensure long-term system stability
+		determinedOutcome = outcomeRoll < 0.5 ? OUTCOME_MERGE : OUTCOME_EJECT;
+	}
 
-			case OUTCOME_EJECT:
-				if (massRatio < 1) {
-					// Recipient is lighter: 'planet' gets ejected, 'nextPlanet' undergoes a minor compensatory shift
-					if (!isFinalStep) {
-						nextPlanet.sma.value *= prng.range(Math.pow(0.9, massRatio), Math.pow(1.1, massRatio)); 
-					}
-					else {
-						nextPlanet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
-					}
-					planet.genData.status = T.migrationStatus.Ejected;
-					planet.sma = new T.Value(Infinity, T.units.Dist.AU);
-						
-				} else {
-					// Recipient is heavier: 'nextPlanet' gets ejected, 'planet' shifts
-					if (!isFinalStep) {
-						planet.sma.value *= prng.range(Math.pow(0.9, 1 / massRatio), Math.pow(1.1, 1 / massRatio)); 
-					}
-					else {
-						planet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
-					}
-					nextPlanet.genData.status = T.migrationStatus.Ejected;
-					nextPlanet.sma = new T.Value(Infinity, T.units.Dist.AU);
-				}
-				break;
+	switch (determinedOutcome) {
+		case OUTCOME_MERGE:
+			mergePlanets(planet, nextPlanet);
+			break;
 
-			case OUTCOME_SHIFT:
-				// Orbital scattering dynamics based on mass ratios
-				if (massRatio < 1) {
-					planet.sma.value *= prng.range(Math.pow(0.7, 1 - massRatio), Math.pow(1.3, 1 - massRatio));
-					nextPlanet.sma.value *= prng.range(Math.pow(0.7, massRatio), Math.pow(1.3, massRatio));
+		case OUTCOME_EJECT:
+			if (massRatio < 1) {
+				// Recipient is lighter: 'planet' gets ejected, 'nextPlanet' undergoes a minor compensatory shift
+				if (!isFinalStep) {
+					nextPlanet.sma.value *= prng.range(Math.pow(0.9, massRatio), Math.pow(1.1, massRatio)); 
 				}
 				else {
-					planet.sma.value *= prng.range(Math.pow(0.7, 1 / massRatio), Math.pow(1.3, 1 / massRatio));
-					nextPlanet.sma.value *= prng.range(Math.pow(0.7, 1 - (1 / massRatio)), Math.pow(1.3, 1 - (1 / massRatio)));
+					nextPlanet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
 				}
-				break;
-		}
+				planet.genData.status = T.migrationStatus.Ejected;
+				planet.sma = new T.Value(Infinity, T.units.Dist.AU);
+					
+			} else {
+				// Recipient is heavier: 'nextPlanet' gets ejected, 'planet' shifts
+				if (!isFinalStep) {
+					planet.sma.value *= prng.range(Math.pow(0.9, 1 / massRatio), Math.pow(1.1, 1 / massRatio)); 
+				}
+				else {
+					planet.sma.value = prng.range(planet.sma.value, nextPlanet.sma.value);
+				}
+				nextPlanet.genData.status = T.migrationStatus.Ejected;
+				nextPlanet.sma = new T.Value(Infinity, T.units.Dist.AU);
+			}
+			break;
+
+		case OUTCOME_SHIFT:
+			// Orbital scattering dynamics based on mass ratios
+			if (massRatio < 1) {
+				planet.sma.value *= prng.range(Math.pow(0.7, 1 - massRatio), Math.pow(1.3, 1 - massRatio));
+				nextPlanet.sma.value *= prng.range(Math.pow(0.7, massRatio), Math.pow(1.3, massRatio));
+			}
+			else {
+				planet.sma.value *= prng.range(Math.pow(0.7, 1 / massRatio), Math.pow(1.3, 1 / massRatio));
+				nextPlanet.sma.value *= prng.range(Math.pow(0.7, 1 - (1 / massRatio)), Math.pow(1.3, 1 - (1 / massRatio)));
+			}
+			break;
 	}
 }
 
@@ -338,7 +338,7 @@ function mergePlanets(recipient, donor) {
 	recipient.envelope.mass.value += donorEnvMass;
 
 	if (recipient.envelope.mass.value > 0) { // Envelope was there initially or was acquired just now
-		const gasCoeff = prng.range(0.50, 0.75); // 50%-75% of gas will remain
+		const gasCoeff = prng.range(0.65, 0.85); // 65%-85% of gas will remain
 
 		// Calculating new composition fractions
 		recipient.envelope.composition.gas = (recipient.envelope.composition.gas * recipientEnvMass + donor.envelope.composition.gas * donorEnvMass) / recipient.envelope.mass.value;

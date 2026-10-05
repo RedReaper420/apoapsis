@@ -10,7 +10,7 @@ export class PlanetEvolution {
 	 * - Magnetosphere (modeled from planet's composition and internal heat)
 	 * - Atmosphere (dissipation by solar wind and radiation)
 	 * 
-	 * @param {T.GenerationSettings} settings 
+	 * @param {T.GeneratorSettings} settings 
 	 * @param {T.Planet} planet 
 	 */
 	constructor (settings, planet) {
@@ -58,10 +58,8 @@ class RotationManager {
 
 		let parent = this.planet.parentBody;
 		if (parent instanceof T.BinaryPlanet) {
-			if (this.planet.parentBody.primary === this.planet)
-				parent = this.planet.parentBody.secondary;
-			else if (this.planet.parentBody.secondary === this.planet)
-				parent = this.planet.parentBody.primary;
+			if (this.planet.companion)
+				parent = this.planet.companion;
 		}
 
 		this.tidalLockTime_s = getTidalLockTime(this.planet, parent).as(T.units.Time.s);
@@ -337,13 +335,13 @@ class MagnetManager {
 				const coreMass_MEarth = this.planet.core.mass.as(T.units.Mass.M_Earth);
 				const r_core_iron_REarth = getMaterialRadius(coreMass_MEarth * this.planet.core.composition.iron, 'iron');
 				this.r_core = new T.Value(r_core_iron_REarth, T.units.Dist.R_Earth).as(T.units.Dist.m);
-				this.rho_core = 7500;
+				this.rho_core = 7500 * (this.planet.density.as(T.units.Dens.g_cm3) / consts.PHY_EARTH_DENSITY);
 				
 				// No plate tectonics assumed (stagnant lid)
-				this.k_tectonics = 0.08; 
+				this.k_tectonics = 0.1; 
 				
 				this.f_ad = 0.04;
-				this.c = 20;
+				this.c = 50;
 				
 				break;
 			}
@@ -354,12 +352,11 @@ class MagnetManager {
 				this.r_core = this.planet.core.radius.as(T.units.Dist.m);
 				this.rho_core = 3500;
 
-				// The dynamo occurs in the thin outer layer of the ionosphere,
-				// which causes the field  to be strongly offset and non-dipolar.
+				// The dynamo occurs in the thin outer layer of the ionosphere
 				this.k_tectonics = 0.3;
 
-				this.f_ad = 0.05;
-				this.c = 25;
+				this.f_ad = 0.06;
+				this.c = 30;
 				
 				break;
 			}
@@ -374,7 +371,7 @@ class MagnetManager {
 				// Adiabatic flow is significantly higher due to the immense pressure
 				// and high thermal conductivity of hydrogen.
 				this.f_ad = 0.6;
-				this.c = 30;
+				this.c = 35;
 				
 				break;
 			}
@@ -394,15 +391,23 @@ class MagnetManager {
 		const planetAge_Gy = new T.Value(t, T.units.Time.y).as(T.units.Time.Gy);
 
 		let q_total = 0; // Total thermal output of the planet
-		if (this.mass_MEarth < 15) // Earth-like heat (scaled from 4.6*10^13 Wt)
+		if (this.mass_MEarth < 15) {
+			// Earth-like heat (scaled from 4.6*10^13 Wt) 
 			q_total = 4.6e13 * this.mass_MEarth * Math.pow(4.5 / planetAge_Gy, 0.5);
-		else if (this.mass_MEarth < 45)
+		}
+		else if (this.mass_MEarth < 45) {
+			// Average between Earth-like and Jupter-like thermal output
 			q_total = ((4.6e13 * this.mass_MEarth * Math.pow(4.5 / planetAge_Gy, 0.5)) + 
 					   (4.0e17 * Math.pow(this.mass_MJupiter, 1.5) * Math.pow(4.5 / planetAge_Gy, 0.5))) / 2;
-		else if (this.mass_MEarth < consts.DEF_BROWN_DWARF_MASS_THRESHOLD) // Gas giant-like heat (Jupiter's is 4*10^17 Wt)
+		}
+		else if (this.mass_MEarth < consts.DEF_BROWN_DWARF_MASS_THRESHOLD) {
+			// Gas giant-like heat (Jupiter's is 4*10^17 Wt)
 			q_total = 4.0e17 * Math.pow(this.mass_MJupiter, 1.5) * Math.pow(4.5 / planetAge_Gy, 0.5);
-		else // Great primordial heat + deuterium fusion
+		}
+		else {
+			// Great primordial heat + deuterium fusion 
 			q_total = 4.0e17 * Math.pow(this.mass_MJupiter, 2.5) * Math.pow(1.0 / planetAge_Gy, 0.4);
+		}
 
 		const q_core = q_total * this.k_tectonics; // Core's thermal output
 		const area_core = 4 * Math.PI * (this.r_core**2);
@@ -493,12 +498,12 @@ class DissipationManager {
 		const eps = 0.10;
 		const R_p = this.planetRadius_m;
 		const M_p = this.planetMass_kg;
-		const M_thermal = (eps * this.evo.solarManager.L_XUV * (R_p**3)) / (4 * consts.PHY_G * M_p * this.distance_m);
+		const M_thermal = (eps * this.evo.solarManager.L_XUV * (R_p ** 3)) / (4 * consts.PHY_G * M_p * this.distance_m);
 
 		// Solar wind stripping
 		const eta = 0.005;
 		const P_sw = this.evo.solarManager.p_sw;
-		const M_wind = eta * ((P_sw * Math.PI * (R_p**2)) / (this.v_esc**2));
+		const M_wind = eta * ((P_sw * Math.PI * (R_p ** 2)) / (this.v_esc ** 2));
 
 		let parentMagneticField = 0;
 		if ((this.planet.parentBody instanceof T.Planet) ||

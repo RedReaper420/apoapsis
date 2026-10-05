@@ -54,7 +54,7 @@ export default function generateBinaryProfile(body) {
 	bodyMassUnit.innerText = bodyMassFit.unit;
 
 	const bodyMassKg = binary.querySelector('#bodyMassKg');
-	bodyMassKg.innerText = body.mass.as(T.units.Mass.kg).toExponential(3).replace('+','');
+	bodyMassKg.innerText = body.mass.as(T.units.Mass.kg).toExponential(3).replace('+','') + ' kg';
 
 	// BINARY MASS RATIO
 	const binaryMassRatio = binary.querySelector('#binaryMassRatio');

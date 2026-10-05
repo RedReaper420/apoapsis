@@ -3,10 +3,12 @@
 <head>
 	<title>Apoapsis</title>
 	<meta charset="utf-8">
-	<link rel="stylesheet" href="/style.css">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="shortcut icon" href="./img/favicon.png">
+	<link rel="stylesheet" href="./style.css">
+	<link rel="stylesheet" type="text/css" href="./toastify.css">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"">
 	<meta name="author" content="GitHub@RedReaper420, GitHub@Vector-Graphics">
-	<script type="module" src="/js/main.js"></script>
+	<script type="module" src="./js/main.js"></script>
 </head>
 
 <body>
@@ -15,16 +17,27 @@
 		<div class="ui bar top left small">
 			<div class="group">
 				<button name="generate">♻️ Generate</button>
-				<button class="toggle" name="settings">⚙️</button>
-				<button name="document">📄</button>
-				<button name="save">💾</button>
-				<button name="load">📂</button>
+
+				<span class="tooltip btn"><button class="toggle" name="settings">⚙️</button><span class="tooltiptext top">Generation settings</span></span>
+
+				<span class="tooltip btn"><button name="document">📄</button><span class="tooltiptext top">Save document</span></span>
+
+				<span class="tooltip btn"><button name="save">💾</button><span class="tooltiptext top">Save system</span></span>
+				
+				<span class="tooltip btn"><button name="load">📂</button><span class="tooltiptext top">Load system</span></span>
+				<input style="display: none;"
+					type="file"
+					id="systemLoader"
+					name="systemLoader"
+					accept="application/json"
+				/>
 			</div>
 		</div>
 		<div class="ui bar top right small">
 			<div class="group">
-				<button commandfor="dialog-about" command="show-modal">❓</button>
-				<button commandfor="dialog-exit" command="show-modal">🏠</button>
+				<span class="tooltip btn"><button commandfor="dialog-about" command="show-modal">❓</button><span class="tooltiptext top">About</span></span>
+
+				<span class="tooltip btn"><button commandfor="dialog-exit" command="show-modal">🏠</button><span class="tooltiptext top edge right">Home</span></span>
 			</div>
 		</div>	
 	</div>
@@ -67,42 +80,116 @@
 	<div class="ui bar bottom">
 		<div class="group">
 			<button class="toggle" name="pause">⏸️</button>
+
 			<label for="warpSlider">Time Warp:</label>
 			<input type="range" id="warpSlider" min="0" max="10" step="0.05" value="4.5">
 			<span id="warpDisplay" class="val">1 day/sec</span>
-			<span>|</span>
+
+			<span style="user-select: none;">|</span>
+
 			<span id="cellScale">1 cell = <span id="cellValue">0</span> <span id="cellUnit">m</span></span>
 		</div>
 		
 		<div class="group">
-			<button class="toggle on" name="setting_enableLighting">🌗</button>
-			<button class="toggle on" name="setting_applyHDR">💡</button>
-			<button class="toggle on" name="setting_showMagnetospheres">🧲</button>
-			<button class="toggle on" name="setting_showAtmospheres">☁️</button>
-			<button class="toggle" name="setting_showGrid">🌐</button>
-			<button class="toggle" name="setting_showHabitableZone">🌱</button>
-			<button class="toggle on" name="setting_showStarsCorona">🔆</button>
-			<button class="toggle on" name="setting_trueStarsRotation">☀️</button>
-			<button class="toggle on" name="setting_applyScaling">📶</button>
-			<button class="multitoggle" data-current-setting="1" data-settings="3" name="setting_showMarkers">📃</button>
-			<button class="multitoggle" data-current-setting="1" data-settings="3" name="setting_drawTrails">💫</button>
-			<button class="toggle on" name="setting_keepUIVisibile">👁️</button>
+			<span class="tooltip btn"><button class="toggle on" name="setting_enableLighting">🌗</button><span class="tooltiptext">Toggles the shading of planets.</span></span>
+
+			<span class="tooltip btn"><button class="toggle on" name="setting_applyHDR">💡</button><span class="tooltiptext">Toggles the increasing of brightness for dim light.</span></span>
+
+			<span class="tooltip btn"><button class="toggle on" name="setting_showMagnetospheres">🧲</button><span class="tooltiptext">Toggles the display of magnetic fields.</span></span>
+
+			<span class="tooltip btn"><button class="toggle on" name="setting_showAtmospheres">☁️</button><span class="tooltiptext">Toggles the atmosphere display.</span></span>
+
+			<span class="tooltip btn"><button class="toggle" name="setting_showGrid">🌐</button><span class="tooltiptext">Toggles the space grid display.</span></span>
+
+			<span class="tooltip btn"><button class="toggle" name="setting_showHabitableZone">🌱</button><span class="tooltiptext">Toggles the star's habitable zone display.</span></span>
+
+			<span class="tooltip btn"><button class="toggle on" name="setting_showStarsCorona">🔆</button><span class="tooltiptext">Toggles the star's corona display.</span></span>
+
+			<span class="tooltip btn"><button class="toggle on" name="setting_trueStarsRotation">🔄</button><span class="tooltiptext">Toggles the star's rotation speed mode (true/constant).</span></span>
+			
+			<span class="tooltip btn"><button class="toggle on" name="setting_applyScaling">🔍</button><span class="tooltiptext">Toggles the bodies' scale exaggeration while being zoomed out.</span></span>
+			
+			<span class="tooltip btn"><button class="toggle on" name="setting_showMarkers">🏷️</button><span class="tooltiptext">Toggles the display of markers.</span></span>
+
+			<span class="tooltip btn"><button class="multitoggle" data-current-setting="1" data-settings="3" name="setting_drawTrails">💫</button><span class="tooltiptext">Toggles the display of orbits/traces.</span></span>
+			
+			<span class="tooltip btn"><button class="toggle on" name="setting_keepUIVisibile">👁️</button><span class="tooltiptext edge right">Toggles the UI fadeout after a moment of inactivity.</span></span>
 		</div>
 	</div>
 
 	<div id="generatorSettings">
 		<div id="settingsContent">
-			<div>
+			<div id="seedBar">
 				<label  for="gen_seed">Seed:</label>
 				<input name="gen_seed" type="text" 
-						id="gen_seed" autocomplete="off">
+						 id="gen_seed" autocomplete="off">
+
+				<span class="tooltip btn"><button name="copySeed">❏</button><span class="tooltiptext top">Copy seed</span></span>
+				
+				<span class="tooltip btn"><button name="resetSeed">↺</button><span class="tooltiptext top">Reset seed</span></span>
+
+				<span style="user-select: none;">|</span>
+
+				<span class="tooltip btn"><button name="saveSettings">💾<span style="font-size: 50%;">⚙️</span></button><span class="tooltiptext top">Save settings</span></span>
+				
+				<span class="tooltip btn"><button name="loadSettings">📂<span style="font-size: 50%;">⚙️</span></button><span class="tooltiptext top">Load settings</span></span>
+				<input style="display: none;"
+					type="file"
+					id="settingsLoader"
+					name="settingsLoader"
+					accept="application/json"
+				/>
 			</div>
 			
 			<div class="tabsBar">
+				<button class="tabButton" name="tab_Filter">Filter</button>
 				<button class="tabButton" name="tab_Stars">Stars</button>
 				<button class="tabButton" name="tab_PlanetsOrbits">Planets' orbits</button>
 				<button class="tabButton" name="tab_Planets">Planets</button>
-				<button class="tabButton" name="tab_Filter">Filter</button>
+			</div>
+
+			<div class="tabContent" id="tab_Filter">
+				<div class="setting-container">
+					<label  for="enable_filter">Enable filter:</label>
+					<input name="enable_filter" type="checkbox" 
+							 id="enable_filter" value="false">
+				</div>
+
+				<div>Generation status: <span id="genStatus">-</span></div>
+
+				<hr style="opacity: 50%;">
+
+				<p><b>Warning:</b> Don't paste any code if you don't understand how it works.</p>
+				
+				<p>
+					<select id="script-select">
+						<button><selectedcontent></selectedcontent></button>
+
+						<option value="">
+							<span class="script-icon">⚙️</span>
+							<span class="script-name">Select a script</span>
+						</option>
+
+						<div id="select-options"></div>
+					</select>
+				</p>
+
+				<label for="predicate">Predicate:</label>
+				<div class="setting-container">
+					<textarea name="predicate" id="predicate" placeholder="if ((body.genData.moonType === T.moonTypes.Binary) && (body.mass.as(T.units.Mass.M_Earth) > 0.5)) { finish(); }"></textarea>
+				</div>
+				
+				<details><summary>Pre-generation script:</summary>
+					<div class="setting-container">
+						<textarea name="pregen" id="pregen" placeholder="attemptsLimit = 100;"></textarea>
+					</div>
+				</details>
+
+				<details><summary>Post-generation script:</summary>
+					<div class="setting-container">
+						<textarea name="postgen" id="postgen" placeholder="console.log(this.system);"></textarea>
+					</div>
+				</details>
 			</div>
 
 			<div class="tabContent" id="tab_Stars"></div>
@@ -110,18 +197,12 @@
 			<div class="tabContent" id="tab_PlanetsOrbits"></div>
 
 			<div class="tabContent" id="tab_Planets"></div>
-
-			<div class="tabContent" id="tab_Filter">
-
-			</div>
 		</div>
 	</div>
 
 	<dialog id="dialog-about">
 		<div class="dialog-title">About</div>
-
 		<hr>
-
 		<div class="dialog-body">
 			<p>
 				<b><a target="_blank" href="https://github.com/RedReaper420/apoapsis">Apoapsis</a></b> by RedReaper420 is inspired with <b><a target="_blank" href="https://github.com/Vector-Graphics/periapsis">Periapsis</a></b> by Vector-Graphics.
@@ -136,12 +217,10 @@
 
 	<dialog id="dialog-exit">
 		<div class="dialog-title">Warning: leaving the app</div>
-
 		<hr>
-
 		<div class="dialog-body">
 			<p>You're going to leave the app and move to the following URL:</p>
-			<p id="outboundPage">website.domain/page</p>
+			<p id="outboundPage">https://github.com/RedReaper420/apoapsis</p>
 			<p>Are you sure?</p>
 		</div>
 		<br>
@@ -152,6 +231,8 @@
 	</dialog>
 	
 	<canvas id="simCanvas"></canvas>
+
+	<!-- Inspector templates -->
 
 	<template id="template_binary">
 		<details open><summary>General</summary>
@@ -181,7 +262,12 @@
 				</tr>
 				<tr>
 					<th>Binary mass ratio</th>
-					<td><span class="progressbar"><span class="progressbar-fill" id="binaryMassRatioBar"></span></span> <span id="binaryMassRatio"></span></td>
+					<td>
+						<span class="progressbar">
+							<span class="progressbar-fill" id="binaryMassRatioBar"></span>
+						</span>
+						<span id="binaryMassRatio"></span>
+					</td>
 				</tr>
 			</table>
 		</details>
@@ -264,7 +350,10 @@
 				</tr>
 				<tr>
 					<th>Light color</th>
-					<td><span id="lightColorBlock">█</span> <span id="lightColorValue"></span></td>
+					<td>
+						<span id="lightColorBlock">█</span>
+						<span id="lightColorValue"></span>
+					</td>
 				</tr>
 				<tr>
 					<th>B-V index</th>
@@ -285,7 +374,12 @@
 				</tr>
 				<tr>
 					<th>Lived fraction</th>
-					<td><span class="progressbar"><span class="progressbar-fill" id="livedFractionBar"></span></span> <span id="livedFraction"></span></td>
+					<td>
+						<span class="progressbar">
+							<span class="progressbar-fill" id="livedFractionBar"></span>
+						</span>
+						<span id="livedFraction"></span>
+					</td>
 				</tr>
 				<tr>
 					<th>Metallicity</th>
@@ -312,7 +406,12 @@
 				</tr>
 				<tr>
 					<th>Earth similarity index</th>
-					<td><span class="progressbar"><span class="progressbar-fill" id="esiBar"></span></span> <span id="esi"></span></td>
+					<td>
+						<span class="progressbar">
+							<span class="progressbar-fill" id="esiBar"></span>
+						</span>
+						<span id="esi"></span>
+					</td>
 				</tr>
 				<tr>
 					<th>Life</th>
@@ -368,39 +467,64 @@
 			</table>
 		</details>
 
-		<details><summary>Composition</summary>
+		<details open><summary>Composition</summary>
 			<table>
 				<tbody id="compositionEnvelope">
 					<tr>
 						<th colspan="2">Gas Envelope</th>
 					</tr>
 					<tr>
-						<th>Gases</th>
+						<td colspan="2">
+							<span class="progressbar" style="width: 100%;">
+								<span class="progressbar-fill" id="compositionEnvelopeGasBar" style="background-color: navajowhite;"></span>
+								<span class="progressbar-fill" id="compositionEnvelopeIceBar" style="background-color: cadetblue;"></span>
+							</span>
+						</td>
+					</tr>
+					<tr style="background-color: rgb(from navajowhite r g b / 0.5);">
+						<th>Gas</th>
 						<td><span id="compositionEnvelopeGas"></span></td>
 					</tr>
-					<tr>
-						<th>Ices</th>
+					<tr style="background-color: rgb(from cadetblue r g b / 0.5);">
+						<th>Ice</th>
 						<td><span id="compositionEnvelopeIce"></span></td>
 					</tr>
 					<tr>
 						<th>Thickness</th>
 						<td><span id="envelopeThickness"></span></td>
 					</tr>
+					<tr>
+						<td colspan="2">
+							<span class="progressbar" style="width: 100%;">
+								<span class="progressbar-fill" id="envelopeThicknessBar"></span>
+							</span>
+						</td>
+					</tr>
+					<tr><!-- Don't delete this row --></tr>
 				</tbody>
 				<tbody>
 					<tr>
 						<th colspan="2">Core</th>
 					</tr>
 					<tr>
+						<td colspan="2">
+							<span class="progressbar" style="width: 100%;">
+								<span class="progressbar-fill" id="compositionCoreIronBar" style="background-color: darkslateblue"></span>
+								<span class="progressbar-fill" id="compositionCoreRockBar" style="background-color: peru;"></span>
+								<span class="progressbar-fill" id="compositionCoreIceBar" style="background-color: cadetblue;"></span>
+							</span>
+						</td>
+					</tr>
+					<tr style="background-color: rgb(from darkslateblue r g b / 0.5);">
 						<th>Iron</th>
 						<td><span id="compositionCoreIron"></span></td>
 					</tr>
-					<tr>
-						<th>Silicates</th>
+					<tr style="background-color: rgb(from peru r g b / 0.5);">
+						<th>Silicate</th>
 						<td><span id="compositionCoreRock"></span></td>
 					</tr>
-					<tr>
-						<th>Ices</th>
+					<tr style="background-color: rgb(from cadetblue r g b / 0.5);">
+						<th>Ice</th>
 						<td><span id="compositionCoreIce"></span></td>
 					</tr>
 				</tbody>
@@ -416,6 +540,10 @@
 				<tr>
 					<th>Retrograde rotation</th>
 					<td><span id="rotationRetrograde"></span></td>
+				</tr>
+				<tr>
+					<th>Synodic day</th>
+					<td><span id="synodicDayValue"></span> <span id="synodicDayUnit"></span></td>
 				</tr>
 				<tr id="tidalLock"></tr>
 			</table>
@@ -460,7 +588,12 @@
 				</tr>
 				<tr>
 					<th>Ocean cover</th>
-					<td><span class="progressbar"><span class="progressbar-fill" id="oceanCoverBar"></span></span> <span id="oceanCover"></span></td>
+					<td>
+						<span class="progressbar">
+							<span class="progressbar-fill" id="oceanCoverBar"></span>
+						</span>
+						<span id="oceanCover"></span>
+					</td>
 				</tr>
 				<tr>
 					<th>Ocean depth</th>
@@ -476,27 +609,67 @@
 					<td><span id="mountainHeight"></span></td>
 				</tr>
 				<tr>
-					<th>Surface</th>
-					<td><span id="tempSurf"></span></td>
+					<th>Albedo</th>
+					<td><span id="albedo"></span></td>
+				</tr>
+				<tr>
+					<th>Surface temperature</th>
+					<td>
+						<span class="tooltip">
+							<span id="tempSurfC"></span>
+							<span class="tooltiptext">
+								<span id="tempSurfK"></span>
+							</span>
+						</span>
+					</td>
 				</tr>
 				<tr>
 					<th>Greenhouse effect</th>
 					<td><span id="greenhouse"></span></td>
 				</tr>
 				<tr>
-					<th>Effective</th>
-					<td><span id="tempEff"></span></td>
+					<th>Effective temperature</th>
+					<td>
+						<span class="tooltip">
+							<span id="tempEffC"></span>
+							<span class="tooltiptext">
+								<span id="tempEffK"></span>
+							</span>
+						</span>
+					</td>
 				</tr>
 				<tr>
-					<th>Equilibrium</th>
-					<td><span id="tempEq"></span></td>
+					<th>Equilibrium temperature</th>
+					<td>
+						<span class="tooltip">
+							<span id="tempEqC"></span>
+							<span class="tooltiptext">
+								<span id="tempEqK"></span>
+							</span>
+						</span>
+					</td>
 				</tr>
-			</table>
-
-			<table>
 				<tr>
-					<th>Albedo</th>
-					<td><span id="albedo"></span></td>
+					<th>Maximal temperature</th>
+					<td>
+						<span class="tooltip">
+							<span id="tempMaxC"></span>
+							<span class="tooltiptext">
+								<span id="tempMaxK"></span>
+							</span>
+						</span>
+					</td>
+				</tr>
+				<tr>
+					<th>Minimal temperature</th>
+					<td>
+						<span class="tooltip">
+							<span id="tempMinC"></span>
+							<span class="tooltiptext">
+								<span id="tempMinK"></span>
+							</span>
+						</span>
+					</td>
 				</tr>
 			</table>
 		</details>

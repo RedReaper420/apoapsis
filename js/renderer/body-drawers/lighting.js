@@ -43,7 +43,7 @@ export default function drawLighting() {
 			shdctx.drawImage(rend.bodyCanvas, 0, 0);
 			shdctx.globalCompositeOperation = 'source-in';
 			shdctx.fillStyle = rend.setting_enableLighting
-				? 'rgba(0, 0, 0, 0.9)'
+				? `hsl(0,0%,10%)`
 				: 'white';
 			shdctx.fillRect(0, 0, shdctx.canvas.width, shdctx.canvas.height);
 		shdctx.restore();
@@ -55,7 +55,9 @@ export default function drawLighting() {
 		litctx.globalCompositeOperation = 'lighter';
 		let lum_avg = 0;
 		
-		stars.forEach(star => { lum_avg += drawLightCone(litctx, star, this); });
+		stars.forEach(star => { 
+			lum_avg += drawLightCone(litctx, star, this); 
+		});
 		lum_avg /= stars.length;
 		this.sim.lum_avg = lum_avg;
 
@@ -75,9 +77,9 @@ export default function drawLighting() {
 			
 			const color = utils.parseColor(this.glowColor);
 
-			glowGrad.addColorStop(0.0, `rgba(255, 255, 127, ${(color.a/255).toFixed(2)}`);
-			glowGrad.addColorStop(0.6, `rgba(${Math.min(Math.floor(color.r * 1.2))}, ${Math.min(Math.floor(color.g * 1.2))}, ${Math.min(Math.floor((color.r + color.g) / 4))}, ${(color.a/255).toFixed(2)})`);
-			glowGrad.addColorStop(1.0, `rgba(${color.r}, ${color.g}, 0, ${(color.a/255).toFixed(2)})`);
+			glowGrad.addColorStop(0.0, `rgba(255, 255, 127, ${color.a/255}`);
+			glowGrad.addColorStop(0.6, `rgba(${color.r * 1.2}, ${color.g * 1.2}, ${(color.r + color.g) / 4}, ${color.a/255})`);
+			glowGrad.addColorStop(1.0, `rgba(${color.r}, ${color.g}, 0, ${color.a/255})`);
 
 			shdctx.beginPath();
 			shdctx.arc(coords.x, coords.y, this.sim.radius_vis, 0, Math.PI * 2);
@@ -94,7 +96,7 @@ export default function drawLighting() {
 }
 
 function drawLightCone(ctx, star, planet) {
-	const { alpha } = calculateStarIllumination(star, planet);
+	const alpha = calculateStarIllumination(star, planet).visualIntensity;
 	const angle = Math.atan2(
 		star.position.screen.y - planet.position.screen.y,
 		star.position.screen.x - planet.position.screen.x
@@ -112,8 +114,8 @@ function drawLightCone(ctx, star, planet) {
 
 	const starColor = utils.parseColor(star.color);
   
-	const dayColor   = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, ${alpha.toFixed(3)})`;
-	const termColor  = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, ${(alpha * 0.5).toFixed(3)})`;
+	const dayColor   = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, ${alpha})`;
+	const termColor  = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, ${alpha * 0.5})`;
 	const nightColor = `rgba(${starColor.r}, ${starColor.g}, ${starColor.b}, 0)`;
 
 	grad.addColorStop(1.0, dayColor);
@@ -139,9 +141,8 @@ function drawLightCone(ctx, star, planet) {
  * @param {T.Star} star 
  * @param {T.Planet} planet 
  * @returns {{ 
- * alpha: number, 
- * color: string, 
- * rawIntensity: number 
+ * 		alpha: number, 
+ * 		rawIntensity: number 
  * }}
  */
 function calculateStarIllumination(star, planet) {
@@ -155,12 +156,9 @@ function calculateStarIllumination(star, planet) {
 	const hdr = planet.renderer.setting_applyHDR;
 	const rawIntensity = star.luminosity / (distAU ** 2);
 	const visualIntensity = Math.min(1.0, hdr ? Math.pow(rawIntensity, 1/5) : rawIntensity); // HDR
-	const ambientLight = 0.15;
-	const finalAlpha = Math.max(ambientLight, visualIntensity);
-
 
 	return {
-		alpha: finalAlpha,
+		visualIntensity: visualIntensity,
 		rawIntensity: rawIntensity
 	};
 }

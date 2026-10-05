@@ -13,7 +13,7 @@ import drawStar from "./body-drawers/star.js";
 import drawPlanet from "./body-drawers/planet.js";
 
 import drawRings from "./body-drawers/rings.js";
-import drawAtmosphereGlow from "./body-drawers/atmosphere.js";
+import drawAtmosphere from "./body-drawers/atmosphere.js";
 import drawLighting from "./body-drawers/lighting.js";
 
 /**
@@ -36,7 +36,7 @@ export function setDrawFunctions(body, renderer) {
 	body.drawPlanet = drawPlanet;
 
 	body.drawRings = drawRings;
-	body.drawAtmosphereGlow = drawAtmosphereGlow;
+	body.drawAtmosphere = drawAtmosphere;
 	body.drawLighting = drawLighting;
 
 	body.drawHint = drawHint;
@@ -100,7 +100,7 @@ function drawBody() {
 
 	// Atmosphere
 	if (rend.setting_showAtmospheres)
-		this.drawAtmosphereGlow();
+		this.drawAtmosphere();
 
 	// Light & shadow
 	this.drawLighting();
@@ -125,20 +125,6 @@ function drawBody() {
 		ctx.restore();
 	}
 	*/
-
-	// Highlight if tracked
-	const visualRadius = Math.max(this.sim.radius_vis, this.sim.radius_vis_scaled);
-	ctx.save();
-		if ((rend.trackedBody === this) || (this.sim.hover)) {
-			ctx.setLineDash(((rend.trackedBody === this) < this.sim.hover) ? [3, 3] : []);
-			ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-			ctx.lineWidth = 1;
-			ctx.beginPath();
-				ctx.arc(coords.x, coords.y, visualRadius * 2, 0, Math.PI * 2);
-			ctx.closePath();
-			ctx.stroke();
-		}
-	ctx.restore();
-
+	
 	this.drawHint();
 }

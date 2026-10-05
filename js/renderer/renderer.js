@@ -1,7 +1,10 @@
 
+import eventBus from "../dependencies/event-bus.js";
+import events from "../data/events.js";
+
 import * as utils from "../utils/utils.js";
-import { events, eventBus } from "../utils/eventbus.js";
 import * as T from "../data/types.js";
+
 import { getKeplerianPosition } from "./kepler.js";
 import { setDrawFunctions } from "./body-drawers.js";
 import * as inspector from "../ui/inspector.js";
@@ -9,6 +12,8 @@ import generateIslandMap from "./islands-gen.js";
 
 class Renderer {
 	constructor () {
+		//#region | Canvases
+
 		this.canvas = document.getElementById('simCanvas');
 		this.ctx = this.canvas.getContext('2d');
 
@@ -28,19 +33,23 @@ class Renderer {
 			this.lightCanvas
 		];
 
-		// --- Simulation Variables ---
+		//#endregion
+
+		//#region | Simulation variables
+
+		this.lastRealTime = 0;
 		this.simTimeSeconds = 0;
 		this.timeMultiplier = 86400;
 		this.pause = false;
 
 		this.currentSystem = null;
+		window.apoapsis_system = null;
 		this.bodyList = [];
 		this.systemMaxRadius = 0;
 
-		window.apoapsis_system = null;
+		//#endregion
 
-		// -- Camera / Interaction State --
-		this.trackedBody = null;
+		//#region | Camera / Interaction state
 
 		this.cameraPosition = { x: 0, y: 0, z: 0, }
 		this.targetCameraPosition = { x: 0, y: 0, z: 0, }
@@ -50,13 +59,19 @@ class Renderer {
 		this.metersPerPixel = 1;
 		this.targetMetersPerPixel = 1;
 
-		this.hoverThreshold = 30;
 		this.cursorX = Infinity;
 		this.cursorY = Infinity;
+
+		this.trackedBody = null;
+		this.hoverThreshold = 30;
 
 		this.uiElements = Array.from(document.getElementsByClassName('ui'));
 		this.idle = 0;
 		this.idleMax = 1.0;
+
+		//#endregion
+
+		//#region | Settings variables
 
 		this.setting_enableLighting = true;
 		this.setting_applyHDR = true;
@@ -67,32 +82,43 @@ class Renderer {
 		this.setting_trueStarsRotation = true;
 		this.setting_showGrid = false;
 		this.setting_applyScaling = true;
+		this.setting_showMarkers = true;
 		this.setting_keepUIVisibile = true;
 
-		this.setting_showMarkers = 1;
 		this.setting_drawTrails = 1;
 
-		// --- System Generation ---
-		eventBus.on(events.Generator.Generation.Completed, (cb) => {
-			this.generateSystem(cb.data);
-		});
+		//#endregion
 
-		// --- UI Handling ---
-		this.warpSlider = document.getElementById('warpSlider');
-		this.warpDisplay = document.getElementById('warpDisplay');
+		//#region | UI handling
 
-		this.warpSlider.addEventListener('input', (e) => { this.updateWarpSpeed(e) });
-
+		// Window resize reaction
 		window.addEventListener('resize', (e) => { this.resizeCanvas(e) });
 		this.resizeCanvas();
 
-		// --- Interaction / Click Event ---
+		// Mouse position update
+		this.canvas.addEventListener('mousemove', (e) => { this.onMouseMove(e) });
+
+		// Click event
 		this.canvas.addEventListener('click', (e) => { this.handleClick(e) });
 
-		eventBus.on('UI:SettingToggle', (cb) => { 
-			this[cb.setting] = cb.value; 
-		});
+		// Mouse scroll zoom feature
+		this.canvas.addEventListener('wheel', (e) => { this.handleWheel(e) }, { passive: false });
 
+		// Touchscreen gestures scaling cancellation
+		document.addEventListener('gesturestart', (e) => e.preventDefault());
+		document.addEventListener('gesturechange', (e) => e.preventDefault());
+		document.addEventListener('gestureend', (e) => e.preventDefault());
+
+		// Processing of touchscreen gestures on canvas 
+		this.touchStartDist = 0;
+		this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+		this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+		this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+
+		// Settings update after buttons pressing
+		eventBus.on(events.UI.SettingToggle, (cb) => { this[cb.setting] = cb.value; });
+
+		// Navigation interaction setup
 		this.bodyListElement = document.getElementById('bodyList');
 		this.bodyListElement.addEventListener('click', (e) => {
 			const target = e.target.closest('[data-id]');
@@ -107,14 +133,17 @@ class Renderer {
 		});
 		this.trackedBodyElement = null;
 
-		// --- Mouse Scroll Zoom Feature ---
-		this.canvas.addEventListener('wheel', (e) => { this.handleWheel(e) }, { passive: false });
-		this.canvas.addEventListener('mousemove', (e) => { this.onMouseMove(e) });
+		// Time warp slider
+		this.warpSlider = document.getElementById('warpSlider');
+		this.warpDisplay = document.getElementById('warpDisplay');
+		this.warpSlider.addEventListener('input', (e) => { this.updateWarpSpeed(e) });
 
-		// --- Main Animation Frame Engine ---
-		this.lastRealTime = 0;
+		//#endregion
 
-		// Start sequence
+		// System generation
+		eventBus.on(events.Generator.Generation.Completed, (cb) => { this.generateSystem(cb.data); });
+
+		// Sequence start
 		this.updateWarpSpeed();
 		requestAnimationFrame((timestamp) => this.loop(timestamp));
 	}
@@ -151,9 +180,7 @@ class Renderer {
 			}
 
 			sma_max = Math.max(pair_max, local_max);
-
 			body.systemRadius = sma_max;
-
 			return sma_max;
 		}
 
@@ -170,7 +197,7 @@ class Renderer {
 		let bodyCount = 0; // Body counter for user to show: not includes binary containers
 		let bodyIdCount = 0; // Body counter for internal use: counts all bodies, including binary containers
 
-		// Recursive function that prepares bodies for rendering, generates profiles, and makes a navigation list
+		// Recursive function that prepares bodies for rendering, generates profiles, and constructs the navigation list
 		const initBodies = (body) => {
 			body.position = {
 				local: { x: 0, y: 0, z: 0 },
@@ -183,7 +210,7 @@ class Renderer {
 				radius: body.radius.as(T.units.Dist.m),
 				radius_atm: (body instanceof T.Planet)
 					? Math.max(
-							body.radius.as(T.units.Dist.m) + (body.atmosphere.scaleHeight.as(T.units.Dist.m) * 3.5),
+							body.radius.as(T.units.Dist.m) + (body.atmosphere.scaleHeight.as(T.units.Dist.m) * 10),
 							body.radius.as(T.units.Dist.m) + 1
 						)
 					: 0,
@@ -192,25 +219,30 @@ class Renderer {
 				cursorDist: Infinity,
 				trail: [],
 				isSystem: false,
-				islandMap: generateIslandMap(body.oceanColor || '#00000000', body.color, body.oceanCoverVisual || '0', body.landscape || undefined),
+				islandMap: generateIslandMap(
+					body.oceanColor || '#00000000', // Ocean color
+					body.color, 					  // Land color
+					body.oceanCoverVisual || '0', 	  // Ocean cover (0..1)
+					body.landscape || undefined		  // Landscape (islands/continents)
+				),
 			}
 
 			setDrawFunctions(body, this);
 
 			const listItem = document.createElement('li');
-			const bodyMark = document.createElement('span');
-			bodyMark.classList.add('body', body instanceof T.Binary
-				? 'binary'
-				: body instanceof T.Star
-					? 'star'
-					: body.type !== T.planetTypes.Terrestrial
-						? 'giant'
-						: 'planet'
-			);
-			bodyMark.innerText = `${body.name}`;
+				const bodyMark = document.createElement('span');
+				bodyMark.classList.add('body', body instanceof T.Binary
+					? 'binary'
+					: body instanceof T.Star
+						? 'star'
+						: body.type !== T.planetTypes.Terrestrial
+							? 'giant'
+							: 'planet'
+				);
+				bodyMark.innerText = `${body.name}`;
 			listItem.appendChild(bodyMark);
 
-			// Recursive calls for a body's children and a sublist construction
+			// Recursive calls for a body's children + a sublist construction
 			if ((body instanceof T.Binary) || (body.bodies.length > 0)) {
 				const listHolder = document.createElement('ul');
 				listItem.appendChild(listHolder);
@@ -244,9 +276,11 @@ class Renderer {
 			return listItem;
 		}
 
-		// Preparing bodies for rendering and making the navigation list
+		// Preparing bodies for rendering and constructing the navigation list
 		this.bodyListElement.innerHTML = '';
-		this.bodyListElement.appendChild(initBodies(this.currentSystem.bodies[0]));
+		this.bodyListElement.appendChild(
+			initBodies(this.currentSystem.bodies[0])
+		);
 
 		// System general info fill in
 		document.getElementById('systemType').innerText = system.type;
@@ -262,88 +296,18 @@ class Renderer {
 		document.getElementById('systemAgeValue').innerText = systemAgeFit.value.toFixed(2);
 		document.getElementById('systemAgeUnit').innerText = systemAgeFit.unit;
 	}
-	
-	updateAbsolutePositions() {
-		const update = (body, parentCoords) => {
-			if (body.parentBody === null)
-				body.position.local = { x: 0, y: 0, z: 0 };
-			else
-				body.position.local = getKeplerianPosition(body.orbit, this.simTimeSeconds);
-
-			body.position.absolute = {
-				x: parentCoords.x + body.position.local.x,
-				y: parentCoords.y + body.position.local.y,
-				z: parentCoords.z + body.position.local.z
-			}
-
-			if (body instanceof T.Binary) {
-				update(body.primary, body.position.absolute);
-				update(body.secondary, body.position.absolute);
-			}
-			body.bodies.forEach(child => update(child, body.position.absolute));
-		};
-
-		if (this.currentSystem !== null)
-			update(this.currentSystem.bodies[0], { x: 0, y: 0, z: 0});
-	}
-
-	updateRelativePositions() {
-		const update = (body) => {
-			body.position.relative = {
-				x: body.position.absolute.x - this.cameraPosition.x,
-				y: body.position.absolute.y - this.cameraPosition.y,
-				z: body.position.absolute.z - this.cameraPosition.z
-			}
-
-			body.position.screen = {
-				x:  (this.canvas.width / 2) + (body.position.relative.x / this.metersPerPixel),
-				y: (this.canvas.height / 2) - (body.position.relative.y / this.metersPerPixel),
-				z: 0
-			}
-
-			if (body instanceof T.Binary) {
-				update(body.primary, body.position.absolute);
-				update(body.secondary, body.position.absolute);
-			}
-			body.bodies.forEach(child => update(child));
-		};
-
-		if (this.currentSystem !== null)
-			update(this.currentSystem.bodies[0]);
-	}
-
-	/**
-	 * 
-	 * @param {InputEvent} e 
-	 */
-	updateWarpSpeed(e) {
-		const timeUnits = Object.freeze({
-			Hour: 3600,
-			Day: 86400,
-			Year: 31557600
-		});
-		
-		const val = parseFloat(this.warpSlider.value);
-		this.timeMultiplier = Math.pow(10, val);
-		
-		if (this.timeMultiplier < timeUnits.Hour)
-			this.warpDisplay.innerText = `${Math.round(this.timeMultiplier)} sec/sec`;
-		else if (this.timeMultiplier < timeUnits.Day)
-			this.warpDisplay.innerText = `${(this.timeMultiplier / timeUnits.Hour).toFixed(1)} hours/sec`;
-		else if (this.timeMultiplier < timeUnits.Year)
-			this.warpDisplay.innerText = `${(this.timeMultiplier / timeUnits.Day).toFixed(1)} days/sec`;
-		else
-			this.warpDisplay.innerText = `${(this.timeMultiplier / timeUnits.Year).toFixed(1)} years/sec`;
-	}
 
 	/**
 	 * 
 	 * @param {UIEvent} e 
 	 */
 	resizeCanvas(e) {
+		const width = document.documentElement.clientWidth || window.innerWidth;
+		const height = document.documentElement.clientHeight || window.innerHeight;
+
 		for (const canvas of this.canvases) {
-			canvas.width = window.innerWidth;
-			canvas.height = window.innerHeight;
+			canvas.width = width;
+			canvas.height = height;
 		}
 	}
 
@@ -409,6 +373,30 @@ class Renderer {
 
 	/**
 	 * 
+	 * @param {InputEvent} e 
+	 */
+	updateWarpSpeed(e) {
+		const timeUnits = Object.freeze({
+			Hour: 3600,
+			Day: 86400,
+			Year: 31557600
+		});
+		
+		const val = parseFloat(this.warpSlider.value);
+		this.timeMultiplier = Math.pow(10, val);
+		
+		if (this.timeMultiplier < timeUnits.Hour)
+			this.warpDisplay.innerText = `${Math.round(this.timeMultiplier)} sec/sec`;
+		else if (this.timeMultiplier < timeUnits.Day)
+			this.warpDisplay.innerText = `${(this.timeMultiplier / timeUnits.Hour).toFixed(1)} hours/sec`;
+		else if (this.timeMultiplier < timeUnits.Year)
+			this.warpDisplay.innerText = `${(this.timeMultiplier / timeUnits.Day).toFixed(1)} days/sec`;
+		else
+			this.warpDisplay.innerText = `${(this.timeMultiplier / timeUnits.Year).toFixed(1)} years/sec`;
+	}
+
+	/**
+	 * 
 	 * @param {MouseEvent} e 
 	 */
 	onMouseMove(e) {
@@ -435,6 +423,109 @@ class Renderer {
 		const maxZoomOut = this.systemBroadViewScale * 4;
 
 		this.targetMetersPerPixel = utils.clamp(nextZoom, maxZoomIn, maxZoomOut);
+	}
+
+	/**
+	 * Calculates distance between fingers.
+	 * @param {TouchEvent} e 
+	 */
+	getTouchDistance(e) {
+		return Math.hypot(
+			e.touches[0].clientX - e.touches[1].clientX,
+			e.touches[0].clientY - e.touches[1].clientY
+		);
+	}
+
+	/**
+	 * @param {TouchEvent} e 
+	 */
+	handleTouchStart(e) {
+		if (e.touches.length === 2) {
+			e.preventDefault();
+			this.touchStartDist = this.getTouchDistance(e);
+		}
+	}
+
+	/**
+	 * @param {TouchEvent} e 
+	 */
+	handleTouchMove(e) {
+		if (e.touches.length > 1) {
+			e.preventDefault();
+		}
+
+		if (e.touches.length === 2 && this.touchStartDist > 0) {
+			const currentDist = this.getTouchDistance(e);
+			const distDiff = this.touchStartDist - currentDist;
+
+			// Wheel event emulation 
+			if (Math.abs(distDiff) > 3) {
+				this.handleWheel({
+					preventDefault: () => {},
+					deltaY: distDiff * 1.0
+				});
+				
+				this.touchStartDist = currentDist;
+			}
+		}
+	}
+
+	/**
+	 * @param {TouchEvent} e 
+	 */
+	handleTouchEnd(e) {
+		if (e.touches.length < 2) {
+			this.touchStartDist = 0;
+		}
+	}
+	
+	updateAbsolutePositions() {
+		const update = (body, parentCoords) => {
+			if (body.parentBody === null)
+				body.position.local = { x: 0, y: 0, z: 0 };
+			else
+				body.position.local = getKeplerianPosition(body.orbit, this.simTimeSeconds);
+
+			body.position.absolute = {
+				x: parentCoords.x + body.position.local.x,
+				y: parentCoords.y + body.position.local.y,
+				z: parentCoords.z + body.position.local.z
+			}
+
+			if (body instanceof T.Binary) {
+				update(body.primary, body.position.absolute);
+				update(body.secondary, body.position.absolute);
+			}
+			body.bodies.forEach(child => update(child, body.position.absolute));
+		};
+
+		if (this.currentSystem !== null)
+			update(this.currentSystem.bodies[0], { x: 0, y: 0, z: 0});
+	}
+
+	updateRelativePositions() {
+		const update = (body) => {
+			body.position.relative = {
+				x: body.position.absolute.x - this.cameraPosition.x,
+				y: body.position.absolute.y - this.cameraPosition.y,
+				z: body.position.absolute.z - this.cameraPosition.z
+			}
+
+			body.position.screen = {
+				x:  (this.canvas.width / 2) + (body.position.relative.x / this.metersPerPixel),
+				y: (this.canvas.height / 2) - (body.position.relative.y / this.metersPerPixel),
+				z: 0
+			}
+
+			if (body instanceof T.Binary) {
+				update(body.primary, body.position.absolute);
+				update(body.secondary, body.position.absolute);
+			}
+			body.bodies.forEach(child => update(child));
+		};
+
+		if (this.currentSystem !== null)
+			update(this.currentSystem.bodies[0]);
 	}
 
 	updateCamera(dT) {
@@ -492,12 +583,12 @@ class Renderer {
 			}
 		}
 		else {
-			// Bar of short vertical lines
+			// Top bar of short vertical lines
 			for (let i = -Math.ceil(this.canvas.width / cellSize / 2); i <= Math.ceil(this.canvas.width / cellSize / 2); i++) {
 				this.ctx.beginPath();
 				const pos_x = this.canvas.width / 2 + i * cellSize + cam_x;
-				const pos_y1 = this.canvas.height * 0.025;
-				const pos_y2 = this.canvas.height * 0.050;
+				const pos_y1 = this.canvas.height * 0.050;
+				const pos_y2 = this.canvas.height * 0.075;
 				this.ctx.moveTo(pos_x, pos_y1);
 				this.ctx.lineTo(pos_x, pos_y2);
 				this.ctx.stroke();
@@ -575,3 +666,4 @@ class Renderer {
 }
 
 const renderer = new Renderer();
+window.apoapsis_renderer = renderer;

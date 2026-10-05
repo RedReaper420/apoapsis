@@ -20,14 +20,15 @@ import { temperatureToColor } from "./star-gen.js";
  * 
  * The further generation (@see {@link planetGeneration_Stage2}) is applied after simulating migration for planets, and immediately for moons. 
  * 
- * @param {T.GenerationSettings} settings 
+ * @param {T.GeneratorSettings} settings 
  * @param {T.Star|T.BinaryStar|T.Planet|T.BinaryPlanet} parentBody 
  * @param {T.Value} sma 
  * @param {GenData} genData
+ * @param {object|undefined} profile - Mass curve warping profile.
  * 
  * @returns {T.Planet}
  */
-export function generatePlanet(settings, parentBody, sma, genData) {
+export function generatePlanet(settings, parentBody, sma, genData, profile = undefined) {
 	const planet = new T.Planet(parentBody, nameGen.generate());
 	planet.sma = sma;
 
@@ -49,7 +50,7 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 
 		planet.age = planet.genData.parentStar.age;
 
-		planet.core = generatePlanetCore(planet);
+		planet.core = generatePlanetCore(planet, profile);
 		planet.envelope = giants.makeGasGiant(planet);
 		
 		planet.mass = new T.Value(
@@ -90,6 +91,7 @@ export function generatePlanet(settings, parentBody, sma, genData) {
 			sma_norm: sma_norm,
 			sma_init_norm: sma_init_norm,
 			parentStar: parentStar,
+			companion: genData.companion,
 		}
 
 		planet.age = planet.genData.parentStar.age;
@@ -154,7 +156,7 @@ export function planetGeneration_Stage2(planet) {
 }
 
 /**
- * @param {T.GenerationSettings} settings 
+ * @param {T.GeneratorSettings} settings 
  * @param {T.Planet} planet 
  */
 export function planetGeneration_Stage3(settings, planet) {
@@ -219,18 +221,23 @@ export function planetGeneration_Stage3(settings, planet) {
 		}
 	}
 
+	//calculateMinMaxTemperature(planet);
+
 	planet.esi = calculateESI(planet);
+
+	planet.category = getPlanetCategory(planet);
 }
 
 /**
  * Generates a rocky base of a planet/moon, with set mass and core composition.
  * 
  * @param {T.Planet} planet A planet for which the core is being generated.
+ * @param {object|undefined} profile - Mass curve warping profile.
  * 
  * @returns {T.Core} A planet core with a certain mass and a set of elements' fractions.
  */
-function generatePlanetCore(planet) {
-	const planetCoreMass = samplePlanetCoreMass(planet.genData);
+function generatePlanetCore(planet, profile) {
+	const planetCoreMass = samplePlanetCoreMass(planet.genData, profile);
 
 	const coreIronFraction = sampleCoreIronFraction(planet.genData, planetCoreMass);
 	const coreIceFraction = (1.0 - coreIronFraction) * sampleCoreIceFraction(planet.genData);
@@ -245,9 +252,9 @@ function generatePlanetCore(planet) {
 		const parentBody = planet.parentBody;
 		switch (planet.genData.moonType) {
 			case T.moonTypes.Impact: {
-				let f_iron = parentBody.core.composition.iron ** 2; // Not much of heavy iron leaves the parent planet
+				let f_iron = parentBody.core.composition.iron ** prng.range(1.5, 2); // Not much of heavy iron leaves the parent planet
 				let f_rock = parentBody.core.composition.rock;
-				let f_ice  = (parentBody.core.composition.ice * 0.1) ** 2; // Most of the ice evaporates and escapes into outer space
+				let f_ice  = (parentBody.core.composition.ice * prng.range(0.1, 0.5)) ** prng.range(1.5, 2); // Most of the ice evaporates and escapes into outer space
 
 				// Re-normalization
 				const f_total = f_iron + f_rock + f_ice;
@@ -286,10 +293,11 @@ function generatePlanetCore(planet) {
  * Samples mass for the core of a planet/moon.
  * 
  * @param {GenData} genData - Generation data of a planet.
+ * @param {object|undefined} profile - Mass curve warping profile.
  * 
  * @returns {T.Value} Planet core mass (unit: `Mass`)
  */
-function samplePlanetCoreMass(genData) {
+function samplePlanetCoreMass(genData, profile) {
 	const star = genData.parentStar;
 	const sma_norm = genData.sma_norm;
 	
@@ -305,7 +313,7 @@ function samplePlanetCoreMass(genData) {
 
 	// Defines a base floor mass curve before (3.5 + 1) AU: ~3.5 M⊕ at 1 AU, ~6.15 M⊕ at 3.5 AU
 	const baseCurve = x <= 1
-		? Math.pow(curveBaseMass * (1 - Math.exp(-5 * sma_norm / consts.PHY_DIST_SNOW_LINE)), 2)
+		? 0.1 * curveBaseMass + 0.9 * curveBaseMass * (1 - Math.exp(-5 * sma_norm / consts.PHY_DIST_SNOW_LINE))
 		: 0;
 	
 	// Defines a peak that adds ~17.5 M⊕ around 3.5 AU
@@ -329,7 +337,12 @@ function samplePlanetCoreMass(genData) {
 		if (prng() < (0.2 * (sma_norm - consts.PHY_DIST_SNOW_LINE * 5))) 
 			coreMass *= prng.range(0.1, 0.5); // "failed" distant cores
 	
-	// Filtering out very small bodies. Those will be automatically removed during the migration simulation.
+	if (profile) {
+		const { c1, c2, p1, p2, f1, f2 } = profile;
+		coreMass *= (1 + c1 * Math.cos(Math.pow(sma_norm, p1) * f1)) * (1 + c2 * Math.cos(Math.pow(sma_norm, p2) * f2));
+	}
+
+	// Filtering out very small planets. Those will be automatically removed during the migration simulation.
 	if (coreMass < 0.001)
 		genData.status = T.migrationStatus.Ejected;
 
@@ -350,19 +363,19 @@ function samplePlanetCoreMass(genData) {
  * @returns {number} Iron fraction [0.01, 0.85]
  */
 function sampleCoreIronFraction(genData, coreMass) {
-	const randomBase = 0.20; const randomScatter = 0.25;
+	const randomBase = 0.1; const randomScatter = 0.25;
 	const randIronFraction = randomBase + utils.randomRangeGaussian(-randomScatter, randomScatter);
 	
 	const starMetallicity = genData.parentStar.metallicity;
-	const starMetallicityFactor = 0.15 * Math.exp(0.5 * starMetallicity);
+	const starMetallicityFactor = 0.15 * Math.exp(0.4 * starMetallicity);
 
 	const sma_norm = genData.sma_norm;
-	const distanceFactor = Math.exp(-0.125 * (sma_norm - consts.PHY_DIST_SNOW_LINE));
+	const distanceFactor = Math.exp(-0.1 * (sma_norm - consts.PHY_DIST_SNOW_LINE));
 
 	const coreMass_MEarth = genData.isMoon ? genData.mass : coreMass.as(T.units.Mass.M_Earth);
-	const massFactor = coreMass_MEarth > 1 ? 1.0 + 0.025 * Math.log10(coreMass_MEarth) : 1.0;
+	const massFactor = coreMass_MEarth > 1 ? 1.0 + 0.25 * Math.log10(coreMass_MEarth) : 1.0;
 
-	return utils.clamp((randIronFraction + starMetallicityFactor) * distanceFactor * massFactor, 0.01, 0.85);
+	return utils.clamp((randIronFraction + starMetallicityFactor) * distanceFactor * massFactor, 0.001, 0.85);
 }
 
 /**
@@ -524,12 +537,8 @@ export function setEccentricity(planet) {
 	
 	let host = planet.parentBody;
 	if (planet.parentBody instanceof T.BinaryPlanet) {
-		if (planet.parentBody.primary === planet) {
-			host = planet.parentBody.secondary;
-		}
-		else if (planet.parentBody.secondary === planet) {
-			host = planet.parentBody.primary;
-		}
+		if (planet.companion)
+			host = planet.companion;
 	}
 	
 	const R_host = host.radius.as(T.units.Dist.m);
@@ -623,12 +632,8 @@ function calculateTotalTidalHeating(planet) {
 
 	let host = planet.parentBody;
 	if (planet.parentBody instanceof T.BinaryPlanet) {
-		if (planet.parentBody.primary === planet) {
-			host = planet.parentBody.secondary;
-		}
-		else if (planet.parentBody.secondary === planet) {
-			host = planet.parentBody.primary;
-		}
+		if (planet.companion)
+			host = planet.companion;
 	}
 	const F_tidal_host = host instanceof T.Star ? 0 : calculateTidalHeating(planet, host, planet.sma, planet.eccentricity);
 	const F_tidal_sat = planet.bodies.length > 0 ? calculateTidalHeating(planet, planet.bodies[0], planet.bodies[0].sma, planet.bodies[0].eccentricity) : 0;
@@ -817,6 +822,154 @@ function setSurfaceTemperature(planet) {
  * 
  * @param {T.Planet} planet 
  */
+export function calculateSynodicDay(planet) {
+	const isNotMoon = (!planet.genData.isMoon) && (planet.companion === undefined);
+
+	const T_rot = planet.rotationPeriod.as(T.units.Time.s);
+	const sign = isNotMoon 
+		? planet.isRotationRetrograde ? 1 : -1 // Accounting for retrograde rotation for planets
+		: planet.genData.retrograde ? 1 : -1; // Accounting for retrograde orbital motion for moons
+	const P_orb = isNotMoon // (Host) planet orbital period
+		? planet.orbitalPeriod.as(T.units.Time.s)
+		: planet.parentBody.orbitalPeriod.as(T.units.Time.s);
+	const T_syn = (T_rot * P_orb) / Math.abs(P_orb + sign * T_rot);
+
+	return new T.Value(T_syn, T.units.Time.s);
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ */
+export function setMinMaxTemperature(planet) {
+	const temp = planet.temperature.as(T.units.Temp.K);
+	const t_eq = planet.temperature_eq.as(T.units.Temp.K);
+	const t_eff = planet.temperature_eff.as(T.units.Temp.K);
+	
+	const t_int = t_eff - t_eq; // Internal heat
+	const e_gh = temp / t_eff; // Greenhouse coefficient
+
+	const p0 = 0.75; // bar
+	const p = planet.type === T.planetTypes.Terrestrial
+		? planet.atmosphere.pressure.as(T.units.Press.bar)
+		: 100000;
+	const f_atm_trans = 1 - Math.exp(-1 * p / p0); // Atmosphere heat transfer
+
+	// Getting surface properties
+	const { tau_surf, ocean_trans } = getSurfaceThermalProperties(planet);
+
+	// Total heat transfer (atmosphere + ocean)
+	const f_trans = 1 - (1 - f_atm_trans) * (1 - ocean_trans);
+
+	// Time for surface to cool down 
+	const tau_0 = 20; // days
+	const tau_rad = tau_surf + tau_0 * Math.pow(p, 0.8);
+
+	// Solar day
+	const P_sol = planet.synodicDay.as(T.units.Time.d);
+	const rot_ratio = tau_rad / P_sol;
+
+	const f_rot = 1 - Math.exp(-0.75 * rot_ratio); // Rotational smoothing coefficient
+	const d_phi = Math.atan(2 * Math.PI * rot_ratio); // Phase shift
+
+	// Subsolar point temperature
+	const t_sub = t_eq * ( (1 - f_rot) * Math.SQRT2 + f_rot * Math.pow(4 / Math.PI, 1/4) ) * e_gh;
+
+	// Daily temperature amplitude
+	const d_t = (t_sub - t_eq) * (1 - f_rot) * (1 - f_trans);
+
+	// Maximal daytime peak w/ phase shift
+	const t_max = t_sub + d_t * Math.cos(d_phi);
+
+	// Night temperature floor
+	// For tidally-locked bodies temperature drops to the radiation floor defined by the atmospheric transfer
+	const t_night_floor = t_eq * (0.15 + 0.85 * f_trans);
+	const cooling_factor = Math.exp(-1 / (2 * rot_ratio));
+
+	// Interpolation between daytime/mean temperature and night floor
+	const t_min_base = t_night_floor + (t_eq - t_night_floor) * (1 - (1 - f_trans) * (1 - cooling_factor));
+	const t_min = Math.min(t_eq, t_min_base);
+
+	// Orbit eccentricity accounting
+	const eccentricity = (!planet.genData.isMoon) && (planet.companion === undefined)
+		? planet.eccentricity
+		: planet.parentBody.eccentricity;
+	const peri_factor = Math.sqrt(1 / (1 - eccentricity));
+	const apo_factor = Math.sqrt(1 / (1 + eccentricity));
+
+	// Final results
+	const temp_max = t_int + t_max * peri_factor;
+	const temp_min = Math.max(t_int + t_min * apo_factor, consts.PHY_TEMP_COSMIC_BACKGROUND);
+
+	planet.temperature_max = new T.Value(temp_max, T.units.Temp.K);
+	planet.temperature_min = new T.Value(temp_min, T.units.Temp.K);
+}
+
+/**
+ * Gets the thermal properties of planet's surface.
+ * @param {T.Planet} planet
+ * @returns {{ tau_surf: number, ocean_trans: number }}
+ */
+function getSurfaceThermalProperties(planet) {
+	// For giant planets, their "surface" is their giant atmosphere
+	if (planet.type !== T.planetTypes.Terrestrial) {
+		return { tau_surf: 1000, ocean_trans: 1.0 };
+	}
+
+	const ocean = planet.ocean;
+	if (ocean === 'Dry') {
+		// Basic heat capacity of a dry regolith
+		return { tau_surf: 0.08, ocean_trans: 0.0 };
+	}
+
+	const coverage = planet.oceanCover;
+	let tau_surf = 0; 
+	let ocean_trans = 0;
+
+	switch (ocean) {
+		case 'Lava':
+			tau_surf = 1.5;
+			ocean_trans = 0.4; // Lava convection
+			break;
+		case 'Water':
+			// Gigantic heat capacity, heat convection
+			tau_surf = 30.0; 
+			ocean_trans = 0.75;
+			break;
+		case 'Water (frozen)':
+			// Average heat capacity, no heat conduction via convection
+			tau_surf = 1.2;
+			break;
+		case 'Ammonia water':
+			// Similar to pure water
+			tau_surf = 25.0;
+			ocean_trans = 0.65;
+			break;
+		case 'Ammonia water (frozen)':
+			tau_surf = 1.0;
+			break;
+		case 'Methane':
+			// Lower heat capacity than water's
+			tau_surf = 8.0;
+			ocean_trans = 0.5;
+			break;
+	}
+	tau_surf *= coverage;
+	ocean_trans *= coverage;
+	
+	const landFraction = 1 - coverage;
+	tau_surf += landFraction * 0.08;
+
+	return {
+		tau_surf: tau_surf,
+		ocean_trans: ocean_trans
+	};
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ */
 function calculateESI(planet) {
 	const R = planet.radius.as(T.units.Dist.km);
 	const rho = planet.density.as(T.units.Dens.g_cm3);
@@ -834,4 +987,147 @@ function calculateESI(planet) {
 	const ESI = Math.sqrt(ESI_I * ESI_S);
 
 	return ESI;
+}
+
+/**
+ * 
+ * @param {T.Planet} planet 
+ */
+function getPlanetCategory(planet) {
+	const capitalizeFirstLetter = (str) => { return str.charAt(0).toUpperCase() + str.slice(1) };
+
+	const temp = planet.temperature.as(T.units.Temp.K);
+	const mass = planet.mass.as(T.units.Mass.M_Earth);
+
+	let tempCat = '';
+	let tempCatStyle = '';
+
+	if (temp < 110) { 
+		// < -163°C, below methane's boiling point (-161.58°C)
+		tempCat = 'super-cold'; 
+		tempCatStyle = 'cornflowerblue';
+	}
+	else if (temp < 260) {
+		// < -13°C, below 18%-salty water's freezing point
+		// Common sea water is ~3.5% salty and freezes at -1.9°C
+		// Dead Sea's salinity is up to 35%, freezing point is -20°C
+		tempCat = 'cold';
+		tempCatStyle = 'lightblue';
+	}
+	else if (temp < 360) {
+		// < 87°C
+		tempCat = 'temperate';
+		tempCatStyle = 'lightgreen';
+	}
+	else if (temp < 800) {
+		// < 527°C
+		tempCat = 'hot';
+		tempCatStyle = 'goldenrod';
+	}
+	else {
+		// Above ~525°C things start to glow in visible light (Draper point)
+		tempCat = 'super-hot';
+		tempCatStyle = 'crimson';
+	}
+
+	tempCat = capitalizeFirstLetter(tempCat);
+	tempCat = `<span style="color: ${tempCatStyle};">${tempCat}</span>`;
+
+	let compCat = '';
+	switch (planet.type) {
+		case T.planetTypes.Terrestrial: {
+			const compProperties = [];
+			if ((mass >= 7.5) && (planet.genData.sma_norm <= 0.1))
+				compProperties.push('chtonian');
+
+			if (planet.core.composition.ice >= 0.1)
+				compProperties.push('oceanic');
+
+			if (planet.core.composition.iron >= 0.5)
+				compProperties.push('iron');
+			else if (planet.core.composition.iron < 0.01)
+				compProperties.push('coreless');
+
+			compCat = compProperties.join(' ');
+
+			break;
+		}
+
+		case T.planetTypes.MiniNeptune:
+		case T.planetTypes.IceGiant:
+		case T.planetTypes.GasDwarf:
+		case T.planetTypes.GasGiant: {
+			if (planet.envelope.composition.ice < 0.4)
+				compCat = 'gas';
+			else if (planet.envelope.composition.ice > 0.6)
+				compCat = 'ice';
+			else
+				compCat = 'hybrid';
+
+			break;
+		}
+
+		case T.planetTypes.BrownDwarf: {
+			//
+
+			break;
+		}
+
+		default: compCat = '???';
+	}
+
+	let massCat = '';
+	switch (planet.type) {
+		case T.planetTypes.Terrestrial: {
+			if (mass < 0.001) massCat = 'asteroid';
+			else if (mass < 0.02) massCat = 'micro-Earth';
+			else if (mass < 0.2) massCat = 'sub-Earth';
+			else if (mass < 2.0) massCat = 'Earth';
+			else if (mass < 10) massCat = 'super-Earth';
+			else massCat = 'mega-Earth';
+
+			break;
+		}
+		case T.planetTypes.MiniNeptune:
+		case T.planetTypes.IceGiant: {
+			if (mass < 10) massCat = 'sub-Neptune';
+
+			else if (mass < 20) massCat = 'Neptune';
+
+			else if (mass < 90) massCat = 'super-Neptune';
+
+			// Saturn-like mass (90+ M⊕) for theoreticized very massive ice giants up to ~140 M⊕
+			else massCat = 'mega-Neptune';
+
+			break;
+		}
+
+		case T.planetTypes.GasDwarf:
+		case T.planetTypes.GasGiant: {
+			if (mass < 10) massCat = 'sub-Neptune';
+
+			else if (mass < 20) massCat = 'Neptune';
+
+			// Saturn's mass is 95 M⊕
+			else if (mass < 90) massCat = 'sub-Saturn';
+
+			// Value a bit less than 2 M♃
+			else if (mass < 635)  massCat = 'Jupiter';
+
+			else massCat = 'super-Jupiter';
+			
+			break;
+		}
+
+		case T.planetTypes.BrownDwarf: {
+			// Separation around 63 M♃, defining if a brown dwarf can burn lithium or not (lithium test)
+			massCat = `${mass < 20000 ? 'low' : 'high'}-mass brown dwarf`;
+			
+			break;
+		}
+
+		default: massCat = '???';
+	}
+	
+	return [tempCat, compCat, massCat].join(' ');
 }

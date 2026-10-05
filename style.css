@@ -1,30 +1,18 @@
 
+/*#region Base */
+
 :root {
     --col-main: hsl(41, 100%, 87%);
 	--col-main-dim: hsl(41, 62%, 70%, 50%);
 	--col-alt: hsl(41, 100%, 95%);
-    --col-background: #0808087f;
+    --col-background: hsla(0, 0%, 0%, 0.67);
 
 	--transition-speed-fast:   0.25s;
-	--transition-speed-medium: 0.33s;
+	--transition-speed-medium: 0.38s;
 	--transition-speed-slow:   0.50s;
 
 	--corner-radius: 0.33em;
 	--corner-radius-big: 0.67em;
-}
-
-@font-face {
-	/* Comfortaa by Johan Aakerlund - https://fonts.google.com/specimen/Comfortaa
-	Converted to WOFF2 */
-	font-family: "Comfortaa";
-	src: url("/fonts/Comfortaa-VariableFont_wght.woff2") format('woff2');
-}
-
-@font-face {
-	/* Orbitron by Matt McInerney - https://fonts.google.com/specimen/Orbitron
-	Converted to WOFF2 */
-	font-family: "Orbitron";
-	src: url("/fonts/Orbitron-VariableFont_wght.woff2") format('woff2');
 }
 
 @font-face {
@@ -35,16 +23,15 @@
 }
 
 html {
-    --screen-size: calc(sqrt(100vh) * sqrt(100vw) / 1440px);
+    --screen-size: calc(sqrt(100vh) * sqrt(100vw) / 1440px); /* sqrt(1920) * sqrt(1080) = 1440 */
 	--font-size-const: 0.6;
-	--font-size: calc(round(nearest, 3.25vmin + 2px, 5px) * var(--font-size-const));
+	--font-size: round(nearest, calc((3.20vmin + 2px) * var(--font-size-const)), 4px);
 
     font-family: 'Metrophobic', Verdana, Geneva, Tahoma, sans-serif;
     font-size: var(--font-size);
-	color: var(--col-main);
 
-    background-color: #090909;
-	
+	color: var(--col-main);
+    background-color: hsl(0, 0%, 4%);
 	scrollbar-color: var(--col-main) var(--col-background);
 
 	scroll-behavior: smooth;
@@ -52,7 +39,7 @@ html {
 }
 @media (orientation: portrait) {
 	html {
-		--font-size: calc((4vmin + 2px) * var(--font-size-const));
+		--font-size: round(nearest, calc((4vmin + 2px) * var(--font-size-const)), 2px);
 	}
 }
 
@@ -62,13 +49,24 @@ html {
 	box-sizing: inherit;
 }
 
-body {
+html, body {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
 	margin: 0;
 	padding: 0;
-	overflow: hidden;
 }
 
-/* - BACKGROUND ---------------------- */
+main {
+	width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/*#endregion*/
+
+/*#region Background */
 
 /* Pseudo-elements defaults */
 html::before,
@@ -94,9 +92,9 @@ html::after {
 	background: url("/img/stars_mirrored.webp") repeat;
 	background-size: 25vw;
 
-	animation: Bkg 15s infinite linear;
+	animation: BkgFlickering 15s infinite linear;
 }
-@keyframes Bkg {
+@keyframes BkgFlickering {
 	0%, 100% { opacity: 0.0; }
 	25%, 75% { opacity: 0.5; }
 	50%      { opacity: 1.0; }
@@ -110,28 +108,30 @@ html::after {
 	}
 }
 
-/* Gradient at the top */
+/* Background dimming */
 body::before {
-	--col-grad-inner: #00000000;
-	--col-grad-outer: #00000064;
-
 	z-index: -1;
 	
-	background: radial-gradient(circle, var(--col-grad-inner), var(--col-grad-outer));
+	background: rgba(0, 0, 0, 33.3%);
 }
 
-/* ------------------------------------- */
+/*#endregion*/
 
+#simCanvas {
+	touch-action: none;
+}
+
+/* UI class (for fade out) */
 .ui {
-	transition: var(--transition-speed-slow);
 	opacity: 1;
+	transition: opacity var(--transition-speed-slow);
 
 	&.hidden {
 		opacity: 0;
 	}
 }
 
-/* UI bars */
+/*#region UI bars */
 
 .barWrapper {
 	display: flex;
@@ -185,13 +185,11 @@ body::before {
 	.bar {
 		flex-direction: column;
 	}
-	.bar.top {
-		position: relative;
-	}
 }
 
 .group {
 	z-index: 1;
+
 	display: flex;
 	gap: 0.5em;
 	flex-wrap: wrap;
@@ -203,9 +201,13 @@ body::before {
 	}
 }
 
-/* Side panels */
+/*#endregion*/
+
+/*#region Side panels */
 
 .sidePanel {
+	--panel-height: 25em;
+
 	position: absolute;
 	top: 50%;
 
@@ -219,7 +221,7 @@ body::before {
 	border: 1px solid var(--col-main-dim);
 	border-radius: var(--corner-radius);
 
-	transform: translateY(-15em);
+	transform: translateY(calc(-0.6 * var(--panel-height)));
 
 	&.left {
 		left: 0;
@@ -239,7 +241,7 @@ body::before {
 .panelContent {
 	overflow-y: auto;
 	width: 22.5em;
-	height: 25em;
+	height: var(--panel-height);
 	
 	padding: 0.5em;
 
@@ -258,7 +260,9 @@ body::before {
 	}
 }
 
-/* Navigation tree */
+/*#endregion*/
+
+/*#region Navigation tree */
 
 .tree {
 	--spacing: round(down, 1.25em, 2px);
@@ -321,6 +325,7 @@ body::before {
 	content: '';
 	position: relative;
 	right: 0.25em;
+	text-shadow: 0 0 0.1em white, 0 0 0.25em white;
 }
 .binary::before {
 	content: '♋';
@@ -335,7 +340,46 @@ body::before {
 	content: '🌑';
 }
 
-/* Inspector tables */
+/*#endregion*/
+
+/*#region Buttons */
+
+button {
+	font-family: inherit;
+	font-size: 1rem;
+
+	min-width: 2.5em;
+	
+	padding: 0.25em 0.5em;
+
+	color: var(--col-main);
+	
+	background-color: var(--col-background);
+
+	border: 1px solid var(--col-main);
+	border-radius: var(--corner-radius);
+}
+
+.toggle {
+	border-color: var(--col-main-dim);
+
+	&:hover {
+		border-color: var(--col-main);
+	}
+
+	&.on {
+		border-color: var(--col-main);
+		box-shadow: 0 0 0.25em var(--col-main), 0 0 0.25em var(--col-main);
+	}
+}
+
+/*#endregion*/
+
+#inspector > div {
+	font-size: 90%;
+}
+
+/*#region Accordions */
 
 details {
 	margin: 0.5em 0;
@@ -344,7 +388,29 @@ details {
 summary {
 	font-weight: bold;
 	margin: 0.25em;
+
+	list-style: none;
+
+	transition: var(--transition-speed-medium);
 }
+summary:hover {
+	color: var(--col-highlight);
+	cursor: pointer;
+}
+
+summary::before {
+	display: inline-block;
+	content: "►";
+	margin-right: 0.25em;
+	transition: rotate var(--transition-speed-fast) ease-in-out;
+}
+details[open] > summary::before {
+	rotate: 90deg;
+}
+
+/*#endregion*/
+
+/*#region Inspector tables */
 
 table {
 	width: 100%;
@@ -400,43 +466,40 @@ tr:nth-of-type(2n) {
 	background-color: transparent;
 }
 
-/* Buttons */
+/*#endregion*/
 
-button {
-	font-size: 1rem;
+/*#region Progress bars */
 
-	min-width: 2.5em;
-	
-	padding: 0.25em 0.5em;
-
-	color: var(--col-main);
-	
+.progressbar {
+	display: inline-flex;
+	justify-content: space-between;
+	overflow: hidden;
+	width: 50%;
+	height: 0.5em;
 	background-color: var(--col-background);
-
 	border: 1px solid var(--col-main);
 	border-radius: var(--corner-radius);
 }
 
-.toggle {
-	border-color: var(--col-main-dim);
-
-	&:hover {
-		border-color: var(--col-main);
-	}
-
-	&.on {
-		border-color: var(--col-main);
-		box-shadow: 0 0 0.25em var(--col-main), 0 0 0.25em var(--col-main);
-	}
+.progressbar-fill {
+	width: 0%;
+	background-color: var(--col-main);
 }
 
-/* Tooltips */
+/*#endregion*/
+
+/*#region Tooltips */
+
 .tooltip {
 	position: relative;
 	display: inline-block;
 	border-bottom: 1px dotted var(--col-main);
 	text-shadow: none;
 	cursor: help;
+
+	&.btn {
+		border-bottom: none;
+	}
 }
 .tooltiptext {
 	--width: 10em;
@@ -445,7 +508,7 @@ button {
 	text-align: center;
 
 	position: absolute;
-	bottom: 125%;
+	bottom: 133%;
 	left: 50%;
 	z-index: 10;
 	
@@ -454,7 +517,7 @@ button {
 	margin-left: calc(var(--width) / -2);
 	padding: 0.2em 0;
 	
-	background-color: #000000bf;
+	background-color: hsla(0, 0%, 0%, 0.85);
 	color: var(--col-main);
 	text-shadow: none;
 
@@ -484,7 +547,27 @@ button {
 	}
 }
 
-/* Generator settings */
+.tooltiptext.top {
+	bottom: unset;
+	top: 133%;
+}
+.tooltiptext.top::after {
+	top: unset;
+	bottom: 100%;
+	border-color: transparent transparent var(--col-main) transparent;
+}
+
+.tooltiptext.edge.right {
+	left: -100%;
+
+	&::after {
+		left: 85%;
+	}
+}
+
+/*#endregion*/
+
+/*#region Generator settings overlay */
 
 #generatorSettings {
 	position: absolute;
@@ -499,18 +582,34 @@ button {
 	transition: var(--transition-speed-fast);
 
 	&.open {
-		height: 100%;
+		height: 100vh;
 	}
 }
 
 #settingsContent {
-	margin: 3em 1em;
+	padding: 3em 1em;
 	height: 100%;
+	overflow: auto;
 }
 
-.tabsBar {
-	overflow: hidden;
+/*#endregion*/
+
+#seedBar {
+	padding: 0.5em;
+	margin-bottom: 0.5em;
 }
+
+#gen_seed {
+	width: 22.5em;
+}
+
+/* Settings tabs bar */
+.tabsBar {
+	display: flex;
+	justify-content: center;
+}
+
+/*#region Settings tabs buttons */
 
 .tabButton {
 	float: left;
@@ -531,94 +630,192 @@ button {
 .tabButton:last-of-type {
 	border-top-right-radius: var(--corner-radius-big);
 }
-
-/* Change background color of buttons on hover */
 .tabButton:hover {
 	border-color: var(--col-main);
 }
-
-/* Create an active/current tablink class */
 .tabButton.active {
  	border-color: var(--col-main);
 	box-shadow: 0 0 0.25em var(--col-main), 0 0 0.25em var(--col-main);
 }
 
-/* Style the tab content */
+/*#endregion*/
+
+/*#region Settings items */
+
+input {
+	font-family: 'Metrophobic', Verdana, Geneva, Tahoma, sans-serif;
+	font-size: 1em;
+}
+
+input[type="number"], input[type="text"] {
+	width: 15em;
+
+	color: var(--col-main);
+	background-color: var(--col-background);
+
+	border: 1px solid var(--col-main-dim);
+	border-radius: var(--corner-radius);
+
+	transition: var(--transition-speed-fast);
+
+	&:hover {
+		border-color: var(--col-alt);
+	}
+}
+
+input[type="checkbox"] {
+	accent-color: var(--col-main);
+
+	&:hover {
+		cursor: pointer;
+	}
+}
+
+.setting-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 0.5em;
+	margin: 0.5em 0;
+}
+
+.setting-container label {
+	display: inline-block;
+	text-align: right;
+	width: 15em;
+}
+
+.setting-container input {
+	margin: 0;
+	padding: 0;
+	width: 15em;
+}
+
+.reset {
+	font-size: 80%;
+}
+
+textarea {
+	font-family: 'Courier New', Courier, monospace;
+	font-size: 1em;
+
+	border-radius: var(--corner-radius);
+	color: var(--col-alt);
+	background-color: var(--col-background);
+	width: 100%;
+	height: 15em;
+}
+
+/*#endregion*/
+
+/* Settings tabs content */
 .tabContent {
 	display: none;
 	padding: 0.5em 1em;
 
 	background-color: var(--col-background);
+	
 	border: 1px solid var(--col-main-dim);
 	border-radius: var(--corner-radius);
-	border-top-left-radius: 0;
 
 	&.active {
 		display: block;
 	}
 }
 
-/* Other elements */
+/*#region Selector */
 
-hr {
-	height: 1px;
-	border: none;
-	margin: 1em 0;
-	background: linear-gradient(to right, transparent 0%, var(--col-main) 50%, transparent 100%);
-}
-
-#warpSlider {
-	appearance: none;
-    font-size: 1rem;
-    width: 15em;
-    height: 0.75em;
-    background: var(--col-background);
-    border: 1px solid var(--col-main);
-    border-radius: 0.5em;
-    filter: brightness(1);
-    transition: var(--transition-speed-fast);
-}
-#warpSlider::-webkit-slider-thumb {
-	appearance: none;
-
-	width: 1em;
-	height: 1em;
-
-	background: var(--col-main);
-	border: 1px solid var(--col-background);
-	border-radius: 50%;
-}
-#warpSlidere::-moz-range-thumb {
-	width: 1em;
-	height: 1em;
-
-	background: var(--col-main);
-	border: 1px solid var(--col-background);
-	border-radius: 50%;
+.select-wrapper {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5em;
 }
 @media (orientation: portrait) {
-	#warpSlider {
-		width: 50%;
+	.select-wrapper {
+		flex-direction: column;
 	}
 }
 
-#cellScale {
-	width: 12em;
+select {
+	transition: var(--transition-speed-fast);
+}
+select,
+::picker(select) {
+	appearance: base-select;
+
+	color: var(--col-main);
+	background-color: var(--col-background);
 }
 
-/* Hovers */
+select::picker-icon {
+	transition: var(--transition-speed-fast) rotate;
+}
+select:open::picker-icon {
+	rotate: 180deg;
+}
+select:hover {
+	border-color: var(--col-alt);
+	filter: drop-shadow(0 0 0.1em var(--col-alt));
 
-summary,
-button,
-.body,
-#warpSlider {
-	transition: filter var(--transition-speed-fast);
+	&&::picker-icon {
+		color: var(--col-alt);
+	}
+}
 
+selectedcontent,
+option {
+	display: flex;
+	justify-content: flex-start;
+	align-items: center;
+	align-content: center;
+	flex-wrap: wrap;
+	max-width: 75vw;
+	gap: 1em;
+	margin: 0.2em;
+}
+@media (orientation: portrait) {
+	selectedcontent,
+	option {
+		font-size: 80%;
+	}
+}
+selectedcontent {
+	font-weight: bold;
+	letter-spacing: 0.075em;
+}
+
+select,
+option {
 	&:hover {
 		cursor: pointer;
-		filter: brightness(1.25);
 	}
 }
+
+option:nth-of-type(odd) {
+	background: rgb(from var(--col-main) calc(r*0.33) calc(g*0.33) calc(b*0.33) / 0.6);
+}
+
+option:hover,
+option:focus {
+	filter: drop-shadow(0 0 0.1em var(--col-alt));
+}
+
+.script-thumb {
+	text-shadow: 0 0 0.25em white;
+}
+
+.script-desc {
+	text-wrap: pretty;
+}
+
+selectedcontent .script-desc {
+	display: none;
+}
+
+/*#endregion*/
+
+/*#region Dialogs */
 
 a {
 	color: var(--col-alt);
@@ -629,7 +826,7 @@ dialog {
 
 	background-color: var(--col-background);
 
-	border: 1px solid var(--col-main);
+	border: 1px solid var(--col-main-dim);
 	border-radius: var(--corner-radius-big);
 
 	&::backdrop {
@@ -661,46 +858,72 @@ dialog {
 	background-color: hsl(0, 0%, 20%);
 }
 
-.progressbar {
-	display: inline-flex;
-	justify-content: space-between;
-	overflow: hidden;
-	width: 50%;
-	height: 0.5em;
-	background-color: var(--col-background);
-	border: 1px solid var(--col-main);
-	border-radius: var(--corner-radius);
+/*#endregion*/
+
+/* Other elements */
+
+hr {
+	height: 1px;
+	border: none;
+	margin: 1em 0;
+	background: linear-gradient(to right, transparent 0%, var(--col-main) 50%, transparent 100%);
 }
 
-.progressbar-fill {
-	width: 0%;
-	background-color: var(--col-main);
+/*#region Time warp slider */
+
+#warpSlider {
+	appearance: none;
+    font-size: 1rem;
+
+    width: 15em;
+    height: 0.75em;
+
+    background: var(--col-background);
+    border: 1px solid var(--col-main);
+    border-radius: 0.5em;
+
+    filter: brightness(1);
 }
+#warpSlider::-webkit-slider-thumb {
+	appearance: none;
 
-.reset {
-	font-size: 80%;
+	width: 1em;
+	height: 1em;
+
+	background: var(--col-main);
+	border: 1px solid var(--col-background);
+	border-radius: 50%;
 }
+#warpSlider::-moz-range-thumb {
+	width: 1em;
+	height: 1em;
 
-input[type="number"], input[type="text"]
-{
-	width: 9em;
-
-	color: var(--col-main);
-	background-color: var(--col-background);
-
-	border: 1px solid var(--col-main-dim);
-	border-radius: var(--corner-radius);
-
-	transition: var(--transition-speed-fast);
-
-	&:hover {
-		border-color: var(--col-alt);
+	background: var(--col-main);
+	border: 1px solid var(--col-background);
+	border-radius: 50%;
+}
+@media (orientation: portrait) {
+	#warpSlider {
+		width: 50%;
 	}
 }
 
-.setting-container {
-	display: flex;
-	align-items: center;
-	gap: 0.5em;
-	margin: 0.5em 0;
+/*#endregion*/
+
+#cellScale {
+	width: 12em;
+}
+
+/* Hovers */
+
+summary,
+button,
+.body,
+#warpSlider {
+	transition: filter var(--transition-speed-fast);
+
+	&:hover {
+		cursor: pointer;
+		filter: brightness(1.25);
+	}
 }

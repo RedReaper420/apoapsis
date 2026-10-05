@@ -14,7 +14,7 @@ const perturbatorDistance = new T.Value(0.1, T.units.Dist.ly);
  * Wrapper for generating planets for the specified star formation.
  * 
  * @param {T.Star|T.BinaryStar} star - Current star formation.
- * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {T.GeneratorSettings} settings - Generation settings configuration.
  * 
  * @see {@link generatePlanetsForBinary}
  * @see {@link generatePlanetsForSingleStar}
@@ -32,7 +32,7 @@ export function generatePlanets(star, settings) {
  * @see {@link generatePlanetsForStar}
  * 
  * @param {T.Star} star - Current star.
- * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {T.GeneratorSettings} settings - Generation settings configuration.
  */
 function generatePlanetsForSingleStar(star, settings) {
 	// Calculating distance limit
@@ -48,7 +48,7 @@ function generatePlanetsForSingleStar(star, settings) {
 		// Simulating a pass-by of a stray red dwarf at 0.2 ly distance
 		a_crit = getMaximalSTypeOrbit(star.mass, evilAndIntimidatingRedDwarf, perturbatorDistance);
 	}
-	a_crit_safe = a_crit.as(T.units.Dist.AU) * settings.planet_s_type_safety_factor;
+	a_crit_safe = a_crit.as(T.units.Dist.AU) * settings.planet_orbit_s_type_safety_factor;
 
 	generatePlanetsForStar(settings, star, a_crit_safe);
 }
@@ -59,7 +59,7 @@ function generatePlanetsForSingleStar(star, settings) {
  * @see {@link generatePlanetsForStar}
  * 
  * @param {T.BinaryStar} binary - Current binary star.
- * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {T.GeneratorSettings} settings - Generation settings configuration.
  */
 function generatePlanetsForBinary(binary, settings) {
 	let limit = new T.Value(Infinity, T.units.Dist.m);
@@ -67,28 +67,28 @@ function generatePlanetsForBinary(binary, settings) {
 	
 	// Planets around the host star
 	limit = getMaximalSTypeOrbit(binary.primary.mass, binary.secondary.mass, binary.primary.sma);
-	limit_safe = limit.as(T.units.Dist.AU) * settings.planet_s_type_safety_factor;
+	limit_safe = limit.as(T.units.Dist.AU) * settings.planet_orbit_s_type_safety_factor;
 	const discardedPlanetsPrimary = generatePlanetsForStar(settings, binary.primary, limit_safe);
 	
 	// Planets around the companion star
 	limit = getMaximalSTypeOrbit(binary.secondary.mass, binary.primary.mass, binary.primary.sma);
-	limit_safe = limit.as(T.units.Dist.AU) * settings.planet_s_type_safety_factor;
+	limit_safe = limit.as(T.units.Dist.AU) * settings.planet_orbit_s_type_safety_factor;
 	const discardedPlanetsSecondary = generatePlanetsForStar(settings, binary.secondary, limit_safe);
 	
 	// Planets around both stars
-	if (settings.planet_p_type_enabled === true) {
+	if (settings.planet_orbit_p_type_enabled === true) {
 		if (binary.parentBody !== null) { // This binary is a companion of other star (formation)
 			limit = getMaximalSTypeOrbit(binary.mass, binary.parentBody.mass, binary.sma);
-			limit_safe = limit.as(T.units.Dist.AU) * settings.planet_s_type_safety_factor;
+			limit_safe = limit.as(T.units.Dist.AU) * settings.planet_orbit_s_type_safety_factor;
 		}
 		else { // This binary is alone
 			// Simulating a pass-by of a stray red dwarf at 0.2 ly distance
 			limit = getMaximalSTypeOrbit(binary.mass, evilAndIntimidatingRedDwarf, perturbatorDistance);
-			limit_safe = limit.as(T.units.Dist.AU) * settings.planet_s_type_safety_factor;
+			limit_safe = limit.as(T.units.Dist.AU) * settings.planet_orbit_s_type_safety_factor;
 		}
 
 		const start = getMinimalPTypeOrbit(binary.primary.mass, binary.secondary.mass, binary.primary.sma);
-		const start_safe = start.as(T.units.Dist.AU) * settings.planet_p_type_safety_factor;
+		const start_safe = start.as(T.units.Dist.AU) * settings.planet_orbit_p_type_safety_factor;
 		
 		let pOrbitPlanetsToGenerate = (discardedPlanetsPrimary + discardedPlanetsSecondary) / 2;
 		if (pOrbitPlanetsToGenerate > 1)
@@ -145,7 +145,7 @@ export function getMinimalPTypeOrbit(mass_greater, mass_lesser, binary_sma) {
 /**
  * Generates planets for the specified (binary) star instance.
  * 
- * @param {T.GenerationSettings} settings - Generation settings configuration.
+ * @param {T.GeneratorSettings} settings - Generation settings configuration.
  * @param {T.Star|T.BinaryStar} star - Current star formation.
  * @param {number} distanceLimit - Distance limit (in AU) beyond which planets won't be generated.
  * @param {number} distanceStart - *[min & default: {@link PLANET_SPAWN_START_DIST}]* distance (in AU) from which planets will start generating.
@@ -159,6 +159,20 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
 		: planetsNumber;
 	if (planetsToGenerate === 0)
 		return 0;
+
+	const generationProfile = {
+		// Amplitude. 1.15^2 = 1.3225
+		c1: prng(0.15),
+		c2: prng(0.15),
+
+		// Power. From 0.2 to 2
+		p1: 2 * (10 ** prng.range(-1, 0)),
+		p2: 2 * (10 ** prng.range(-1, 0)),
+
+		// Frequency
+		f1: prng(23),
+		f2: prng(23)
+	}
 
 	const startDistance = (Math.max(PLANET_SPAWN_START_DIST, distanceStart) + 0.3 * Math.pow(prng(), 2)) * Math.sqrt(star.luminosity); // AU
 	let sma = startDistance;
@@ -179,7 +193,8 @@ function generatePlanetsForStar(settings, star, distanceLimit, distanceStart = 0
 				sma_init: sma,
 				sma_min: distanceStart, 
 				sma_max: distanceLimit,
-			}
+			},
+			generationProfile
 		);
 		star.bodies.push(planet);
 

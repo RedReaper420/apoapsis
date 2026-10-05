@@ -39,6 +39,9 @@ export default function generatePlanetProfile(body) {
 		: '🌑';
 	bodyType.innerText = `${icon} Planet / ${body.type}`;
 
+	const category = planet.querySelector('#classification');
+	category.innerHTML = body.category;
+
 	// ====== PHYSICAL ======
 
 	// MASS
@@ -180,27 +183,44 @@ export default function generatePlanetProfile(body) {
 
 	// CORE
 	const compositionCoreIron = planet.querySelector('#compositionCoreIron');
-	compositionCoreIron.innerText = (body.core.composition.iron * 100).toPrecision(2) + '%';
+	const compositionCoreIronBar = planet.querySelector('#compositionCoreIronBar');
+	const ironPercent = body.core.composition.iron * 100;
+	compositionCoreIron.innerText = (ironPercent < 100 ? ironPercent.toPrecision(2) : ironPercent.toFixed(0)) + '%';
+	compositionCoreIronBar.style.width = compositionCoreIron.innerText;
 
 	const compositionCoreRock = planet.querySelector('#compositionCoreRock');
-	compositionCoreRock.innerText = (body.core.composition.rock * 100).toPrecision(2) + '%';
+	const compositionCoreRockBar = planet.querySelector('#compositionCoreRockBar');
+	const rockPercent = body.core.composition.rock * 100;
+	compositionCoreRock.innerText = (rockPercent < 100 ? rockPercent.toPrecision(2) : rockPercent.toFixed(0)) + '%';
+	compositionCoreRockBar.style.width = compositionCoreRock.innerText;
 
 	const compositionCoreIce = planet.querySelector('#compositionCoreIce');
-	compositionCoreIce.innerText = (body.core.composition.ice * 100).toPrecision(2) + '%';
+	const compositionCoreIceBar = planet.querySelector('#compositionCoreIceBar');
+	const icePercent = body.core.composition.ice * 100;
+	compositionCoreIce.innerText = (icePercent < 100 ? icePercent.toPrecision(2) : icePercent.toFixed(0)) + '%';
+	compositionCoreIceBar.style.width = compositionCoreIce.innerText;
 
 	// ENVELOPE
 	const compositionEnvelope = planet.querySelector('#compositionEnvelope');
 	if (body.type !== T.planetTypes.Terrestrial) {
 		const compositionEnvelopeGas = planet.querySelector('#compositionEnvelopeGas');
-		compositionEnvelopeGas.innerText = (body.envelope.composition.gas * 100).toPrecision(2) + '%';
+		const compositionEnvelopeGasBar = planet.querySelector('#compositionEnvelopeGasBar');
+		const gasPercent = body.envelope.composition.gas * 100;
+		compositionEnvelopeGas.innerText = (gasPercent < 100 ? gasPercent.toPrecision(2) : gasPercent.toFixed(0)) + '%';
+		compositionEnvelopeGasBar.style.width = compositionEnvelopeGas.innerText;
 
 		const compositionEnvelopeIce = planet.querySelector('#compositionEnvelopeIce');
-		compositionEnvelopeIce.innerText = (body.envelope.composition.ice * 100).toPrecision(2) + '%';
+		const compositionEnvelopeIceBar = planet.querySelector('#compositionEnvelopeIceBar');
+		const iceEnvPercent = body.envelope.composition.ice * 100;
+		compositionEnvelopeIce.innerText = (iceEnvPercent < 100 ? iceEnvPercent.toPrecision(2) : iceEnvPercent.toFixed(0)) + '%';
+		compositionEnvelopeIceBar.style.width = compositionEnvelopeIce.innerText;
 
 		const envelopeThickness = planet.querySelector('#envelopeThickness');
+		const envelopeThicknessBar = planet.querySelector('#envelopeThicknessBar');
 		const envelopeThickness_km = body.envelope.thickness.as(T.units.Dist.km);
 		const totalRadius_km = body.radius.as(T.units.Dist.km);
 		envelopeThickness.innerText = `${envelopeThickness_km.toFixed(2)} km (${(envelopeThickness_km / totalRadius_km * 100).toPrecision(2)}% of radius)`;
+		envelopeThicknessBar.style.width = (envelopeThickness_km / totalRadius_km * 100).toPrecision(2) + '%';
 	}
 	else {
 		compositionEnvelope.remove();
@@ -227,6 +247,28 @@ export default function generatePlanetProfile(body) {
 	// RETROGRADE ROTATION
 	const rotationRetrograde = planet.querySelector('#rotationRetrograde');
 	rotationRetrograde.innerText = body.isRotationRetrograde ? 'Yes' : 'No';
+
+	// SYNODIC DAY
+	const synodicDayValue = planet.querySelector('#synodicDayValue');
+	const synodicDayUnit = planet.querySelector('#synodicDayUnit');
+	if (body.synodicDay.as(T.units.Time.y) <= 100) {
+		const synodicDayFit = utils.getFittingValue(
+			body.synodicDay,
+			T.units.Time.s,
+			[
+				T.units.Time.h, 
+				T.units.Time.d, 
+				T.units.Time.y
+			],
+			0.9
+		);
+		synodicDayValue.innerText = synodicDayFit.value.toFixed(2);
+		synodicDayUnit.innerText = synodicDayFit.unit;
+	}
+	else {
+		synodicDayValue.innerText = 'Infinite';
+		synodicDayUnit.remove();
+	}
 	
 	// TIDAL LOCK
 	const tidalLock = planet.querySelector('#tidalLock');
@@ -296,7 +338,7 @@ export default function generatePlanetProfile(body) {
 
 	// EFFECTIVE STAR DISTANCE
 	const starDistanceEff = planet.querySelector('#starDistanceEff');
-	starDistanceEff.innerText = (body.genData.sma_norm).toPrecision(3) + ' AU☉';
+	starDistanceEff.innerText = (body.genData.sma_norm < 1000 ? body.genData.sma_norm.toPrecision(3) : body.genData.sma_norm.toFixed(1)) + ' AU☉';
 
 	// LIGHT INTENSITY
 	const lightIntensity = planet.querySelector('#lightIntensity');
@@ -310,7 +352,7 @@ export default function generatePlanetProfile(body) {
 	if (body.genData.secondStar !== null) {
 		starDistance2.innerText = (body.genData.secondStarSmaNorm * Math.sqrt(body.genData.secondStar.luminosity)).toPrecision(3) + ' AU';
 
-		starDistanceEff2.innerText = (body.genData.secondStarSmaNorm).toPrecision(3) + ' AU☉';
+		starDistanceEff2.innerText = (body.genData.secondStarSmaNorm < 1000 ? body.genData.secondStarSmaNorm.toPrecision(3) : body.genData.secondStarSmaNorm.toFixed(1)) + ' AU☉';
 
 		const illumination2 = 1 / (body.genData.secondStarSmaNorm ** 2) * 100;
 		lightIntensity2.innerText = (illumination2 > 100 ? illumination2.toFixed(1) : illumination2.toPrecision(3)) + '%';
@@ -336,7 +378,8 @@ export default function generatePlanetProfile(body) {
 
 			// ATMOSPHERE MASS
 			const atmosphereMass = planet.querySelector('#atmosphereMass');
-			atmosphereMass.innerText = body.atmosphere.mass.as(T.units.Mass.M_Earth_atm).toPrecision(3) + ' Matm⊕';
+			const atmosphereMassValue = body.atmosphere.mass.as(T.units.Mass.M_Earth_atm)
+			atmosphereMass.innerText = (atmosphereMassValue < 1 ? atmosphereMassValue.toPrecision(2) : atmosphereMassValue.toFixed(2)) + ' Matm⊕';
 
 			const atmosphereMass_kg = planet.querySelector('#atmosphereMass_kg');
 			atmosphereMass_kg.innerText = body.atmosphere.mass.as(T.units.Mass.kg).toExponential(3).replace('+','') + ' kg';
@@ -383,7 +426,8 @@ export default function generatePlanetProfile(body) {
 				cell.appendChild(cell_span);
 				
 				header_span.innerText = gas;
-				cell_span.innerText = (body.atmosphere.composition[gas] * 100).toPrecision(2) + '%';
+				const atmGasPercent = body.atmosphere.composition[gas] * 100;
+				cell_span.innerText = (atmGasPercent < 100 ? atmGasPercent.toPrecision(2) : atmGasPercent.toFixed(0)) + '%';
 
 				const barComponent = document.createElement('span');
 				barComponent.classList.add('progressbar-fill');
@@ -416,8 +460,10 @@ export default function generatePlanetProfile(body) {
 	// TEMPERATURE
 	
 	// SURFACE
-	const tempSurf = planet.querySelector('#tempSurf');
-	tempSurf.innerText = (body.temperature.as(T.units.Temp.C)).toFixed(2) + '°C';
+	const tempSurfC = planet.querySelector('#tempSurfC');
+	tempSurfC.innerText = (body.temperature.as(T.units.Temp.C)).toFixed(2) + '°C';
+	const tempSurfK = planet.querySelector('#tempSurfK');
+	tempSurfK.innerText = (body.temperature.as(T.units.Temp.K)).toFixed(2) + 'K';
 
 	// GREENHOUSE EFFECT
 	const greenhouse = planet.querySelector('#greenhouse');
@@ -425,12 +471,28 @@ export default function generatePlanetProfile(body) {
 	greenhouse.innerText = `${Math.sign(greenhouseTemp) >= 0 ? '+' : '-'}${greenhouseTemp.toFixed(2)}°C`;
 
 	// EFFECTIVE
-	const tempEff = planet.querySelector('#tempEff');
-	tempEff.innerText = (body.temperature_eff.as(T.units.Temp.C)).toFixed(3) + '°C';
+	const tempEffC = planet.querySelector('#tempEffC');
+	tempEffC.innerText = (body.temperature_eff.as(T.units.Temp.C)).toFixed(3) + '°C';
+	const tempEffK = planet.querySelector('#tempEffK');
+	tempEffK.innerText = (body.temperature_eff.as(T.units.Temp.K)).toFixed(3) + 'K';
 
 	// EQUILIBRIUM
-	const tempEq = planet.querySelector('#tempEq');
-	tempEq.innerText = (body.temperature_eq.as(T.units.Temp.C)).toFixed(3) + '°C';
+	const tempEqC = planet.querySelector('#tempEqC');
+	tempEqC.innerText = (body.temperature_eq.as(T.units.Temp.C)).toFixed(3) + '°C';
+	const tempEqK = planet.querySelector('#tempEqK');
+	tempEqK.innerText = (body.temperature_eq.as(T.units.Temp.K)).toFixed(3) + 'K';
+
+	// MAXIMAL
+	const tempMaxC = planet.querySelector('#tempMaxC');
+	tempMaxC.innerText = (body.temperature_max.as(T.units.Temp.C)).toFixed(3) + '°C';
+	const tempMaxK = planet.querySelector('#tempMaxK');
+	tempMaxK.innerText = (body.temperature_max.as(T.units.Temp.K)).toFixed(3) + 'K';
+
+	// MINIMAL
+	const tempMinC = planet.querySelector('#tempMinC');
+	tempMinC.innerText = (body.temperature_min.as(T.units.Temp.C)).toFixed(3) + '°C';
+	const tempMinK = planet.querySelector('#tempMinK');
+	tempMinK.innerText = (body.temperature_min.as(T.units.Temp.K)).toFixed(3) + 'K';
 
 	// ====== MAGNETOSPHERE ======
 

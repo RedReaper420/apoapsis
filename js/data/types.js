@@ -206,6 +206,8 @@ export class Value {
 	 * @param {string} unit - Unit name. Use `units` enum to assign (`T.units.GROUP.UNIT`).
 	 */
 	constructor (value, unit) {
+		this.$type = 'Value';
+
 		/** @type {number} */ this.value = value;
 		/** @type {string} */ this.unit = unit;
 	}
@@ -288,7 +290,7 @@ export class Value {
 // Generation Settings
 // =================================================
 
-export class GenerationSettings {
+export class GeneratorSettings {
     constructor(
 		seed_user = '',
 		seed = '',
@@ -311,20 +313,23 @@ export class GenerationSettings {
 
 		// Planets orbits settings
 
-		planet_s_type_safety_factor = consts.UI_PLANET_S_TYPE_SAFETY_FACTOR_VAL_DEF,
-		planet_p_type_enabled = consts.UI_PLANET_P_TYPE_ENABLED_VAL_DEF,
-		planet_p_type_safety_factor = consts.UI_PLANET_P_TYPE_SAFETY_FACTOR_VAL_DEF,
+		planet_orbit_s_type_safety_factor = consts.UI_PLANET_S_TYPE_SAFETY_FACTOR_VAL_DEF,
+		planet_orbit_p_type_enabled = consts.UI_PLANET_P_TYPE_ENABLED_VAL_DEF,
+		planet_orbit_p_type_safety_factor = consts.UI_PLANET_P_TYPE_SAFETY_FACTOR_VAL_DEF,
 
-		planet_migration_type_1_enabled = consts.UI_PLANET_MIGRATION_TYPE_1_ENABLED_VAL_DEF,
-		planet_migration_type_1_coeff = consts.UI_PLANET_MIGRATION_TYPE_1_COEFF_VAL_DEF,
-		planet_migration_type_2_enabled = consts.UI_PLANET_MIGRATION_TYPE_2_ENABLED_VAL_DEF,
-		planet_migration_type_2_coeff = consts.UI_PLANET_MIGRATION_TYPE_2_COEFF_VAL_DEF,
-		planet_migration_interpolated = consts.UI_PLANET_MIGRATION_INTERPOLATED_VAL_DEF,
-		planet_migration_grand_tack_chance = consts.UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_VAL_DEF,
-		planet_migration_hill_safety_factor = consts.UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF,
+		planet_orbit_migration_type_1_enabled = consts.UI_PLANET_MIGRATION_TYPE_1_ENABLED_VAL_DEF,
+		planet_orbit_migration_type_1_coeff = consts.UI_PLANET_MIGRATION_TYPE_1_COEFF_VAL_DEF,
+		planet_orbit_migration_type_2_enabled = consts.UI_PLANET_MIGRATION_TYPE_2_ENABLED_VAL_DEF,
+		planet_orbit_migration_type_2_coeff = consts.UI_PLANET_MIGRATION_TYPE_2_COEFF_VAL_DEF,
+		planet_orbit_migration_interpolated = consts.UI_PLANET_MIGRATION_INTERPOLATED_VAL_DEF,
+		planet_orbit_migration_grand_tack_chance = consts.UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_VAL_DEF,
+		planet_orbit_migration_hill_safety_factor = consts.UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_VAL_DEF,
 
 		// Planets settings
 		planet_amount_multiplier = consts.UI_PLANET_AMOUNT_MULT_VAL_DEF,
+		planet_bonus_giant_impact_chance = consts.UI_PLANET_BONUS_GIANT_IMPACT_CHANCE_VAL_DEF,
+		planet_max_bonus_giant_impacts = consts.UI_PLANET_MAX_BONUS_GIANT_IMPACTS_VAL_DEF,
+		planet_binary_chance = consts.UI_PLANET_BINARY_CHANCE_VAL_DEF,
 		planet_life_chance = consts.UI_PLANET_LIFE_CHANCE_DEF,
 	) {
 		this.seed_user = seed_user;
@@ -348,30 +353,33 @@ export class GenerationSettings {
 
 		// Planets orbits settings
 
-		this.planet_s_type_safety_factor = planet_s_type_safety_factor;
-		this.planet_p_type_enabled = planet_p_type_enabled;
-		this.planet_p_type_safety_factor = planet_p_type_safety_factor;
+		this.planet_orbit_s_type_safety_factor = planet_orbit_s_type_safety_factor;
+		this.planet_orbit_p_type_enabled = planet_orbit_p_type_enabled;
+		this.planet_orbit_p_type_safety_factor = planet_orbit_p_type_safety_factor;
 
-		this.planet_migration_type_1_enabled = planet_migration_type_1_enabled;
-		this.planet_migration_type_1_coeff = planet_migration_type_1_coeff;
-		this.planet_migration_type_2_enabled = planet_migration_type_2_enabled;
-		this.planet_migration_type_2_coeff = planet_migration_type_2_coeff;
-		this.planet_migration_interpolated = planet_migration_interpolated;
-		this.planet_migration_grand_tack_chance = planet_migration_grand_tack_chance;
-		this.planet_migration_hill_safety_factor = planet_migration_hill_safety_factor;
+		this.planet_orbit_migration_type_1_enabled = planet_orbit_migration_type_1_enabled;
+		this.planet_orbit_migration_type_1_coeff = planet_orbit_migration_type_1_coeff;
+		this.planet_orbit_migration_type_2_enabled = planet_orbit_migration_type_2_enabled;
+		this.planet_orbit_migration_type_2_coeff = planet_orbit_migration_type_2_coeff;
+		this.planet_orbit_migration_interpolated = planet_orbit_migration_interpolated;
+		this.planet_orbit_migration_grand_tack_chance = planet_orbit_migration_grand_tack_chance;
+		this.planet_orbit_migration_hill_safety_factor = planet_orbit_migration_hill_safety_factor;
 
 		// Planets settings
 
 		this.planet_amount_multiplier = planet_amount_multiplier;
+		this.planet_bonus_giant_impact_chance = planet_bonus_giant_impact_chance;
+		this.planet_max_bonus_giant_impacts = planet_max_bonus_giant_impacts;
+		this.planet_binary_chance = planet_binary_chance;
 		this.planet_life_chance = planet_life_chance;
 	}
 }
 
 export class System {
 	constructor(
-		settings = new GenerationSettings()
+		settings = new GeneratorSettings()
 	) {
-		/** @type {GenerationSettings} */
+		/** @type {GeneratorSettings} */
 		this.settings = settings;
 
 		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */
@@ -456,6 +464,8 @@ export class Orbit {
 export class Star extends Body {
 	constructor (parentBody = null, name = 'Sol') {
 		super(parentBody, name);
+		
+		this.$type = 'Star';
 
 		/** @type {Value} */ this.mass = new Value(1.0, units.Mass.M_Sun);
 		/** @type {Value} */ this.radius = new Value(1.0, units.Dist.R_Sun);
@@ -502,7 +512,7 @@ export const migrationStatus = Object.freeze({
  * 
  * @typedef {Object} GenData
  * 
- * @property {boolean} isMoon - Is the planet a moon of other planet. Affects generation.
+ * @property {boolean} isMoon - Is the planet a moon of other planet. Affects interior generation.
  * @property {string} moonType - Moon type (`T.moonTypes`)
  * @property {boolean} retrograde - Retrograde orbit flag, assigned for some regular moons.
  * @property {number} mass - Moon mass (M⊕).
@@ -523,6 +533,8 @@ export const migrationStatus = Object.freeze({
 export class Planet extends Body {
 	constructor (parentBody = null, name = 'Terra') {
 		super(parentBody, name);
+		
+		this.$type = 'Planet';
 
 		/** @type {Value} */ this.mass = new Value(1.0, units.Mass.M_Earth);
 		/** @type {Value} */ this.radius = new Value(1.0, units.Dist.R_Earth);
@@ -561,11 +573,13 @@ export class Binary extends Body {
 		this.primary = primary;
 		this.primary.parentBody = this;
 		this.primary.sma = sma;
+		this.primary.companion = secondary;
 		
 		/** @type {Planet|Star|BinaryPlanet|BinaryStar} */
 		this.secondary = secondary;
 		this.secondary.parentBody = this;
 		this.secondary.sma = sma;
+		this.secondary.companion = primary;
 
 		/** @type {string} */
 		this.color = '#ffffff';
@@ -579,6 +593,8 @@ export class BinaryStar extends Binary {
 		sma = new Value(15, units.Dist.AU),
 	) {
 		super(primary, secondary, sma);
+		
+		this.$type = 'BinaryStar';
 
 		this.combineProperties();
 	}
@@ -632,6 +648,8 @@ export class BinaryPlanet extends Binary {
 		sma = new Value(420000, units.Dist.km),
 	) {
 		super(primary, secondary, sma);
+		
+		this.$type = 'BinaryPlanet';
 
 		this.combineProperties();
 	}
