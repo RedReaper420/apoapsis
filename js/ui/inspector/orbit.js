@@ -2,16 +2,17 @@
 import * as T from "../../data/types.js";
 import * as utils from "../../utils/utils.js";
 
-export default /**
- * 
+/**
+ * Generates orbit information section for the body inspector.
  * @param {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} body 
- * @returns {HTMLElement}
+ * @returns
  */
-function generateOrbitSection(body) {
+export default function generateOrbitSection(body) {
 	const template_orbit = document.getElementById('template_orbit');
+	/** @type {Node} */
 	const orbit = document.importNode(template_orbit.content, true);
 
-	// PARENT BODY & BARYCENTER
+	//#region | Parent body & barycenter
 	const parentBody = orbit.querySelector('#parentBody');
 	const binaryMassRatioRow = orbit.querySelector('#binaryMassRatioRow');
 
@@ -42,6 +43,7 @@ function generateOrbitSection(body) {
 		binaryMassRatioRow.remove();
 	}
 
+	// Parent body icon
 	const parentType = host instanceof T.Binary
 		? '♋'
 		: host instanceof T.Star
@@ -50,8 +52,9 @@ function generateOrbitSection(body) {
 				? '🪐'
 				: '🌑';
 	parentBody.innerText = `${parentType} ${host.name}`;
+	//#endregion
 
-	// ORBITAL PERIOD
+	//#region | Orbital period
 	const orbitalPeriodValue = orbit.querySelector('#orbitalPeriodValue');
 	const orbitalPeriodUnit = orbit.querySelector('#orbitalPeriodUnit');
 	const orbitalPeriodFit = utils.getFittingValue(
@@ -66,12 +69,14 @@ function generateOrbitSection(body) {
 	);
 	orbitalPeriodValue.innerText = orbitalPeriodFit.value.toFixed(2);
 	orbitalPeriodUnit.innerText = orbitalPeriodFit.unit;
+	//#endregion
 
-	// MEAN ORBITAL SPEED
+	//#region | Mean orbital speed
 	const orbitalSpeed = orbit.querySelector('#orbitalSpeed');
 	orbitalSpeed.innerText = body.orbitalSpeed.as(T.units.Spd.km_s).toFixed(2) + ' km/s';
+	//#endregion
 
-	// SEMI-MAJOR AXIS
+	//#region | Semi-major axis
 	const smaValue = orbit.querySelector('#smaValue');
 	const smaUnit = orbit.querySelector('#smaUnit');
 	const smaFit = utils.getFittingValue(
@@ -85,8 +90,9 @@ function generateOrbitSection(body) {
 	);
 	smaValue.innerText = smaFit.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 	smaUnit.innerText = smaFit.unit;
+	//#endregion
 
-	// PERIAPSIS
+	//#region | Periapsis
 	const periapsisValue = orbit.querySelector('#periapsisValue');
 	const periapsisUnit = orbit.querySelector('#periapsisUnit');
 	const periapsisFit = utils.getFittingValue(
@@ -100,8 +106,9 @@ function generateOrbitSection(body) {
 	);
 	periapsisValue.innerText = periapsisFit.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 	periapsisUnit.innerText = periapsisFit.unit;
+	//#endregion
 
-	// APOAPSIS
+	//#region | Apoapsis
 	const apoapsisValue = orbit.querySelector('#apoapsisValue');
 	const apoapsisUnit = orbit.querySelector('#apoapsisUnit');
 	const apoapsisFit = utils.getFittingValue(
@@ -115,30 +122,35 @@ function generateOrbitSection(body) {
 	);
 	apoapsisValue.innerText = apoapsisFit.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 	apoapsisUnit.innerText = apoapsisFit.unit;
+	//#endregion
 
-	// ECCENTRICITY
+	//#region | Eccentricity
 	const eccentricity = orbit.querySelector('#eccentricity');
 	eccentricity.innerText = body.orbit.e.toPrecision(2);
+	//#endregion
 
-	// RETROGRADE ORBIT
+	//#region | Retrograde orbit
 	const retrogradeOrbit = orbit.querySelector('#retrogradeOrbit');
 	retrogradeOrbit.innerText = body instanceof T.Planet
 		? body.genData.retrograde
 			? 'Yes'
 			: 'No'
 		: 'No';
-	
-	// ARG. OF PERIAPSIS
+	//#endregion
+
+	//#region | Arg. of periapsis
 	const argOfPeriapsis = orbit.querySelector('#argOfPeriapsis');
 	argOfPeriapsis.innerText = utils.radToDeg(body.orbit.w).toFixed(2) + '°';
+	//#endregion
 
+	//#region | Long. of asc. node
 	/*
-	// LONG. OF ASC. NODE
 	const longAscNode = orbit.querySelector('#longAscNode');
 	longAscNode.innerText = utils.radToDeg(body.orbit.Omega).toFixed(2) + '°';
 	*/
+	//#endregion
 	
-	// ---------
+	// ---
 
 	return orbit;
 }

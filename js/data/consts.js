@@ -45,11 +45,11 @@ const consts = Object.freeze({
 	/** Unit: K */
 	PHY_EARTH_TEMP_SURF: 288,
 
-	/** 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon). ("Lagrange point test") */
+	/** 1:25 or greater mass ratio qualifies planetary system as "binary", otherwise hierarchical (planet and moon). Search for "Lagrange point test". */
 	DEF_BINARY_PLANET_MASS_RATIO: 0.04,
 	/** Below 15 M⊕, a gas planet is classified as Mini-Neptune or Gas Dwarf, otherwise as Ice/Gas Giant. */
 	DEF_SUB_NEPTUNE_MASS_THRESHOLD: 15,
-	/** Equal and above 4100 M⊕, a gas giant is classified as Brown Dwarf. */
+	/** Equal and above 4100 M⊕ (12.9 M♃), a gas giant is classified as Brown Dwarf. */
 	DEF_BROWN_DWARF_MASS_THRESHOLD: 4100,
 
 	/** Unit: g/mol */
@@ -129,9 +129,9 @@ const consts = Object.freeze({
 
 	UI_PLANET_MIGRATION_INTERPOLATED_VAL_DEF: true,
 
-	UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_VAL_DEF: 0.25,
 	UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_LIM_MIN: 0.0,
 	UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_LIM_MAX: 1.0,
+	UI_PLANET_MIGRATION_GRAND_TACK_CHANCE_VAL_DEF: 0.25,
 
 	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_LIM_MIN: 3.5,
 	UI_PLANET_MIGRATION_HILL_SAFETY_FACTOR_LIM_MAX: 20.0,

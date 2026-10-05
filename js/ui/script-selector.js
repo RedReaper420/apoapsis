@@ -1,22 +1,47 @@
+
 const selector = document.getElementById('script-select');
 let selectorData = null;
-
-const scriptTextarea = document.getElementById('predicate');
 
 selector.addEventListener('change', event => {
 	handleScriptChange(event.target.value);
 });
+
+const scriptTextarea = document.getElementById('predicate');
+const preTextarea = document.getElementById('pregen');
+const postTextarea = document.getElementById('postgen');
 
 async function handleScriptChange(id) {
 	const options = Array.from(document.getElementsByTagName('option'));
 	const selected = options.find(opt => { return opt.value === id });
 
 	if (selected && id) {
-		const response = await fetch(`../../filters/${id}.js`);
-		scriptTextarea.value = await response.text();
+		// Load and set search script
+		const response_predicate = await fetch(`../../filters/${id}.js`);
+		scriptTextarea.value = await response_predicate.text();
+
+		// Load and set pre-gen script
+		if (selected.dataset.pre === 'true') {
+			const response_pre = await fetch(`../../filters/${id}.pre.js`);
+			preTextarea.value = await response_pre.text();
+		}
+		else {
+			preTextarea.value = '';
+		}
+
+		// Load and set post-gen script
+		if (selected.dataset.post === 'true') {
+			const response_post = await fetch(`../../filters/${id}.post.js`);
+			postTextarea.value = await response_post.text();
+		}
+		else {
+			postTextarea.value = '';
+		}
 	}
 	else {
+		// Flush scripts
 		scriptTextarea.value = '';
+		preTextarea.value = '';
+		postTextarea.value = '';
 	}
 }
 
@@ -41,17 +66,22 @@ async function initSelector() {
 
 				// Metadata
 				option.value = `${item.script}`;
+				option.dataset.pre = String(item.pre);
+				option.dataset.post = String(item.post);
 
+				// "Thumbnail"
 				const thumb = document.createElement('span');
 				thumb.classList.add('script-thumb');
 				thumb.innerHTML = item.thumb;
 				option.appendChild(thumb);
 
+				// Script name
 				const name = document.createElement('q');
 				name.classList.add('script-name');
 				name.innerHTML = item.name;
 				option.appendChild(name);
 
+				// Script description
 				const desc = document.createElement('i');
 				desc.classList.add('script-desc');
 				desc.innerHTML = item.desc;
@@ -61,9 +91,6 @@ async function initSelector() {
 			});
 
 			optionsContainer.appendChild(optionGroup);
-		});
-		selectorData.forEach(item => {
-			
 		});
 	}
 	catch (error) {

@@ -6,14 +6,18 @@
 			{
 				"thumb": "🟤",
 				"name": "Brown Dwarf",
-				"desc": "Finds a brown dwarf planet (mass >= 4100 M⊕).",
-				"script": "brown_dwarf"
+				"desc": "Finds a brown dwarf planet (mass >= 4100 M⊕ (12.9 M♃)).",
+				"script": "brown_dwarf",
+				"pre": false,
+				"post": false
 			},
 			{
 				"thumb": "🔵",
 				"name": "Mega-Neptune",
 				"desc": "Finds an ice giant with mass >= 90 M⊕.",
-				"script": "mega_neptune"
+				"script": "mega_neptune",
+				"pre": false,
+				"post": false
 			}
 		]
 	},
@@ -25,13 +29,17 @@
 				"thumb": "🌎🌏",
 				"name": "Twin Earths",
 				"desc": "Finds a binary planetary system of habitable meso-Earths.",
-				"script": "twin_earths"
+				"script": "twin_earths",
+				"pre": false,
+				"post": false
 			},
 			{
 				"thumb": "🪐<span style='font-size: 50%;'>🌑</span>",
 				"name": "Anomalous Binary Planet",
 				"desc": "Finds a binary planetary system with mass ratio lesser than 1:25.",
-				"script": "anomalous_binary_planet"
+				"script": "anomalous_binary_planet",
+				"pre": false,
+				"post": false
 			}
 		]
 	},
@@ -43,13 +51,17 @@
 				"thumb": "🪐<span style='font-size: 50%;'>🌍</span>",
 				"name": "Pandora",
 				"desc": "Finds a habitable big moon orbiting a giant planet.",
-				"script": "pandora"
+				"script": "pandora",
+				"pre": false,
+				"post": false
 			},
 			{
 				"thumb": "🪐🪐<span style='font-size: 50%;'>🌑</span>",
 				"name": "Circumbinary Moon",
 				"desc": "Finds a circumbinary moon (a common moon of a binary planet).",
-				"script": "circumbinary_moon"
+				"script": "circumbinary_moon",
+				"pre": false,
+				"post": false
 			}
 		]
 	},
@@ -61,13 +73,17 @@
 				"thumb": "🦠<span style='font-size: 50%;'>🟠</span>",
 				"name": "Methane Life",
 				"desc": "Finds a planet hosting life in methane ocean.",
-				"script": "methane_life"
+				"script": "methane_life",
+				"pre": false,
+				"post": false
 			},
 			{
 				"thumb": "🦠<span style='font-size: 50%;'>🔵</span>",
 				"name": "Ammonia Life",
 				"desc": "Finds a planet hosting life in ammonia water ocean.",
-				"script": "ammonia_life"
+				"script": "ammonia_life",
+				"pre": false,
+				"post": false
 			}
 		]
 	},
@@ -79,7 +95,9 @@
 				"thumb": "☀️☀️<span style='font-size: 50%;'>🌕</span>",
 				"name": "Tatooine",
 				"desc": "Finds a warm circumbinary terrestrial planet.",
-				"script": "tatooine"
+				"script": "tatooine",
+				"pre": false,
+				"post": false
 			}
 		]
 	}

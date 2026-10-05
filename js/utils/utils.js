@@ -3,10 +3,12 @@ import prng from "../utils/prng.js";
 import * as T from "../data/types.js";
 
 /**
- * Returns a value within a range of values between a defined minimum bound and a maximum bound.
+ * Returns a value constrained by set minimal and maximal bound values.
+ * 
  * @param {number} value 
  * @param {number} min 
  * @param {number} max 
+ * 
  * @returns {number}
  */
 export function clamp(value, min, max) {
@@ -15,8 +17,10 @@ export function clamp(value, min, max) {
 
 /**
  * Generate a random number following a normal (Gaussian) distribution.
+ * 
  * @param {number} mean - *[default: 0]* mean value.
  * @param {number} stdev - *[default: 1]* standard deviation (width of scatter).
+ * 
  * @returns {number}
  */
 export function gaussianRandom(mean = 0, stdev = 1) {
@@ -36,6 +40,7 @@ export function gaussianRandom(mean = 0, stdev = 1) {
  * 
  * @param {number} min - *[default 0]* minimal range value
  * @param {number} max - *[default 1]* maximal range value
+ * 
  * @returns {number} [min, max], exp. value (mean) = (min + max) / 2
  */
 export function randomRangeGaussian(min = 0, max = 1) {
@@ -59,6 +64,13 @@ export function generateFallbackSeed() {
 	return `${time}-${perf}-${random}`;
 }
 
+/**
+ * Parses a hex-encoded color string into an object with integer values.
+ * 
+ * @param {string} colorStr Color string in format `#RGB`, `#RRGGBB`, or #RRGGBBAA
+ * 
+ * @returns Color values object
+ */
 export function parseColor(colorStr) {
 	if (colorStr.startsWith('#')) {
 		let hex = colorStr.slice(1); // Removing # character
@@ -82,11 +94,14 @@ export function parseColor(colorStr) {
 }
 
 /**
+ * Refits the specified value into a suitable unit from the provided list.
  * 
- * @param {T.Value} value 
- * @param {string} unitStd 
- * @param {string[]} allowedUnits 
- * @param {number} threshold 
+ * @param {T.Value} value - Value to be refitted
+ * @param {string} unitStd - Standard unit (`T.units.GROUP.STD_UNIT`)
+ * @param {string[]} allowedUnits - List of allowed units (`T.units.GROUP.STD_UNIT`)
+ * @param {number} threshold - Threshold between two neighboring units (`(0..1)`)
+ * 
+ * @returns Context-appropriate numeric value and unit
  */
 export function getFittingValue(value, unitStd, allowedUnits, threshold = 0.1) {
 	const inputStd = value.as(unitStd);
@@ -112,6 +127,11 @@ export function getFittingValue(value, unitStd, allowedUnits, threshold = 0.1) {
 	return { value: convertedValue, unit: fittingUnitName };
 }
 
+/**
+ * Converts value from radians into degrees.
+ * @param {number} rad 
+ * @returns 
+ */
 export function radToDeg(rad){
 	return rad * (180.0 / Math.PI);
 }

@@ -179,13 +179,13 @@
 					<textarea name="predicate" id="predicate" placeholder="if ((body.genData.moonType === T.moonTypes.Binary) && (body.mass.as(T.units.Mass.M_Earth) > 0.5)) { finish(); }"></textarea>
 				</div>
 				
-				<details><summary>Pre-generation script:</summary>
+				<details open><summary>Pre-generation script:</summary>
 					<div class="setting-container">
 						<textarea name="pregen" id="pregen" placeholder="attemptsLimit = 100;"></textarea>
 					</div>
 				</details>
 
-				<details><summary>Post-generation script:</summary>
+				<details open><summary>Post-generation script:</summary>
 					<div class="setting-container">
 						<textarea name="postgen" id="postgen" placeholder="console.log(this.system);"></textarea>
 					</div>
@@ -580,28 +580,6 @@
 			</table>
 		</details>
 
-		<details open id="oceanSection"><summary>Ocean</summary>
-			<table>
-				<tr>
-					<th>Ocean substance</th>
-					<td><span id="oceanSubstance"></span></td>
-				</tr>
-				<tr>
-					<th>Ocean cover</th>
-					<td>
-						<span class="progressbar">
-							<span class="progressbar-fill" id="oceanCoverBar"></span>
-						</span>
-						<span id="oceanCover"></span>
-					</td>
-				</tr>
-				<tr>
-					<th>Ocean depth</th>
-					<td><span id="oceanDepth"></span></td>
-				</tr>
-			</table>
-		</details>
-
 		<details open><summary>Surface & Climate</summary>
 			<table>
 				<tr id="mountainHeightRow">
@@ -670,6 +648,28 @@
 							</span>
 						</span>
 					</td>
+				</tr>
+			</table>
+		</details>
+
+		<details open id="oceanSection"><summary>Ocean</summary>
+			<table>
+				<tr>
+					<th>Ocean substance</th>
+					<td><span id="oceanSubstance"></span></td>
+				</tr>
+				<tr>
+					<th>Ocean cover</th>
+					<td>
+						<span class="progressbar">
+							<span class="progressbar-fill" id="oceanCoverBar"></span>
+						</span>
+						<span id="oceanCover"></span>
+					</td>
+				</tr>
+				<tr>
+					<th>Ocean depth</th>
+					<td><span id="oceanDepth"></span></td>
 				</tr>
 			</table>
 		</details>

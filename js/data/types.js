@@ -2,9 +2,7 @@
 import consts from "./consts.js";
 import * as utils from "../utils/utils.js";
 
-// =================================================
-// Units
-// =================================================
+//#region | Units
 
 /**
  * Enum for available units.
@@ -201,7 +199,7 @@ export const unitNames = new Map([
 
 export class Value {
 	/**
-	 * A value with an assigned unit (convertable).
+	 * A value with assigned unit (convertable).
 	 * @param {number} value - Numeric value.
 	 * @param {string} unit - Unit name. Use `units` enum to assign (`T.units.GROUP.UNIT`).
 	 */
@@ -213,7 +211,7 @@ export class Value {
 	}
 
 	/**
-	 * Gets a raw number value converted to a specified unit.
+	 * Gets a number value converted into a specified unit.
 	 * @param {string} targetUnit - Unit enum (`T.units.GROUP.UNIT`).
 	 * @returns {number}
 	 */
@@ -271,7 +269,7 @@ export class Value {
 	/**
 	 * Sets the value in specified units.
 	 * 
-	 * First in converts the type, then assigns the value.
+	 * First it converts the type, then assigns the value.
 	 * 
 	 * @param {number} value - Numeric value.
 	 * @param {string} unit - Unit enum (`T.units.GROUP.UNIT`).
@@ -282,13 +280,24 @@ export class Value {
 	}
 }
 
-// -------------------------------------------------
+//#endregion
 
+export class System {
+	constructor(
+		settings = new GeneratorSettings()
+	) {
+		/** @type {GeneratorSettings} */
+		this.settings = settings;
 
+		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */
+		this.bodies = [];
 
-// =================================================
-// Generation Settings
-// =================================================
+		/** @type {string} */
+		this.type = systemTypes.Single;
+	}
+}
+
+//#region | Generator settings
 
 export class GeneratorSettings {
     constructor(
@@ -375,35 +384,9 @@ export class GeneratorSettings {
 	}
 }
 
-export class System {
-	constructor(
-		settings = new GeneratorSettings()
-	) {
-		/** @type {GeneratorSettings} */
-		this.settings = settings;
+//#endregion
 
-		/** @type {Array<BinaryPlanet|BinaryStar|Planet|Star>} */
-		this.bodies = [];
-
-		/** @type {string} */
-		this.type = systemTypes.Single;
-	}
-}
-
-export const systemTypes = Object.freeze({
-	Single: 'Single',
-	Binary: 'Binary',
-	Triple: 'Triple',
-	Quadruple: 'Quadruple',
-});
-
-// -------------------------------------------------
-
-
-
-// =================================================
-// Celestial bodies
-// =================================================
+//#region | Celestial bodies
 
 export class Body {
 	constructor (parentBody = null, name = 'Spaceball') {
@@ -483,53 +466,6 @@ export class Star extends Body {
 	}
 }
 
-export const planetTypes = Object.freeze({
-	Terrestrial: 'Terrestrial',
-
-	MiniNeptune: 'Mini-Neptune',
-	GasDwarf: 'Gas Dwarf',
-
-	IceGiant: 'Ice Giant',
-	GasGiant: 'Gas Giant',
-	
-	BrownDwarf: 'Brown Dwarf',
-});
-
-export const moonTypes = Object.freeze({
-	Binary: 'Binary',
-	Impact: 'Impact',
-	Regular: 'Regular'
-});
-
-export const migrationStatus = Object.freeze({
-	Still: 'Still',
-	Ejected: 'Ejected',
-	Merged: 'Merged',
-});
-
-/**
- * Generation data of a planet.
- * 
- * @typedef {Object} GenData
- * 
- * @property {boolean} isMoon - Is the planet a moon of other planet. Affects interior generation.
- * @property {string} moonType - Moon type (`T.moonTypes`)
- * @property {boolean} retrograde - Retrograde orbit flag, assigned for some regular moons.
- * @property {number} mass - Moon mass (M⊕).
- * 
- * @property {BinaryStar|Star} parentStar - A star that hosts the planet.
- * @property {string} status - Planet's status that is assigned and used during the migration.
- * @property {number} impacts - Giant impacts counter, incremented during the migration, then used during the moons generation.
- * 
- * @property {number} sma_norm - Distance converted to normalized, solar units (AU☉).
- * 
- * @property {number} sma_init - Initial spawn distance, used during the moons generation (AU).
- * @property {number} sma_init_norm - Initial spawn distance converted to normalized, solar units (AU☉).
- * 
- * @property {number} sma_min - Minimum allowed spawn distance, used during the migration (AU).
- * @property {number} sma_max - Maximum allowed spawn distance, used during the migration (AU).
- */
-
 export class Planet extends Body {
 	constructor (parentBody = null, name = 'Terra') {
 		super(parentBody, name);
@@ -552,14 +488,9 @@ export class Planet extends Body {
 	}
 }
 
-// -------------------------------------------------
+//#endregion
 
-
-
-// =================================================
-// Binary containers
-// =================================================
-
+//#region | Binary containers
 
 export class Binary extends Body {
 	constructor (
@@ -673,13 +604,9 @@ export class BinaryPlanet extends Binary {
 	}
 }
 
-// -------------------------------------------------
+//#endregion
 
-
-
-// =================================================
-// Planets components
-// =================================================
+//#region | Planets components
 
 export class MassComponent {
 	/**
@@ -758,4 +685,62 @@ export class RingSystem {
 	}
 }
 
-// -------------------------------------------------
+/**
+ * Generation data of a planet.
+ * 
+ * @typedef {Object} GenData
+ * 
+ * @property {boolean} isMoon - Is the planet a moon of other planet. Affects interior generation.
+ * @property {string} moonType - Moon type (`T.moonTypes`)
+ * @property {boolean} retrograde - Retrograde orbit flag, assigned for some regular moons.
+ * @property {number} mass - Moon mass (M⊕).
+ * 
+ * @property {BinaryStar|Star} parentStar - A star that hosts the planet.
+ * @property {string} status - Planet's status that is assigned and used during the migration.
+ * @property {number} impacts - Giant impacts counter, incremented during the migration, then used during the moons generation.
+ * 
+ * @property {number} sma_norm - Distance converted to normalized, solar units (AU☉).
+ * 
+ * @property {number} sma_init - Initial spawn distance, used during the moons generation (AU).
+ * @property {number} sma_init_norm - Initial spawn distance converted to normalized, solar units (AU☉).
+ * 
+ * @property {number} sma_min - Minimum allowed spawn distance, used during the migration (AU).
+ * @property {number} sma_max - Maximum allowed spawn distance, used during the migration (AU).
+ */
+
+//#endregion
+
+//#region | Enums
+
+export const systemTypes = Object.freeze({
+	Single: 'Single',
+	Binary: 'Binary',
+	Triple: 'Triple',
+	Quadruple: 'Quadruple',
+});
+
+export const planetTypes = Object.freeze({
+	Terrestrial: 'Terrestrial',
+
+	MiniNeptune: 'Mini-Neptune',
+	GasDwarf: 'Gas Dwarf',
+
+	IceGiant: 'Ice Giant',
+	GasGiant: 'Gas Giant',
+	
+	BrownDwarf: 'Brown Dwarf',
+});
+
+export const moonTypes = Object.freeze({
+	Binary: 'Binary',
+	Impact: 'Impact',
+	Regular: 'Regular'
+});
+
+export const migrationStatus = Object.freeze({
+	Still: 'Still',
+	Ejected: 'Ejected',
+	Merged: 'Merged',
+});
+
+//#endregion
