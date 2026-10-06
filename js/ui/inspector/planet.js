@@ -170,21 +170,21 @@ export default function generatePlanetProfile(body) {
 		const compositionCoreIron = planet.querySelector('#compositionCoreIron');
 		const compositionCoreIronBar = planet.querySelector('#compositionCoreIronBar');
 		const ironPercent = body.core.composition.iron * 100;
-		compositionCoreIron.innerText = (ironPercent < 100 ? ironPercent.toPrecision(2) : ironPercent.toFixed(0)) + '%';
+		compositionCoreIron.innerText = (ironPercent < 100 ? ironPercent.toPrecision(3) : ironPercent.toFixed(0)) + '%';
 		compositionCoreIronBar.style.width = compositionCoreIron.innerText;
 
 		// Rock
 		const compositionCoreRock = planet.querySelector('#compositionCoreRock');
 		const compositionCoreRockBar = planet.querySelector('#compositionCoreRockBar');
 		const rockPercent = body.core.composition.rock * 100;
-		compositionCoreRock.innerText = (rockPercent < 100 ? rockPercent.toPrecision(2) : rockPercent.toFixed(0)) + '%';
+		compositionCoreRock.innerText = (rockPercent < 100 ? rockPercent.toPrecision(3) : rockPercent.toFixed(0)) + '%';
 		compositionCoreRockBar.style.width = compositionCoreRock.innerText;
 
 		// Ice
 		const compositionCoreIce = planet.querySelector('#compositionCoreIce');
 		const compositionCoreIceBar = planet.querySelector('#compositionCoreIceBar');
 		const icePercent = body.core.composition.ice * 100;
-		compositionCoreIce.innerText = (icePercent < 100 ? icePercent.toPrecision(2) : icePercent.toFixed(0)) + '%';
+		compositionCoreIce.innerText = (icePercent < 100 ? icePercent.toPrecision(3) : icePercent.toFixed(0)) + '%';
 		compositionCoreIceBar.style.width = compositionCoreIce.innerText;
 		//#endregion
 
@@ -195,14 +195,14 @@ export default function generatePlanetProfile(body) {
 			const compositionEnvelopeGas = planet.querySelector('#compositionEnvelopeGas');
 			const compositionEnvelopeGasBar = planet.querySelector('#compositionEnvelopeGasBar');
 			const gasPercent = body.envelope.composition.gas * 100;
-			compositionEnvelopeGas.innerText = (gasPercent < 100 ? gasPercent.toPrecision(2) : gasPercent.toFixed(0)) + '%';
+			compositionEnvelopeGas.innerText = (gasPercent < 100 ? gasPercent.toPrecision(3) : gasPercent.toFixed(0)) + '%';
 			compositionEnvelopeGasBar.style.width = compositionEnvelopeGas.innerText;
 
 			// Ice
 			const compositionEnvelopeIce = planet.querySelector('#compositionEnvelopeIce');
 			const compositionEnvelopeIceBar = planet.querySelector('#compositionEnvelopeIceBar');
 			const iceEnvPercent = body.envelope.composition.ice * 100;
-			compositionEnvelopeIce.innerText = (iceEnvPercent < 100 ? iceEnvPercent.toPrecision(2) : iceEnvPercent.toFixed(0)) + '%';
+			compositionEnvelopeIce.innerText = (iceEnvPercent < 100 ? iceEnvPercent.toPrecision(3) : iceEnvPercent.toFixed(0)) + '%';
 			compositionEnvelopeIceBar.style.width = compositionEnvelopeIce.innerText;
 
 			// Thickness
@@ -343,7 +343,7 @@ export default function generatePlanetProfile(body) {
 
 		//#region | Effective star distance
 		const starDistanceEff = planet.querySelector('#starDistanceEff');
-		starDistanceEff.innerText = (body.genData.sma_norm < 1000 ? body.genData.sma_norm.toPrecision(3) : body.genData.sma_norm.toFixed(1)) + ' AU☉';
+		starDistanceEff.innerText = (body.genData.sma_norm < 999 ? body.genData.sma_norm.toPrecision(3) : body.genData.sma_norm.toFixed(1)) + ' AU☉';
 		//#endregion
 
 		//#region | Light intensity
@@ -360,7 +360,7 @@ export default function generatePlanetProfile(body) {
 		if (body.genData.secondStar !== null) {
 			starDistance2.innerText = (body.genData.secondStarSmaNorm * Math.sqrt(body.genData.secondStar.luminosity)).toPrecision(3) + ' AU';
 
-			starDistanceEff2.innerText = (body.genData.secondStarSmaNorm < 1000 ? body.genData.secondStarSmaNorm.toPrecision(3) : body.genData.secondStarSmaNorm.toFixed(1)) + ' AU☉';
+			starDistanceEff2.innerText = (body.genData.secondStarSmaNorm < 999 ? body.genData.secondStarSmaNorm.toPrecision(3) : body.genData.secondStarSmaNorm.toFixed(1)) + ' AU☉';
 
 			const illumination2 = 1 / (body.genData.secondStarSmaNorm ** 2) * 100;
 			lightIntensity2.innerText = (illumination2 > 100 ? illumination2.toFixed(1) : illumination2.toPrecision(3)) + '%';
@@ -450,7 +450,7 @@ export default function generatePlanetProfile(body) {
 			const oceanCover = planet.querySelector('#oceanCover');
 			const oceanCoverBar = planet.querySelector('#oceanCoverBar');
 			const oceanCoverPercent = body.oceanCover * 100;
-			oceanCover.innerText = (oceanCoverPercent < 100 ? oceanCoverPercent.toPrecision(2) : oceanCoverPercent.toFixed(0)) + '%';
+			oceanCover.innerText = (oceanCoverPercent < 100 ? oceanCoverPercent.toPrecision(3) : oceanCoverPercent.toFixed(0)) + '%';
 			oceanCoverBar.style = `width: ${oceanCover.innerText};`;
 			//#endregion
 
@@ -535,7 +535,7 @@ export default function generatePlanetProfile(body) {
 					
 					header_span.innerText = gas;
 					const atmGasPercent = body.atmosphere.composition[gas] * 100;
-					cell_span.innerText = (atmGasPercent < 100 ? atmGasPercent.toPrecision(2) : atmGasPercent.toFixed(0)) + '%';
+					cell_span.innerText = (atmGasPercent < 100 ? atmGasPercent.toPrecision(3) : atmGasPercent.toFixed(0)) + '%';
 
 					const barComponent = document.createElement('span');
 					barComponent.classList.add('progressbar-fill');
@@ -613,6 +613,73 @@ export default function generatePlanetProfile(body) {
 		const giantImpacts = planet.querySelector('#giantImpacts');
 		giantImpacts.innerText = body.genData.impacts || 0;
 		//#endregion
+
+		const ringsRadiusRow = planet.querySelector('#ringsRadius');
+		const ringsMassesRow = planet.querySelector('#ringsMasses');
+		if (body.rings.length > 0) {
+			//#region | Rings outer radius
+			const ringsRadiusHeader = document.createElement('th');
+				ringsRadiusHeader.innerText = 'Rings outer radius';
+			ringsRadiusRow.appendChild(ringsRadiusHeader);
+
+			const ringsRadiusCell = document.createElement('td');
+				let max = body.rings[0];
+				body.rings.forEach(ring => {
+					if (ring.outerRadius.as(T.units.Dist.km) > max.outerRadius.as(T.units.Dist.km))
+						max = ring;
+				});
+
+				const ringsRadius = max.outerRadius;
+				const ringsRadiusFit = utils.getFittingValue(
+					ringsRadius,
+					T.units.Dist.m,
+					[
+						T.units.Dist.km, 
+						T.units.Dist.AU, 
+						T.units.Dist.ly
+					],
+				);
+				const ringsRadiusValue = ringsRadiusFit.value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+				const ringsRadiusUnit = ringsRadiusFit.unit;
+
+				const ringsRadiusKm = ringsRadius.as(T.units.Dist.km).toExponential(3).replace('+','') + '  km';
+			
+				ringsRadiusCell.innerHTML = `<span class='tooltip'>${ringsRadiusValue} ${ringsRadiusUnit}<span class='tooltiptext'>${ringsRadiusKm}</span></span>`;
+			ringsRadiusRow.appendChild(ringsRadiusCell);
+			//#endregion
+
+			//#region | Rings masses
+			const ringsMassesHeader = document.createElement('th');
+				ringsMassesHeader.innerText = 'Rings from moons';
+			ringsMassesRow.appendChild(ringsMassesHeader);
+
+			const ringsMassesList = document.createElement('td');
+				const moonsMasses = [];
+				body.rings.forEach(ring => {
+					const moonMassFit = utils.getFittingValue(
+						ring.originMass,
+						T.units.Mass.kg,
+						[
+							T.units.Mass.M_Moon, 
+							T.units.Mass.M_Earth, 
+						],
+						0.1
+					);
+					const moonMassValue = moonMassFit.value.toPrecision(3);
+					const MoonMassUnit = moonMassFit.unit;
+
+					const moonMassKg = ring.originMass.as(T.units.Mass.kg).toExponential(3).replace('+','') + ' kg';
+					
+					moonsMasses.push(`<span class='tooltip'>${moonMassValue} ${MoonMassUnit}<span class='tooltiptext'>${moonMassKg}</span></span>`);
+				});
+				ringsMassesList.innerHTML += moonsMasses.join(', ');
+			ringsMassesRow.appendChild(ringsMassesList);
+			//#endregion
+		}
+		else {
+			ringsRadiusRow.remove();
+			ringsMassesRow.remove();
+		}
 
 		//#region | Magnetic field lost
 		const magneticFieldLost = planet.querySelector('#magneticFieldLost');

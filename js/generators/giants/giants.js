@@ -101,15 +101,16 @@ export function makeGasGiant(planet) {
 		}
 	}
 	
+	const totalMass = coreMass + envelopeMass;
 	let envelopeIceFraction = isIceGiant
 		? prng.range(0.65, 0.85)
-		: prng.range(0.05, 0.15) * Math.pow(Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) / consts.PHY_DIST_SNOW_LINE, 2);
+		: prng.range(0.05, 0.15) * (0.25 + 0.75 * Math.exp(-0.4 * (totalMass / 300))) * Math.pow(Math.min(sma_norm, consts.PHY_DIST_SNOW_LINE) / consts.PHY_DIST_SNOW_LINE, 3);
 	
 	if (envelopeMass > 0) {
-		if ((coreMass + envelopeMass) >= consts.DEF_BROWN_DWARF_MASS_THRESHOLD) {
+		if (totalMass >= consts.DEF_BROWN_DWARF_MASS_THRESHOLD) {
 			planet.type = T.planetTypes.BrownDwarf;
 		}
-		else if ((coreMass + envelopeMass) < consts.DEF_SUB_NEPTUNE_MASS_THRESHOLD) {
+		else if (totalMass < consts.DEF_SUB_NEPTUNE_MASS_THRESHOLD) {
 			planet.type = isIceGiant
 				? T.planetTypes.MiniNeptune
 				: T.planetTypes.GasDwarf;
@@ -331,7 +332,41 @@ export function getColor(planet) {
 export function setSurfaceTemperature(planet) {
 	planet.temperature_eq.convertTo(T.units.Temp.K);
 	planet.temperature_eq.value *= Math.pow(1 - planet.albedo, 1/4);
+
+	let T_eff_fusion = 0;
+	if (planet.type === T.planetTypes.BrownDwarf) {
+		const m = planet.mass.as(T.units.Mass.M_Jupiter);
+		const age = planet.age.as(T.units.Time.Gy);
+
+		if (age <= 0.1) {
+			T_eff_fusion = 2500 * Math.pow(m / 30, 0.35) * Math.pow(age / 0.01, -0.12);
+		}
+		else {
+			T_eff_fusion = 1800 * Math.pow(m / 30, 0.58) * Math.pow(age / 1.00, -0.36);
+		}
+
+		let spectralClass = '';
+		if (T_eff_fusion >= 2200) {
+			// Class M (M7 - M9)
+			const sub = 7 + (2800 - T_eff_fusion) / 300;
+			spectralClass = `M${Math.min(9, Math.max(7, sub)).toFixed(1)}`;
+		} else if (T_eff_fusion >= 1300) {
+			// Class L (L0 - L9)
+			const sub = (2200 - T_eff_fusion) / 100;
+			spectralClass = `L${Math.min(9, Math.max(0, sub)).toFixed(1)}`;
+		} else if (T_eff_fusion >= 600) {
+			// Class T (T0 - T9)
+			const sub = (1300 - T_eff_fusion) / 70;
+			spectralClass = `T${Math.min(9, Math.max(0, sub)).toFixed(1)}`;
+		} else {
+			// Class Y (Y0 - Y2)
+			const sub = (600 - T_eff_fusion) / 125;
+			spectralClass = `Y${Math.min(2.5, Math.max(0, sub)).toFixed(1)}`;
+		}
+		planet.spectralClass = spectralClass;
+	}
 	
-	planet.temperature_eff = new T.Value(planet.temperature_eq.value, T.units.Temp.K);
-	planet.temperature = new T.Value(planet.temperature_eq.value, T.units.Temp.K);
+	const T_eff = Math.pow((planet.temperature_eq.value ** 4) + (T_eff_fusion ** 4), 1/4);
+	planet.temperature_eff = new T.Value(T_eff, T.units.Temp.K);
+	planet.temperature = new T.Value(planet.temperature_eff.value, T.units.Temp.K);
 }

@@ -11,11 +11,14 @@ export default function drawRings() {
 	const coords = this.position.screen;
 	const rend = this.renderer;
 	const ctx = rend.bodyCtx;
+
+	const hdr = rend.setting_applyHDR;
+	const lighting = Math.min(1.0, hdr ? Math.pow(this.sim.lum_avg, 1/5) : this.sim.lum_avg); // HDR
 	
 	for (const ring of this.rings) {
 		const innerRadius = ring.innerRadius.as(T.units.Dist.m) / rend.metersPerPixel;
 		const outerRadius = ring.outerRadius.as(T.units.Dist.m) / rend.metersPerPixel;
-		const albedo = (0.5 * ring.albedo + 0.25) * this.sim.lum_avg;
+		const albedo = (0.5 * ring.albedo + 0.25) * lighting;
 		const baseColor = `rgb(${Math.floor(200 * albedo)}, ${Math.floor(220 * albedo)}, ${Math.floor(240 * albedo)})`;
 
 		const gradient = ctx.createRadialGradient(coords.x, coords.y, innerRadius, coords.x, coords.y, outerRadius);
