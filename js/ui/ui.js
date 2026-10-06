@@ -202,9 +202,7 @@ function handleButtonClick(button) {
 		}
 
 		case 'copySeed': {
-			const seed = document.getElementById('gen_seed');
-			navigator.clipboard.writeText(seed.value ? seed.value : seed.placeholder);
-
+			copySeed();
 			break;
 		}
 
@@ -322,6 +320,44 @@ function saveSettings() {
 	link.download = `Apoapsis Settings ${timestamp}.json`;
 	link.click();
 	URL.revokeObjectURL(link.href);
+}
+
+function copySeed() {
+	const seed = document.getElementById('gen_seed');
+	const value = seed.value ? seed.value : seed.placeholder;
+
+	if (navigator.clipboard && window.isSecureContext) {
+		navigator.clipboard.writeText(value);
+	}
+	else {
+		const textArea = document.createElement('textarea');
+		textArea.value = value;
+		
+		textArea.style.position = 'fixed';
+		textArea.style.left = '-999999px';
+		textArea.style.top = '-999999px';
+		document.body.appendChild(textArea);
+		
+		textArea.focus();
+		textArea.select();
+		
+		new Promise((resolve, reject) => {
+			try {
+				const successful = document.execCommand('copy');
+				document.body.removeChild(textArea);
+				if (successful) {
+					resolve();
+				} else {
+					reject(new Error('Failed to copy text.'));
+					alert('Failed to copy text. Copy the seed manually, or save the config and retrieve the seed from there.');
+				}
+			} catch (err) {
+				document.body.removeChild(textArea);
+				reject(err);
+				alert('Failed to copy text. Copy the seed manually, or save the config and retrieve the seed from there.');
+			}
+		});
+	}
 }
 
 //#region | Outbound URL setup
