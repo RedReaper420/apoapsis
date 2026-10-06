@@ -1,11 +1,10 @@
 
 import prng from "../../utils/prng.js";
-import * as utils from "../../utils/utils.js";
 import * as T from "../../data/types.js";
 import consts from "../../data/consts.js";
 
 /**
- * Attempts to generate a thick gas envelope for a planet, potentially turning it into some type of a giant.
+ * Attempts to generate a thick gas envelope for a planet, subsequently turning it into some type of a giant.
  * 
  * Outcomes:
  * - No gas envelope (an empty envelope is assigned). Planet type is left as `Terrestrial`.
@@ -151,9 +150,7 @@ export function makeGasGiant(planet) {
 
 /**
  * Assumes the planet's albedo based on the planet's composition and blackbody temperature.
- * 
  * @param {T.Planet} planet 
- * 
  * @returns
  */
 export function assumeAlbedo(planet) {
@@ -204,7 +201,6 @@ export function assumeAlbedo(planet) {
 }
 
 /**
- * 
  * @param {T.Planet} planet 
  */
 export function setDummyAtmosphere(planet) {
@@ -213,14 +209,13 @@ export function setDummyAtmosphere(planet) {
 		pressure: new T.Value(1, T.units.Press.atm),
 		composition: { }
 	}
-	planet.temperature_eff = new T.Value(planet.temperature.value, planet.temperature.unit);
 }
 
 /**
- * 
+ * Gets base color for a giant planet and sets properties for its faux-atmosphere.
  * @param {T.Planet} planet 
  */
-export function setColor(planet) {
+export function getColor(planet) {
 	const temp = planet.temperature.as(T.units.Temp.K);
 
 	// Atmosphere composition settings are done purely for visuals.
@@ -330,6 +325,9 @@ export function setColor(planet) {
 	}
 }
 
+/**
+ * @param {T.Planet} planet 
+ */
 export function setSurfaceTemperature(planet) {
 	planet.temperature_eq.convertTo(T.units.Temp.K);
 	planet.temperature_eq.value *= Math.pow(1 - planet.albedo, 1/4);

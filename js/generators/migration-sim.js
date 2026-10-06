@@ -14,7 +14,7 @@ const GIANT_MASS = 60; // M⊕, mass threshold above which a planet is being acc
  * @param {Array<T.Star|T.BinaryStar>} starsArray - List of tracking stars in the generated cluster.
  */
 export function simulateMigration(settings, starsArray) {
-	// --- 1. Unit Standardization ---
+	// --- 1. Unit standardization ---
 	starsArray.forEach(star => { 
 		star.bodies.forEach(body => { 
 			if (body instanceof T.Planet) {
@@ -24,11 +24,11 @@ export function simulateMigration(settings, starsArray) {
 		}); 
 	});
 
-	// --- 2. Protoplanetary Disk Parameters Configuration ---
+	// --- 2. Protoplanetary disk parameters configuration ---
 	const TIME_STEP_YEARS = 10000; // Δt step size
 	const diskLifetimeYears = new T.Value(5, T.units.Time.My).as(T.units.Time.y); // 5 Myr lifespan
 	
-	// --- 3. Discrete Migration Simulation Engine ---
+	// --- 3. Discrete migration simulation engine ---
 	starsArray.forEach(star => {
 		// Base disk gas density scaled by metallicity and natural variance
 		const initialDiskDensity = 1 * Math.pow(10, star.metallicity * 0.2) * Math.pow(10, utils.randomRangeGaussian(-0.5, 0.5));
@@ -41,7 +41,7 @@ export function simulateMigration(settings, starsArray) {
 		const totalDiscreteSteps = Math.round(Math.min(diskLifetimeYears, starAgeYears) / TIME_STEP_YEARS);
 
 		for (let step = 0; step < totalDiscreteSteps; step++) {
-			// Exponential disk gas dispersion model over time
+			// Exponential gas dispersion over time
 			const currentDiskDensity = initialDiskDensity * Math.exp(-step / totalDiscreteSteps);
 			activeGiantsCount = 0; 
 
@@ -55,10 +55,10 @@ export function simulateMigration(settings, starsArray) {
 					(planet.genData.status === T.migrationStatus.Merged))
 					continue;
 
-				// 3.1. Compute and Apply Disk Forces
+				// 3.1. Compute and apply disk forces
 				applyMigration(settings, planet, currentDiskDensity, TIME_STEP_YEARS, isGrandTackTriggered);
 
-				// 3.2. Proximity Encounter Validation & Resolution
+				// 3.2. Proximity encounters validation & resolution
 				if (i !== (star.bodies.length - 1)) {
 					let validNextPlanet = null;
 					
@@ -88,7 +88,7 @@ export function simulateMigration(settings, starsArray) {
 				}
 			}
 
-			// 3.4. Evaluate Grand Tack Resonance Constraints
+			// 3.4. Evaluate the Grand Tack
 			if (canActivateGrandTack && !isGrandTackTriggered) {
 				if (activeGiantsCount >= 2 && step >= (totalDiscreteSteps / 2)) {
 					isGrandTackTriggered = true;
@@ -104,9 +104,9 @@ export function simulateMigration(settings, starsArray) {
 		}
 	});
 
-	// --- 4. Post-Simulation Pipeline & Data Refactoring ---
+	// --- 4. Post-simulation pipeline & data refactoring ---
 	starsArray.forEach(star => {
-		// 4.1. Purge Discarded/Ejected Bodies from Arrays
+		// 4.1. Purge Discarded/Ejected bodies from arrays
 		for (let i = star.bodies.length - 1; i >= 0; i--) {
 			if (!(star.bodies[i] instanceof T.Planet))
 				continue;
@@ -123,7 +123,7 @@ export function simulateMigration(settings, starsArray) {
 			}
 		}
 
-		// 4.2. Recalculate Relative Orbital Neighbors
+		// 4.2. Recalculate relative orbital neighbors
 		for (let i = 0; i < star.bodies.length; i++) {
 			if (!(star.bodies[i] instanceof T.Planet))
 				continue;

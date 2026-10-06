@@ -5,18 +5,15 @@ import * as T from "../../data/types.js";
 import consts from "../../data/consts.js";
 
 /**
- * 
+ * Sets up initial atmosphere and surface temperature for a planet.
  * @param {T.Planet} planet 
  */
 export function generateAtmosphere(planet) {
 	const planetMass_MEarth = planet.mass.as(T.units.Mass.M_Earth);
 	const planetRadius_REarth = planet.radius.as(T.units.Dist.R_Earth);
 
-	const T_eq = planet.temperature_eq.as(T.units.Temp.K);
 	const F_tidal = planet.F_tidal.total;
-
-	const T_eff = Math.pow( (T_eq ** 4) + (F_tidal / consts.PHY_SIGMA) , 1/4);
-	planet.temperature_eff = new T.Value(T_eff, T.units.Temp.K);
+	const T_eff = planet.temperature_eff.as(T.units.Temp.K);
 
 	/*
 	K_ret < 0.2: Planet can't hold even heavy gases
@@ -185,7 +182,8 @@ export function generateAtmosphere(planet) {
 
 
 /**
- * 
+ * Enriches planet's atmosphere with payload of 25% set substance's vapor, 25% CO2, and 50% N2, 
+ * with mass increasing total atmosphere pressure by the set value.
  * @param {T.Planet} planet 
  * @param {string} substance 
  * @param {number} pressure 
@@ -283,6 +281,12 @@ export function calculateMeanMolarMass(composition) {
 	return sum;
 }
 
+/**
+ * @param {number} T_surf 
+ * @param {number} g_ms2 
+ * @param {number} mu 
+ * @returns 
+ */
 export function calculateScaleHeight(T_surf, g_ms2, mu) {
 	if (mu === 0) return new T.Value(0, T.units.Dist.m);
 	

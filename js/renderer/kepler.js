@@ -3,6 +3,9 @@ import { Orbit } from "../data/types.js";
 
 /**
  * Calculates the eccentric anomaly E using the Newton-Raphson method for M = E - e * sin(E)
+ * @param {number} M 
+ * @param {number} e 
+ * @param {number} [tolerance=1e-7] 
  */
 function solveKepler(M, e, tolerance = 1e-7) {
 	// Normalizing M to [0, 2pi]
@@ -23,7 +26,7 @@ function solveKepler(M, e, tolerance = 1e-7) {
 /**
  * Calculates a body's position using Keplerian elements, mean motion, and time.
  * @param {Orbit} elements 
- * @param {Number} timeInSeconds 
+ * @param {number} timeInSeconds 
  * @returns 
  */
 export function getKeplerianPosition(elements, timeInSeconds) {

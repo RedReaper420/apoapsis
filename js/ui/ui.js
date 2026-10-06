@@ -96,6 +96,7 @@ for (let i = 0; i < tabButtons.length; i++) {
 const systemLoader = document.getElementById('systemLoader');
 const settingsLoader = document.getElementById('settingsLoader');
 
+// System load upon file select handle
 systemLoader.addEventListener('change', async () => {
 	if (!systemLoader.files.length) {
 		return;
@@ -122,6 +123,7 @@ systemLoader.addEventListener('change', async () => {
 	eventBus.emit(events.Generator.Generation.Completed, { data: loadedSystem });
 });
 
+// Settings load upon file select handle
 settingsLoader.addEventListener('change', async () => {
 	if (!settingsLoader.files.length)
 		return;
@@ -148,6 +150,7 @@ settingsLoader.addEventListener('change', async () => {
 	seed.dispatchEvent(new Event('input'));
 });
 
+// Click event emitting for buttons
 const buttons = Array.from(document.getElementsByTagName('button'));
 buttons.forEach(button => {
 	button.addEventListener('click', (e) => {
@@ -158,7 +161,6 @@ buttons.forEach(button => {
 eventBus.on(events.UI.ButtonClick, (cb) => handleButtonClick(cb.data));
 
 /**
- * 
  * @param {HTMLButtonElement} button 
  */
 function handleButtonClick(button) {

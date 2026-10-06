@@ -6,7 +6,7 @@ import generateStarProfile from "./inspector/star.js";
 import generatePlanetProfile from "./inspector/planet.js";
 
 /**
- * 
+ * Wrapper function for generation of a body inspector profile.
  * @param {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} body 
  */
 export function generateProfile(body) {

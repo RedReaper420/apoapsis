@@ -21,7 +21,7 @@ export default function drawOrbit() {
 	ctx.lineWidth = 1;
 	
 	ctx.beginPath();
-	const segments = utils.clamp(Math.ceil(Math.PI * Math.sqrt(a_px)), 36, 1440 * (1 + 3 * (rend.trackedBody === this)));
+	const segments = utils.clamp(Math.ceil(Math.PI * Math.sqrt(a_px)), 72, 1440 * (1 + 3 * (rend.trackedBody === this)));
 	const parent = this.parentBody;
 	for (let i = 0; i <= segments; i++) {
 		const nu = (i / segments) * 2 * Math.PI;
@@ -41,7 +41,6 @@ export default function drawOrbit() {
 }
 
 /**
- * 
  * @param {number} nu 
  * @param {T.Orbit} orbit 
  * @returns 

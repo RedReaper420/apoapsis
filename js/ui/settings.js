@@ -5,14 +5,19 @@ import events from "../data/events.js";
 import consts from "../data/consts.js";
 
 /**
+ * Generates interface elements for a generator setting.
  * 
- * @param {string} tab 
- * @param {string} labelText 
- * @param {string} id 
- * @param {string} type 
- * @param {object} values 
- * @param {string} options 
- * @param {string} tooltip
+ * @param {string} tab - Settings tab HTML `id`
+ * @param {string} labelText - Setting's displayed name
+ * @param {string} id - Setting ID (Enum: `events.Generator.Settings.SETTING`)
+ * @param {string} type - Input type
+ * @param {{
+ * 	def: number|boolean,
+ * 	min: number|undefined,
+ * 	max: number|undefined
+ * }} values - Default value (mandatory), and min and max boundaries (optional, for numeric values)
+ * @param {string} options - Input element attributes to assign
+ * @param {string} tooltip - Tooltip text
  */
 function generateSetting(tab, labelText, id, type, values, options, tooltip = undefined) {
 	const tabElement = document.getElementById(tab);
@@ -20,6 +25,7 @@ function generateSetting(tab, labelText, id, type, values, options, tooltip = un
 	const settingContainer = document.createElement('div');
 	settingContainer.classList.add('setting-container');
 
+	// Label & tooltip
 	const labelElement = document.createElement('label');
 	labelElement.setAttribute('for', id);
 	const labelTextElement = document.createElement('span');
@@ -39,9 +45,9 @@ function generateSetting(tab, labelText, id, type, values, options, tooltip = un
 	else {
 		labelElement.appendChild(labelTextElement);
 	}
-
 	settingContainer.appendChild(labelElement);
 	
+	// Input element
 	const inputElement = document.createElement('input');
 	inputElement.type = type;
 	inputElement.name = id;
@@ -50,8 +56,23 @@ function generateSetting(tab, labelText, id, type, values, options, tooltip = un
 	for (const opt in options) { inputElement.setAttribute(opt, options[opt]); }
 	settingContainer.appendChild(inputElement);
 
-	setupSetting(inputElement, id, values);
+	// Values and listeners for the input
+	if (type === 'checkbox') {
+		inputElement.addEventListener('input', (e) => {
+			eventBus.emit(id, { data: e.currentTarget.checked });
+		});
+		inputElement.checked = values.def;
+	}
+	else {
+		inputElement.addEventListener('input', (e) => {
+			eventBus.emit(id, { data: Number(e.currentTarget.value) });
+		});
+		if (values.min !== undefined) inputElement.min = values.min;
+		if (values.max !== undefined) inputElement.max = values.max;
+		inputElement.value = values.def;
+	}
 	
+	// Reset button
 	const resetButton = document.createElement('button');
 	resetButton.innerText = '↺';
 	resetButton.classList.add('reset');
@@ -68,38 +89,13 @@ function generateSetting(tab, labelText, id, type, values, options, tooltip = un
 		}
 	}
 	settingContainer.appendChild(resetButton);
+
 	tabElement.appendChild(settingContainer);
 }
 
 /**
- * @param {HTMLElement} element 
- * @param {string} event 
- * @param {object} values 
- */
-function setupSetting(element, event, values) {
-	const defaultValue = values.def;
-	const limitMin = values.min;
-	const limitMax = values.max;
-
-	if (element.type === 'checkbox') {
-		element.addEventListener('input', (e) => {
-			eventBus.emit(event, { data: e.currentTarget.checked });
-		});
-		element.checked = defaultValue;
-	}
-	else {
-		element.addEventListener('input', (e) => {
-			eventBus.emit(event, { data: Number(e.currentTarget.value) });
-		});
-		if (limitMin !== undefined) element.min = limitMin;
-		if (limitMax !== undefined) element.max = limitMax;
-		element.value = defaultValue;
-	}
-}
-
-/**
- * 
- * @param {string} tab 
+ * Adds a horizontal ruler (`<hr>`) to the specified settings tab.
+ * @param {string} tab - Settings tab HTML `id`
  */
 function addRuler(tab) {
 	const tabElement = document.getElementById(tab);
@@ -108,17 +104,17 @@ function addRuler(tab) {
 	tabElement.appendChild(hr);
 }
 
-// Seed field
+// ---
+
+// Seed input
 const gen_seed = document.getElementById('gen_seed');
 gen_seed.addEventListener('input', (e) => {
 	eventBus.emit(events.Generator.Settings.Seed, { data: e.currentTarget.value });
 });
 
-// ====================================================
-// STARS
-// ====================================================
+//#region | Stars
 
-// Binary star chance field
+// Binary star chance input
 generateSetting(
 	'tab_Stars', 
 	'Binary star chance',
@@ -134,7 +130,7 @@ generateSetting(
 
 addRuler('tab_Stars');
 
-// Min star mass field
+// Min star mass input
 generateSetting(
 	'tab_Stars', 
 	'Minimal star mass',
@@ -149,7 +145,7 @@ generateSetting(
 	`Unit: M☉\nValue >= 0.08`
 );
 
-// Max star mass field
+// Max star mass input
 generateSetting(
 	'tab_Stars', 
 	'Maximal star mass',
@@ -179,7 +175,7 @@ generateSetting(
 
 addRuler('tab_Stars');
 
-// Min star metallicity field
+// Min star metallicity input
 generateSetting(
 	'tab_Stars', 
 	'Minimal star metallicity',
@@ -193,7 +189,7 @@ generateSetting(
 	{}
 );
 
-// Max star metallicity field
+// Max star metallicity input
 generateSetting(
 	'tab_Stars', 
 	'Maximal star metallicity',
@@ -219,7 +215,7 @@ generateSetting(
 	{}
 );
 
-// Mean star metallicity field
+// Mean star metallicity input
 generateSetting(
 	'tab_Stars', 
 	'Mean star metallicity',
@@ -231,7 +227,7 @@ generateSetting(
 	{ step: 0.05 }
 );
 
-// Standard derivative of star metallicity field
+// Standard derivative of star metallicity input
 generateSetting(
 	'tab_Stars', 
 	'Standard deviation for star metallicity',
@@ -261,15 +257,11 @@ generateSetting(
 	Unbound: sets the system's age between 20% and 80% of the first star's total lifespan.`
 );
 
-// ----------------------------------------------------
+//#endregion
 
+//#region | Planets' orbits
 
-
-// ====================================================
-// PLANETS ORBITS
-// ====================================================
-
-// S-type orbits safety factor field
+// S-type orbits safety factor input
 generateSetting(
 	'tab_PlanetsOrbits', 
 	'S-type orbits safety factor', 
@@ -297,7 +289,7 @@ generateSetting(
 	`Determines if circumbinary planets and moons (like Tatooine) are allowed to be generated.`
 );
 
-// P-type orbits safety factor field
+// P-type orbits safety factor input
 generateSetting(
 	'tab_PlanetsOrbits', 
 	'P-type orbits safety factor', 
@@ -327,7 +319,7 @@ generateSetting(
 	`Slow inward migration of low-mass planets in the early period of the planetary system.`
 );
 
-// Type I migration coefficient field
+// Type I migration coefficient input
 generateSetting(
 	'tab_PlanetsOrbits', 
 	'Type I migration coefficient', 
@@ -354,7 +346,7 @@ generateSetting(
 	`Fast inward migration of high-mass planets in the early period of the planetary system.`
 );
 
-// Type II migration coefficient field
+// Type II migration coefficient input
 generateSetting(
 	'tab_PlanetsOrbits', 
 	'Type II migration coefficient', 
@@ -381,7 +373,7 @@ generateSetting(
 	`Linear interpolation of migration regimes for planets with masses between 15 M⊕ and 120 M⊕.`
 );
 
-// Grand Tack chance field
+// Grand Tack chance input
 generateSetting(
 	'tab_PlanetsOrbits', 
 	'Grand Tack activation chance', 
@@ -396,7 +388,7 @@ generateSetting(
 	`Determines a chance for two giant planets (>= 60 M⊕) to start the Grand Tack (outward migration) at some point.`
 );
 
-// Hill safety factor field
+// Hill safety factor input
 generateSetting(
 	'tab_PlanetsOrbits', 
 	'Hill orbit safety factor', 
@@ -411,15 +403,11 @@ generateSetting(
 	`Determines how close planets can get to one another without triggering a close encounter (orbits shift, planet ejection or collision) during the migration simulation.`
 );
 
-// ----------------------------------------------------
+//#endregion
 
+//#region | Planets
 
-
-// ====================================================
-// PLANETS
-// ====================================================
-
-// Planet amount multiplier field
+// Planet amount multiplier input
 generateSetting(
 	'tab_Planets', 
 	'Planets amount multiplier', 
@@ -433,7 +421,7 @@ generateSetting(
 	{}
 );
 
-// Binary chance field
+// Binary chance input
 generateSetting(
 	'tab_Planets', 
 	'Bonus giant impact chance', 
@@ -448,7 +436,7 @@ generateSetting(
 	`Determines a chance to add a giant impact entry to a planet's history even if it didn't get actual impacts during the migration simulation.`
 );
 
-// Max bonus impacts field
+// Max bonus impacts input
 generateSetting(
 	'tab_Planets', 
 	'Maximal number of bonus giant impacts', 
@@ -462,7 +450,7 @@ generateSetting(
 	{ step: 1 }
 );
 
-// Binary chance field
+// Binary chance input
 generateSetting(
 	'tab_Planets', 
 	'Maximal binary planet chance', 
@@ -476,7 +464,7 @@ generateSetting(
 	{ step: 0.01 }
 );
 
-// Life chance field
+// Life chance input
 generateSetting(
 	'tab_Planets', 
 	'Life presence chance', 
@@ -490,3 +478,5 @@ generateSetting(
 	{},
 	`Determines a chance for a planet, even with ideal conditions, to be able to develop any life.`
 );
+
+//#endregion

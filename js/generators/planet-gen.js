@@ -116,7 +116,7 @@ export function generatePlanet(settings, parentBody, sma, genData, profile = und
 }
 
 /**
- * Continuation of a planet/moon generation.
+ * Continuation of a planet/moon's generation.
  * 
  * @param {T.Planet} planet 
  */
@@ -174,6 +174,17 @@ export function planetGeneration_Stage3(settings, planet) {
 		planet.rotationPeriod.value *= 1 + tidalForceFactor;
 	}
 
+	if (planet.type === T.planetTypes.Terrestrial) {
+		const T_eq = planet.temperature_eq.as(T.units.Temp.K);
+		const F_tidal = planet.F_tidal.total;
+
+		const T_eff = Math.pow( (T_eq ** 4) + (F_tidal / consts.PHY_SIGMA) , 1/4);
+		planet.temperature_eff = new T.Value(T_eff, T.units.Temp.K);
+	}
+	else {
+		planet.temperature_eff = new T.Value(planet.temperature.value, planet.temperature.unit);
+	}
+
 	generateAtmosphere(planet);
 
 	planet.planetEvolution = new planetEvolutionSim.PlanetEvolution(settings, planet);
@@ -186,8 +197,10 @@ export function planetGeneration_Stage3(settings, planet) {
 
 	planet.life = 0;
 	planet.lifeHistory = new Map();
+
 	if (planet.type === T.planetTypes.Terrestrial) {
 		terrestrial.setOcean(planet);
+
 		planet.albedo = terrestrial.calculateAlbedo(planet);
 		terrestrial.setSurfaceTemperature(planet);
 
@@ -221,15 +234,13 @@ export function planetGeneration_Stage3(settings, planet) {
 		}
 	}
 
-	//calculateMinMaxTemperature(planet);
 
 	planet.esi = calculateESI(planet);
-
 	planet.category = getPlanetCategory(planet);
 }
 
 /**
- * Generates a rocky base of a planet/moon, with set mass and core composition.
+ * Generates a rocky base of a planet/moon, with setted up mass and core composition.
  * 
  * @param {T.Planet} planet A planet for which the core is being generated.
  * @param {object|undefined} profile - Mass curve warping profile.
@@ -620,9 +631,8 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 
 
 /**
- * 
+ * Calculates planet's tidal heating caused by its star, host planet, and nearest moon.
  * @param {T.Planet} planet 
- * 
  * @returns
  */
 function calculateTotalTidalHeating(planet) {
@@ -649,7 +659,6 @@ function calculateTotalTidalHeating(planet) {
 }
 
 /**
- * 
  * @param {T.Planet} planet 
  * @param {T.Planet|T.Star} host 
  * @param {T.Value} sma 
@@ -661,7 +670,7 @@ function calculateTidalHeating(planet, host, sma, eccentricity) {
 	const M_host = host.mass.as(T.units.Mass.kg);
 	const a = sma.as(T.units.Dist.m);
 	const n = Math.sqrt((consts.PHY_G * (M_host + M_p)) / (a ** 3));
-	const e = planet.eccentricity;
+	const e = eccentricity;
 
 	const k2 = planetEvolutionSim.calculateLoveNumber(planet);
 	const Q = planetEvolutionSim.calculateTidalQ(planet);
@@ -674,13 +683,11 @@ function calculateTidalHeating(planet, host, sma, eccentricity) {
 }
 
 /**
- * 
  * @param {T.Planet} planet 
  * 
  * @returns {T.Value} (unit: `Temp`)
  */
 function calculateBlackBodyTemperature(planet) {
-
 	// Calculating black-body temperature (albedo = 0) from Earth's effective temperature w/o its albedo (0.3)
 	const T_bb_prim = consts.PHY_EARTH_TEMP_EQ / Math.sqrt(planet.genData.sma_norm) / Math.pow(1 - 0.30, 1/4);
 
@@ -728,7 +735,6 @@ function calculateBlackBodyTemperature(planet) {
 }
 
 /**
- * 
  * @param {T.Planet} planet 
  * 
  * @returns {T.Value} (unit: `Temp`)
@@ -742,6 +748,9 @@ function calculateEquilibriumTemperature(planet) {
 /**
  * Assumes the planet's albedo based on the planet's composition and blackbody temperature.
  * 
+ * @see {@link terrestrial.assumeAlbedo}
+ * @see {@link giants.assumeAlbedo}
+ * 
  * @param {T.Planet} planet 
  * 
  * @returns
@@ -754,19 +763,24 @@ function assumeAlbedo(planet) {
 }
 
 /**
+ * Gets base/surface color for a planet.
+ * 
+ * @see {@link terrestrial.getColor}
+ * @see {@link giants.getColor}
  * 
  * @param {T.Planet} planet 
  */
 function setPlanetColor(planet) {
 	if (planet.type === T.planetTypes.Terrestrial)
-		planet.color = terrestrial.setColor(planet);
+		planet.color = terrestrial.getColor(planet);
 	else
-		planet.color = giants.setColor(planet)
+		planet.color = giants.getColor(planet)
 }
 
 /**
- * 
+ * Gets heat glow color from the temperature.
  * @param {T.Value} temperature 
+ * @returns `#RRGGBBAA`
  */
 function getGlowColor(temperature) {
 	const temp = temperature.as(T.units.Temp.K);
@@ -808,7 +822,6 @@ function generateAtmosphere(planet) {
 }
 
 /**
- * 
  * @param {T.Planet} planet 
  */
 function setSurfaceTemperature(planet) {
@@ -819,7 +832,6 @@ function setSurfaceTemperature(planet) {
 }
 
 /**
- * 
  * @param {T.Planet} planet 
  */
 export function calculateSynodicDay(planet) {
@@ -838,7 +850,7 @@ export function calculateSynodicDay(planet) {
 }
 
 /**
- * 
+ * Calculates and sets minimal and maximal temperatures for a planet.
  * @param {T.Planet} planet 
  */
 export function setMinMaxTemperature(planet) {
@@ -967,8 +979,13 @@ function getSurfaceThermalProperties(planet) {
 }
 
 /**
+ * Calculates Earth Similarity Index for a planet.
+ * 
+ * Radius, density, escape velocity, and surface temperature are accounted.
  * 
  * @param {T.Planet} planet 
+ * 
+ * @returns (`(0..1]`)
  */
 function calculateESI(planet) {
 	const R = planet.radius.as(T.units.Dist.km);
@@ -990,6 +1007,9 @@ function calculateESI(planet) {
 }
 
 /**
+ * Gets a planet's classification.
+ * 
+ * Temperature - composition - mass
  * 
  * @param {T.Planet} planet 
  */

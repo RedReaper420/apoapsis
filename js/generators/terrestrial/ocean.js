@@ -155,7 +155,7 @@ class AmmoniaWater extends OceanSubstance {
 }
 
 /**
- * 
+ * Calculates liquids states and sets up an ocean for a planet.
  * @param {T.Planet} planet 
  */
 export function setOcean(planet) {
@@ -230,7 +230,7 @@ export function setOcean(planet) {
 		let hasFrozenOcean = false;
 		// A planet must be cold enough, otherwise its ice will sublimate too quickly, 
 		// leaving no ice at the surface in geological time.
-		// !!! DISABLED: post-GOE cooled planets are turning into deserts instead of snowballs !!!
+		// --- CONDITION DISABLED: post-GOE cooled planets are turning into deserts instead of snowballs ---
 		//if ((planet.temperature.as(T.units.Temp.K) <= 150)) {
 			for (const substance in oceanSubstances) {
 				if (oceanSubstances[substance].budget < maxSubstance.budget)
@@ -278,10 +278,10 @@ export function setOcean(planet) {
 }
 
 /**
- * 
+ * Calculate ocean depth based on planet's and ocean substance physical properties.
  * @param {T.Planet} planet 
  * @param {OceanSubstance} substance 
- * @returns 
+ * @returns (Unit: `Dist`)
  */
 function calculateOceanDepth(planet, substance) {
 	const M = planet.mass.as(T.units.Mass.kg);

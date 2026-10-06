@@ -1,17 +1,12 @@
 
-import prng from "../../utils/prng.js";
-import * as utils from "../../utils/utils.js";
 import * as T from "../../data/types.js";
-import consts from "../../data/consts.js";
 
 import * as ocean from "./ocean.js";
 import * as atmosphere from "./atmosphere.js";
 
 /**
  * Calculates maximal mountain height for a planet.
- * 
  * @param {T.Planet} planet 
- * 
  * @returns {T.Value} (unit: `Dist`)
  */
 export function calculateMountainHeight(planet) {
@@ -96,9 +91,7 @@ export function calculateMountainHeight(planet) {
 
 /**
  * Assumes the planet's albedo based on the planet's composition and blackbody temperature.
- * 
  * @param {T.Planet} planet 
- * 
  * @returns
  */
 export function assumeAlbedo(planet) {
@@ -119,7 +112,7 @@ export function assumeAlbedo(planet) {
 
 
 /**
- * 
+ * Calculates planet's albedo based on its surface and atmosphere properties.
  * @param {T.Planet} planet 
  */
 export function calculateAlbedo(planet) {
@@ -166,9 +159,7 @@ export function calculateAlbedo(planet) {
 		albedo_atmosphere_comp += albedo * Math.pow(fraction, 1/3);
 	}
 	albedo_atmosphere_comp = Math.min(0.8, albedo_atmosphere_comp) + Math.pow(Math.max(0, albedo_atmosphere_comp - 0.8), 3);
-
 	const albedo_atmosphere_press = 0.5 * (1 - Math.exp(-0.05 * planet.atmosphere.pressure.as(T.units.Press.atm)));
-
 	const albedo_atmosphere = Math.max(albedo_atmosphere_comp, albedo_atmosphere_press);
 
 	const albedo = albedo_atmosphere + Math.pow(1 - albedo_atmosphere, 2) * albedo_surface;
@@ -176,10 +167,10 @@ export function calculateAlbedo(planet) {
 }
 
 /**
- * 
+ * Gets surface color for a terrestrial planet.
  * @param {T.Planet} planet 
  */
-export function setColor(planet) {
+export function getColor(planet) {
 	const metallicity = planet.core.composition.iron / (1 - planet.core.composition.ice);
 
 	const red 	= Math.floor(65 + 90 * (1 - metallicity));
@@ -191,7 +182,7 @@ export function setColor(planet) {
 }
 
 /**
- * 
+ * @see {@link atmosphere.generateAtmosphere}
  * @param {T.Planet} planet 
  */
 export function generateAtmosphere(planet) {
@@ -199,7 +190,7 @@ export function generateAtmosphere(planet) {
 }
 
 /**
- * 
+ * @see {@link atmosphere.setSurfaceTemperature}
  * @param {T.Planet} planet 
  */
 export function setSurfaceTemperature(planet) {
@@ -207,7 +198,7 @@ export function setSurfaceTemperature(planet) {
 }
 
 /**
- * 
+ * @see {@link ocean.setOcean}
  * @param {T.Planet} planet 
  */
 export function setOcean(planet) {

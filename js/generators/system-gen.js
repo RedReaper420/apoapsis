@@ -34,6 +34,8 @@ class SystemGenerator {
 			console.error(error);
 			console.warn('Unable to generate seeds normally, switching to fallback method.');
 		}
+
+		// Cycling symbols in the UI after each generation for feedback
 		this.feedback = ['🔺', '🟡', '🔷'];
 		this.feedbackId = 0;
 
@@ -121,7 +123,7 @@ class SystemGenerator {
 				finishGeneration(body.secondary);
 			}
 
-			// -------
+			// ---
 
 			body.orbit.a = body.sma.as(T.units.Dist.m);
 			body.orbit.calculateMeanMotion(body);
@@ -173,7 +175,7 @@ class SystemGenerator {
 				}
 			}
 
-			// -------
+			// ---
 
 			// Recursive calls
 			body.bodies.forEach(child => { 
@@ -242,8 +244,9 @@ class SystemGenerator {
 		let gen = true;
 		let attempts = isFilterOn ? 0 : attemptsLimit - 1;
 		let status = false;
-
-		const finish = () => { gen = false; status = true; }
+	
+		// Used in filtration scripts
+		let finish = () => { gen = false; status = true; }
 
 		if (isFilterOn)
 			eval(pregen);

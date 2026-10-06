@@ -6,7 +6,10 @@ import * as terrestrial from "./terrestrial.js";
 import * as atmosphere from "./atmosphere.js";
 
 /**
- * Calculates life presense on the planet. If post-prokaryotic life calculated and set, it will transform planet's atmosphere.
+ * Calculates life presense on a planet.
+ * 
+ * If post-prokaryotic life calculated and set, the planet's atmosphere will be transformed.
+ * 
  * @param {T.Planet} planet 
  * @returns 
  */
@@ -134,8 +137,9 @@ export function calculateLife(planet, lifeChance) {
 }
 
 /**
- * 
+ * Attempts to convert the planet's atmosphere composition into Earth-like.
  * @param {T.Planet} planet 
+ * @returns Event trigger status
  */
 function greatOxidationEvent(planet) {
 	const T_surf = planet.temperature.as(T.units.Temp.K);
@@ -145,37 +149,29 @@ function greatOxidationEvent(planet) {
 	const isHabitableThermal = (273 <= T_surf) && (T_surf <= 340);
 	const isHabitablePressure = (0.4 <= P_surf) && (P_surf <= 10.0);
 
-	if (isHabitableThermal && isHabitablePressure && (h2 < 0.05)) {
-		const currentComp = { ...planet.atmosphere.composition };
-
-		// Convert CO2/CH4 pool into O2 via photosynthesis simulation
-		const o2Target = prng.range(0.18, 0.24);
-
-		// Nitrogenn re-balance
-		currentComp['N2'] = ((currentComp['N2'] || 0) + prng.range(0.73, 0.80)) / 2;
-
-		// Add Oxygen and re-balance
-		currentComp['O2'] = o2Target;
-		//*
-		if (currentComp['CO2']) currentComp['CO2'] *= prng.range(0.002, 0.01); // CO2 drawdown
-		if (currentComp['CH4']) currentComp['CH4'] *= prng.range(0.001, 0.005); // Methane oxidation
-		//*/
-		/*
-		if (currentComp['CO2']) currentComp['CO2'] *= 0.05; // CO2 drawdown
-		if (currentComp['CH4']) currentComp['CH4'] *= 0.01; // Methane oxidation
-		*/
-
-		planet.atmosphere.composition = atmosphere.normalizeComposition(currentComp);
-
-		// Recalculate climate feedback
-		terrestrial.setSurfaceTemperature(planet);
-		terrestrial.setOcean(planet);
-		planet.albedo = terrestrial.calculateAlbedo(planet);
-		terrestrial.setSurfaceTemperature(planet);
-
-		return true;
-	}
-	else {
+	if (!(isHabitableThermal && isHabitablePressure && (h2 < 0.05)))
 		return false;
-	}
+
+	const currentComp = { ...planet.atmosphere.composition };
+
+	// Convert CO2/CH4 pool into O2 via photosynthesis simulation
+	const o2Target = prng.range(0.18, 0.24);
+
+	// Nitrogenn re-balance
+	currentComp['N2'] = ((currentComp['N2'] || 0) + prng.range(0.73, 0.80)) / 2;
+
+	// Add Oxygen and re-balance
+	currentComp['O2'] = o2Target;
+	if (currentComp['CO2']) currentComp['CO2'] *= prng.range(0.002, 0.01); // CO2 drawdown
+	if (currentComp['CH4']) currentComp['CH4'] *= prng.range(0.001, 0.005); // Methane oxidation
+
+	planet.atmosphere.composition = atmosphere.normalizeComposition(currentComp);
+
+	// Recalculate climate feedback
+	terrestrial.setSurfaceTemperature(planet);
+	terrestrial.setOcean(planet);
+	planet.albedo = terrestrial.calculateAlbedo(planet);
+	terrestrial.setSurfaceTemperature(planet);
+
+	return true;
 }
