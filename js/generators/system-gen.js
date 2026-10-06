@@ -24,16 +24,9 @@ class SystemGenerator {
 		this.settings = settings;
 
 		// Fallback seed generation setup
-		this.fallbackSeed = false;
-		try {
-			// window.crypto.randomUUID() is available only with a secure connection
-			const seedTest = window.crypto.randomUUID();
-		}
-		catch (error) {
-			this.fallbackSeed = true;
-			console.error(error);
+		this.fallbackSeed = typeof window.crypto?.randomUUID !== 'function';
+		if (this.fallbackSeed)
 			console.warn('Unable to generate seeds normally, switching to fallback method.');
-		}
 
 		// Cycling symbols in the UI after each generation for feedback
 		this.feedback = ['🔺', '🟡', '🔷'];
