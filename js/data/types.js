@@ -341,6 +341,8 @@ export class GeneratorSettings {
 		planet_binary_chance = consts.UI_PLANET_BINARY_CHANCE_VAL_DEF,
 		planet_life_chance = consts.UI_PLANET_LIFE_CHANCE_DEF,
 	) {
+		this.version = window.apoapsis_version();
+		
 		this.seed_user = seed_user;
 		this.seed = seed;
 

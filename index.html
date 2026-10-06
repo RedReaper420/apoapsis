@@ -3,12 +3,12 @@
 <head>
 	<title>Apoapsis</title>
 	<meta charset="utf-8">
-	<link rel="shortcut icon" href="./img/favicon.png">
-	<link rel="stylesheet" href="./style.css">
-	<link rel="stylesheet" type="text/css" href="./toastify.css">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"">
 	<meta name="author" content="GitHub@RedReaper420, GitHub@Vector-Graphics">
-	<script type="module" src="./js/main.js"></script>
+	<link rel="shortcut icon" href="./img/favicon.png">
+	<link rel="stylesheet" href="./toastify.css">
+	<link rel="stylesheet" href="./style.css?v=0.9.0">
+	<script type="module" src="./js/main.js?v=0.9.0"></script>
 </head>
 
 <body>
@@ -201,11 +201,12 @@
 	</div>
 
 	<dialog id="dialog-about">
-		<div class="dialog-title">About</div>
+		<div class="dialog-title">About <q>Apoapsis v<span class="version">1.0.0.0</span></q></div>
 		<hr>
 		<div class="dialog-body">
 			<p>
-				<b><a target="_blank" href="https://github.com/RedReaper420/apoapsis">Apoapsis</a></b> by RedReaper420 is inspired with <b><a target="_blank" href="https://github.com/Vector-Graphics/periapsis">Periapsis</a></b> by Vector-Graphics.
+				<div id="logo"><img src="./img/logo.webp"></div>
+				<b><a target="_blank" href="https://github.com/RedReaper420/apoapsis">Apoapsis</a></b> made by RedReaper420 is a web-based interactive star/planet system generator inspired by <b><a target="_blank" href="https://github.com/Vector-Graphics/periapsis">Periapsis</a></b> made by Vector-Graphics.
 			</p>
 		</div>
 		<br>
@@ -216,7 +217,7 @@
 	</dialog>
 
 	<dialog id="dialog-exit">
-		<div class="dialog-title">Warning: leaving the app</div>
+		<div class="dialog-title">Warning: Leaving the app</div>
 		<hr>
 		<div class="dialog-body">
 			<p>You're going to leave the app and move to the following URL:</p>

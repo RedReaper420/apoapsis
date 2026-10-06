@@ -822,6 +822,9 @@ a {
 }
 
 dialog {
+	max-width: 40em;
+	padding: 1.5em;
+
 	color: var(--col-main);
 
 	background-color: var(--col-background);
@@ -833,9 +836,14 @@ dialog {
 		background-color: rgba(0, 0, 0, 50%);
 	}
 }
+@media (orientation: portrait) {
+	dialog {
+		max-width: 90%;
+	}
+}
 
 .dialog-title {
-	font-size: large;
+	font-size: 120%;
 	font-weight: bold;
 	text-align: center;
 }
@@ -912,6 +920,23 @@ hr {
 
 #cellScale {
 	width: 12em;
+}
+
+#logo {
+	display: flex;
+	align-content: center;
+	justify-content: center;
+	align-items: center;
+
+	height: 5em;
+
+	margin: 1em;
+
+	img {
+		height: 100%;
+		width: auto;
+		object-fit: contain;
+	}
 }
 
 /* Hovers */
