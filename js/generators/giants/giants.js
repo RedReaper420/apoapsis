@@ -1,5 +1,6 @@
 
 import prng from "../../utils/prng.js";
+import * as utils from "../../utils/utils.js";
 import * as T from "../../data/types.js";
 import consts from "../../data/consts.js";
 
@@ -21,7 +22,7 @@ export function makeGasGiant(planet) {
 
 	const critBaseMin = 5.0;
 	const critBaseMax = 20.0;
-	const criticalMass = critBaseMin * Math.exp(-0.06 * Math.sqrt(sma_norm)) + (critBaseMax - critBaseMin) * Math.exp(-0.6 * Math.sqrt(sma_norm));
+	const criticalMass = critBaseMin * Math.exp(-0.05 * Math.sqrt(sma_norm)) + (critBaseMax - critBaseMin) * Math.exp(-0.7 * Math.sqrt(sma_norm));
 
 	const coreMass = planet.core.mass.as(T.units.Mass.M_Earth);
 	const coreToCritRatio = coreMass / criticalMass;
@@ -56,6 +57,8 @@ export function makeGasGiant(planet) {
 					envelopeMult = dampeningThreshold + (envelopeMult - dampeningThreshold) * (1 - Math.exp(-5 * starMass));
 				}
 
+				envelopeMult *= utils.randomRangeGaussian(0.8, 1.2);
+
 				envelopeMass = coreMass * envelopeMult;
 			}
 			else {
@@ -68,9 +71,11 @@ export function makeGasGiant(planet) {
 				else 
 					envelopeMult = prng.range(3, 16);
 
+				envelopeMult *= utils.randomRangeGaussian(0.9, 1.1);
+
 				// Additional "luck" for enlarged gas giants (enabling super-Jupiters and brown dwarfs)
 				if (prng() < (0.05 + star.metallicity * 0.2))
-					envelopeMult *= prng.range(1.5, 3.5);
+					envelopeMult *= utils.randomRangeGaussian(1.5, 4.5);
 
 				const dampeningThreshold = 4;
 				if (envelopeMult > dampeningThreshold) {
@@ -81,7 +86,7 @@ export function makeGasGiant(planet) {
 			}
 		}
 		else {
-			const subNeptuneChance = 1 / (1 + Math.exp(-5 * 0.05 * (sma_norm - consts.PHY_DIST_SNOW_LINE)));
+			const subNeptuneChance = 0.25 + 0.75 * ( 1 / (1 + Math.exp(-0.50 * (sma_norm - consts.PHY_DIST_SNOW_LINE))) );
 			if (prng() < subNeptuneChance) {
 				if (isIceGiant) {
 					// Mini-Neptune

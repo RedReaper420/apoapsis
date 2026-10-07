@@ -858,7 +858,7 @@ export function setMinMaxTemperature(planet) {
 	const t_eq = planet.temperature_eq.as(T.units.Temp.K);
 	const t_eff = planet.temperature_eff.as(T.units.Temp.K);
 	
-	const t_int = Math.pow((t_eff ** 4) - (t_eq ** 4), 1/4); // Internal heat
+	const t_int = t_eff - t_eq; // Internal heat
 	const e_gh = temp / t_eff; // Greenhouse coefficient
 
 	const p0 = 0.75; // bar

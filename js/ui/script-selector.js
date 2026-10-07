@@ -87,6 +87,12 @@ async function initSelector() {
 				desc.innerHTML = item.desc;
 				option.appendChild(desc);
 
+				// Rarity
+				const rarity = document.createElement('i');
+				rarity.classList.add('script-desc');
+				rarity.innerText = '1/' + item.rarity;
+				option.appendChild(rarity);
+
 				optionGroup.appendChild(option);
 			});
 

@@ -7,8 +7,8 @@
 	<meta name="author" content="GitHub@RedReaper420, GitHub@Vector-Graphics">
 	<link rel="shortcut icon" href="./img/favicon.png">
 	<link rel="stylesheet" href="./toastify.css">
-	<link rel="stylesheet" href="./style.css?v=0.9.0">
-	<script type="module" src="./js/main.js?v=0.9.0"></script>
+	<link rel="stylesheet" href="./style.css?v=0.9.1">
+	<script type="module" src="./js/main.js?v=0.9.1"></script>
 </head>
 
 <body>
@@ -159,7 +159,7 @@
 
 				<hr style="opacity: 50%;">
 
-				<p><b>Warning:</b> Don't paste any code if you don't understand how it works.</p>
+				<p><b>⚠️ Security Warning:</b> Executing untrusted JavaScript can compromise your browser and data. Never paste code from sources you do not explicitly trust.</p>
 				
 				<p>
 					<select id="script-select">
@@ -201,12 +201,12 @@
 	</div>
 
 	<dialog id="dialog-about">
-		<div class="dialog-title">About <q>Apoapsis v<span class="version">1.0.0.0</span></q></div>
+		<div class="dialog-title">About <q>Apoapsis v<span class="version">1.0.0</span></q></div>
 		<hr>
 		<div class="dialog-body">
 			<p>
 				<div id="logo"><img src="./img/logo.webp"></div>
-				<b><a target="_blank" href="https://github.com/RedReaper420/apoapsis">Apoapsis</a></b> made by RedReaper420 is a web-based interactive star/planet system generator inspired by <b><a target="_blank" href="https://github.com/Vector-Graphics/periapsis">Periapsis</a></b> made by Vector-Graphics.
+				<b><a target="_blank" href="https://github.com/RedReaper420/apoapsis">Apoapsis</a></b>, developed by RedReaper420, is an interactive web-based star and planetary system generator inspired by Vector-Graphics' <b><a target="_blank" href="https://github.com/Vector-Graphics/periapsis">Periapsis</a></b>.
 			</p>
 		</div>
 		<br>
@@ -475,6 +475,28 @@
 						<th colspan="2">Gas Envelope</th>
 					</tr>
 					<tr>
+						<th>Envelope mass</th>
+						<td>
+							<span class="tooltip">
+							<span id="envelopeMassValue"></span> <span id="envelopeMassUnit"></span>
+							<span class="tooltiptext">
+								<span id="envelopeMassKg"></span>
+							</span>
+						</span>
+						</td>
+					</tr>
+					<tr>
+						<th>Envelope thickness</th>
+						<td><span id="envelopeThickness"></span></td>
+					</tr>
+					<tr>
+						<td colspan="2">
+							<span class="progressbar" style="width: 100%;">
+								<span class="progressbar-fill" id="envelopeThicknessBar"></span>
+							</span>
+						</td>
+					</tr>
+					<tr>
 						<td colspan="2">
 							<span class="progressbar" style="width: 100%;">
 								<span class="progressbar-fill" id="compositionEnvelopeGasBar" style="background-color: navajowhite;"></span>
@@ -490,22 +512,26 @@
 						<th>Ice</th>
 						<td><span id="compositionEnvelopeIce"></span></td>
 					</tr>
-					<tr>
-						<th>Thickness</th>
-						<td><span id="envelopeThickness"></span></td>
-					</tr>
-					<tr>
-						<td colspan="2">
-							<span class="progressbar" style="width: 100%;">
-								<span class="progressbar-fill" id="envelopeThicknessBar"></span>
-							</span>
-						</td>
-					</tr>
 					<tr><!-- Don't delete this row --></tr>
 				</tbody>
 				<tbody>
 					<tr>
-						<th colspan="2">Core</th>
+						<th colspan="2">Solid body</th>
+					</tr>
+					<tr>
+						<th>Body mass</th>
+						<td>
+							<span class="tooltip">
+							<span id="coreMassValue"></span> <span id="coreMassUnit"></span>
+							<span class="tooltiptext">
+								<span id="coreMassKg"></span>
+							</span>
+						</span>
+						</td>
+					</tr>
+					<tr>
+						<th>Body radius</th>
+						<td><span id="coreRadius"></span></td>
 					</tr>
 					<tr>
 						<td colspan="2">

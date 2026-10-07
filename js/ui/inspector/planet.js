@@ -164,8 +164,83 @@ export default function generatePlanetProfile(body) {
 	//#endregion
 
 	//#region || COMPOSITION
+		
+		//#region | Envelope
+		const compositionEnvelope = planet.querySelector('#compositionEnvelope');
+		if (body.type !== T.planetTypes.Terrestrial) {
+			// Mass
+			const envelopeMassValue = planet.querySelector('#envelopeMassValue');
+			const envelopeMassUnit = planet.querySelector('#envelopeMassUnit');
+			const envelopeMassFit = utils.getFittingValue(
+				body.envelope.mass,
+				T.units.Mass.kg,
+				[
+					T.units.Mass.M_Moon, 
+					T.units.Mass.M_Earth, 
+					T.units.Mass.M_Jupiter, 
+				],
+				0.1
+			);
+			envelopeMassValue.innerText = envelopeMassFit.value.toPrecision(3);
+			envelopeMassUnit.innerText = envelopeMassFit.unit;
+
+			const envelopeMassKg = planet.querySelector('#envelopeMassKg');
+			envelopeMassKg.innerText = body.envelope.mass.as(T.units.Mass.kg).toExponential(3).replace('+','') + ' kg';
+
+			// Thickness
+			const envelopeThickness = planet.querySelector('#envelopeThickness');
+			const envelopeThicknessBar = planet.querySelector('#envelopeThicknessBar');
+			const envelopeThickness_km = body.envelope.thickness.as(T.units.Dist.km);
+			const totalRadius_km = body.radius.as(T.units.Dist.km);
+			envelopeThickness.innerText = `${envelopeThickness_km.toFixed(2)} km (${(envelopeThickness_km / totalRadius_km * 100).toPrecision(2)}% of total radius)`;
+			envelopeThicknessBar.style.width = (envelopeThickness_km / totalRadius_km * 100).toPrecision(2) + '%';
+
+			// Gas
+			const compositionEnvelopeGas = planet.querySelector('#compositionEnvelopeGas');
+			const compositionEnvelopeGasBar = planet.querySelector('#compositionEnvelopeGasBar');
+			const gasPercent = body.envelope.composition.gas * 100;
+			compositionEnvelopeGas.innerText = (gasPercent < 100 ? gasPercent.toPrecision(3) : gasPercent.toFixed(0)) + '%';
+			compositionEnvelopeGasBar.style.width = compositionEnvelopeGas.innerText;
+
+			// Ice
+			const compositionEnvelopeIce = planet.querySelector('#compositionEnvelopeIce');
+			const compositionEnvelopeIceBar = planet.querySelector('#compositionEnvelopeIceBar');
+			const iceEnvPercent = body.envelope.composition.ice * 100;
+			compositionEnvelopeIce.innerText = (iceEnvPercent < 100 ? iceEnvPercent.toPrecision(3) : iceEnvPercent.toFixed(0)) + '%';
+			compositionEnvelopeIceBar.style.width = compositionEnvelopeIce.innerText;
+
+		}
+		else {
+			compositionEnvelope.remove();
+		}
+		//#endregion
 
 		//#region | Core
+		
+		// Mass
+		const coreMassValue = planet.querySelector('#coreMassValue');
+		const coreMassUnit = planet.querySelector('#coreMassUnit');
+		const coreMassFit = utils.getFittingValue(
+			body.core.mass,
+			T.units.Mass.kg,
+			[
+				T.units.Mass.M_Moon, 
+				T.units.Mass.M_Earth, 
+				T.units.Mass.M_Jupiter, 
+			],
+			0.1
+		);
+		coreMassValue.innerText = coreMassFit.value.toPrecision(3);
+		coreMassUnit.innerText = coreMassFit.unit;
+
+		const coreMassKg = planet.querySelector('#coreMassKg');
+		coreMassKg.innerText = body.core.mass.as(T.units.Mass.kg).toExponential(3).replace('+','') + ' kg';
+
+		// Radius
+		const coreRadius = planet.querySelector('#coreRadius');
+		const coreRadius_km = body.core.radius.as(T.units.Dist.km);
+		coreRadius.innerText = `${coreRadius_km.toFixed(2)} km`;
+
 		// Iron
 		const compositionCoreIron = planet.querySelector('#compositionCoreIron');
 		const compositionCoreIronBar = planet.querySelector('#compositionCoreIronBar');
@@ -188,36 +263,6 @@ export default function generatePlanetProfile(body) {
 		compositionCoreIceBar.style.width = compositionCoreIce.innerText;
 		//#endregion
 
-		//#region | Envelope
-		const compositionEnvelope = planet.querySelector('#compositionEnvelope');
-		if (body.type !== T.planetTypes.Terrestrial) {
-			// Gas
-			const compositionEnvelopeGas = planet.querySelector('#compositionEnvelopeGas');
-			const compositionEnvelopeGasBar = planet.querySelector('#compositionEnvelopeGasBar');
-			const gasPercent = body.envelope.composition.gas * 100;
-			compositionEnvelopeGas.innerText = (gasPercent < 100 ? gasPercent.toPrecision(3) : gasPercent.toFixed(0)) + '%';
-			compositionEnvelopeGasBar.style.width = compositionEnvelopeGas.innerText;
-
-			// Ice
-			const compositionEnvelopeIce = planet.querySelector('#compositionEnvelopeIce');
-			const compositionEnvelopeIceBar = planet.querySelector('#compositionEnvelopeIceBar');
-			const iceEnvPercent = body.envelope.composition.ice * 100;
-			compositionEnvelopeIce.innerText = (iceEnvPercent < 100 ? iceEnvPercent.toPrecision(3) : iceEnvPercent.toFixed(0)) + '%';
-			compositionEnvelopeIceBar.style.width = compositionEnvelopeIce.innerText;
-
-			// Thickness
-			const envelopeThickness = planet.querySelector('#envelopeThickness');
-			const envelopeThicknessBar = planet.querySelector('#envelopeThicknessBar');
-			const envelopeThickness_km = body.envelope.thickness.as(T.units.Dist.km);
-			const totalRadius_km = body.radius.as(T.units.Dist.km);
-			envelopeThickness.innerText = `${envelopeThickness_km.toFixed(2)} km (${(envelopeThickness_km / totalRadius_km * 100).toPrecision(2)}% of radius)`;
-			envelopeThicknessBar.style.width = (envelopeThickness_km / totalRadius_km * 100).toPrecision(2) + '%';
-		}
-		else {
-			compositionEnvelope.remove();
-		}
-		//#endregion
-	
 	//#endregion
 
 	//#region || ROTATION

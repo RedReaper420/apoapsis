@@ -4,9 +4,28 @@
 		"groupName": "Giant planets",
 		"scripts": [
 			{
+				"thumb": "🔴<span style='font-size: 75%;'>🪐</span>",
+				"name": "A giant around a red dwarf",
+				"desc": "Finds a red dwarf hosting a giant planet (>= 15 M⊕).",
+				"rarity": 40,
+				"script": "giant_around_red_dwarf",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "❄️/💨",
+				"name": "Hybrid giant",
+				"desc": "Finds a sub-Neptune or a giant planet with ~1:1 ice to gas ratio.",
+				"rarity": 310,
+				"script": "hybrid_giant",
+				"pre": false,
+				"post": false
+			},
+			{
 				"thumb": "🟤",
-				"name": "Brown Dwarf",
+				"name": "Brown dwarf",
 				"desc": "Finds a brown dwarf planet (mass >= 4100 M⊕ (12.9 M♃)).",
+				"rarity": 2400,
 				"script": "brown_dwarf",
 				"pre": false,
 				"post": false
@@ -15,6 +34,7 @@
 				"thumb": "🔵",
 				"name": "Mega-Neptune",
 				"desc": "Finds an ice giant with mass >= 90 M⊕.",
+				"rarity": 4400,
 				"script": "mega_neptune",
 				"pre": false,
 				"post": false
@@ -29,15 +49,17 @@
 				"thumb": "🌎🌏",
 				"name": "Twin Earths",
 				"desc": "Finds a binary planetary system of habitable meso-Earths.",
+				"rarity": 3300,
 				"script": "twin_earths",
 				"pre": false,
 				"post": false
 			},
 			{
 				"thumb": "🪐<span style='font-size: 50%;'>🌑</span>",
-				"name": "Anomalous Binary Planet",
-				"desc": "Finds a binary planetary system with mass ratio lesser than 1:25.",
-				"script": "anomalous_binary_planet",
+				"name": "Massive moon",
+				"desc": "Finds a massive moon that is technically a component of a binary with mass ratio lesser than 1:25.",
+				"rarity": 4800,
+				"script": "massive_moon",
 				"pre": false,
 				"post": false
 			}
@@ -48,18 +70,20 @@
 		"groupName": "Moons",
 		"scripts": [
 			{
-				"thumb": "🪐<span style='font-size: 50%;'>🌍</span>",
-				"name": "Pandora",
-				"desc": "Finds a habitable big moon orbiting a giant planet.",
-				"script": "pandora",
+				"thumb": "🪐🪐<span style='font-size: 50%;'>🌑</span>",
+				"name": "Circumbinary moon",
+				"desc": "Finds a circumbinary moon (a common moon of a binary planet).",
+				"rarity": 4800,
+				"script": "circumbinary_moon",
 				"pre": false,
 				"post": false
 			},
 			{
-				"thumb": "🪐🪐<span style='font-size: 50%;'>🌑</span>",
-				"name": "Circumbinary Moon",
-				"desc": "Finds a circumbinary moon (a common moon of a binary planet).",
-				"script": "circumbinary_moon",
+				"thumb": "🪐<span style='font-size: 50%;'>🌍</span>",
+				"name": "Pandora",
+				"desc": "Finds a habitable big moon orbiting a giant planet.",
+				"rarity": 7400,
+				"script": "pandora",
 				"pre": false,
 				"post": false
 			}
@@ -70,18 +94,20 @@
 		"groupName": "Life",
 		"scripts": [
 			{
-				"thumb": "🦠<span style='font-size: 50%;'>🟠</span>",
-				"name": "Methane Life",
-				"desc": "Finds a planet hosting life in methane ocean.",
-				"script": "methane_life",
+				"thumb": "🦠<span style='font-size: 50%;'>🔵</span>",
+				"name": "Ammonia life",
+				"desc": "Finds a planet hosting life in ammonia water ocean.",
+				"rarity": 9,
+				"script": "ammonia_life",
 				"pre": false,
 				"post": false
 			},
 			{
-				"thumb": "🦠<span style='font-size: 50%;'>🔵</span>",
-				"name": "Ammonia Life",
-				"desc": "Finds a planet hosting life in ammonia water ocean.",
-				"script": "ammonia_life",
+				"thumb": "🦠<span style='font-size: 50%;'>🟠</span>",
+				"name": "Methane life",
+				"desc": "Finds a planet hosting life in methane ocean.",
+				"rarity": 12,
+				"script": "methane_life",
 				"pre": false,
 				"post": false
 			}
@@ -95,6 +121,7 @@
 				"thumb": "☀️☀️<span style='font-size: 50%;'>🌕</span>",
 				"name": "Tatooine",
 				"desc": "Finds a warm circumbinary terrestrial planet.",
+				"rarity": 60,
 				"script": "tatooine",
 				"pre": false,
 				"post": false

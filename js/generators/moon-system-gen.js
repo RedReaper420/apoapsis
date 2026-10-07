@@ -295,7 +295,7 @@ function generateRegularMoons(settings, planet, moonSmaMax_REarth, moonSmaStartO
 	const planetMassFactor = 0.5 * Math.log10(planet.mass.as(T.units.Mass.M_Earth) + 1);
 	let massBudget = planetMass_MMoon * planetMassFactor * 1e-4 * utils.randomRangeGaussian(0.7, 1.3);
 	if (planet instanceof T.BinaryPlanet)
-		massBudget /= 3; // A semblance of mass preservation (B1-S-moons + B2-S-moons + P-moons)
+		massBudget /= 2.5; // A semblance of mass preservation (B1-S-moons + B2-S-moons + P-moons)
 
 	// Chance to loose a moon due to violent collissions in the past
 	const moonLossChance = planet.genData.impacts > 0
@@ -421,7 +421,7 @@ function generateImpactMoon(settings, planet, moonSmaMin_REarth, moonSmaMax_REar
 		if (sma <= rocheLimit_REarth) {
 			// Turning the moon into rings if it falls on the planet.
 			planet.rings.push(new T.RingSystem(
-				new T.Value(planet.radius.value * 1.5, planet.radius.unit), 
+				new T.Value(planet.radius.value * 1.2, planet.radius.unit), 
 				rocheLimit, 
 				moon.mass, 
 				moon.core.composition.ice
