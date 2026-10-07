@@ -30,4 +30,5 @@ python -m http.server 8000
 ## License & Credits
 
 This project is licensed under the [MIT License](LICENSE).  
+
 For third-party libraries, assets, and attributions, see [THIRD_PARTY_LICENCES.md](THIRD_PARTY_LICENCES.md).
