@@ -19,7 +19,7 @@
 	/* Metrophobic by Vernon Adams - https://fonts.google.com/specimen/Metrophobic
 	Converted to WOFF2 */
 	font-family: "Metrophobic";
-	src: url("/fonts/Metrophobic-Regular.woff2") format('woff2');
+	src: url("./fonts/Metrophobic-Regular.woff2") format('woff2');
 }
 
 html {
@@ -81,7 +81,7 @@ body::before {
 html::before {
 	z-index: -3;
 
-	background: url("/img/stars.webp") repeat;
+	background: url("./img/stars.webp") repeat;
 	background-size: 25vw;
 }
 
@@ -89,7 +89,7 @@ html::before {
 html::after {
 	z-index: -2;
 
-	background: url("/img/stars_mirrored.webp") repeat;
+	background: url("./img/stars_mirrored.webp") repeat;
 	background-size: 25vw;
 
 	animation: BkgFlickering 15s infinite linear;
