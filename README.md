@@ -9,7 +9,7 @@ Live demo: https://redreaper420.github.io/apoapsis/
 
 ## Features
 
-* Astrophysics-faithul seeded procedural generation of main-sequence stars and planets from smallest moons to brown dwarfs.
+* Astrophysics-faithul, thorough seeded procedural generation of main-sequence stars and planets from smallest moons to brown dwarfs.
 * Configurable generation settings (i.e. stars properties, planetary migration).
 * Interactive 2D top-down system visualization (on Kelperial rails) with time warp.
 * Detailed body properties inspector.
