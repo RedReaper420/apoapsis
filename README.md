@@ -7,6 +7,15 @@ Apoapsis is an interactive web-based star and planetary system generator inspire
 
 Live demo: https://redreaper420.github.io/apoapsis/
 
+## Features
+
+* Astrophysics-faithul seeded procedural generation of main-sequence stars and planets from smallest moons to brown dwarfs.
+* Configurable generation settings (i.e. stars properties, planetary migration).
+* Interactive 2D top-down system visualization (on Kelperial rails) with time warp.
+* Detailed body properties inspector.
+* Scriptable generation filter.
+* Saving & loading of systems and settings (JSON)
+
 ## Hosting & Launch
 
 Just unpack the content of this repository into some directory on your server/hosting. When hosting the app on your server, you might want to edit the "To homepage" link in `home_url.txt`.
