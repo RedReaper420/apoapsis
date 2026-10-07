@@ -16,12 +16,12 @@ async function handleScriptChange(id) {
 
 	if (selected && id) {
 		// Load and set search script
-		const response_predicate = await fetch(`../../filters/${id}.js`);
+		const response_predicate = await fetch(`filters/${id}.js`);
 		scriptTextarea.value = await response_predicate.text();
 
 		// Load and set pre-gen script
 		if (selected.dataset.pre === 'true') {
-			const response_pre = await fetch(`../../filters/${id}.pre.js`);
+			const response_pre = await fetch(`filters/${id}.pre.js`);
 			preTextarea.value = await response_pre.text();
 		}
 		else {
@@ -30,7 +30,7 @@ async function handleScriptChange(id) {
 
 		// Load and set post-gen script
 		if (selected.dataset.post === 'true') {
-			const response_post = await fetch(`../../filters/${id}.post.js`);
+			const response_post = await fetch(`filters/${id}.post.js`);
 			postTextarea.value = await response_post.text();
 		}
 		else {
@@ -47,7 +47,7 @@ async function handleScriptChange(id) {
 
 async function initSelector() {
 	try {
-		const response = await fetch(`../../filters/_filters.json`);
+		const response = await fetch(`filters/_filters.json`);
 
 		if (!response.ok) {
 			console.error(`JSON loading error: ${response.status}`);
