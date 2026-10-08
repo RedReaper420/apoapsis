@@ -38,12 +38,12 @@ Just open the [live demo](https://redreaper420.github.io/apoapsis/).
 1. Clone or download the repository (or a release).
 2. Serve the files with any static HTTP server. Examples:
 
-**Python 3**
+> **Python 3**
 ```bash
 python -m http.server 8000
 ```
 
-**Node.js (npx)**
+> **Node.js (npx)**
 ```bash
 npx serve .
 ```
