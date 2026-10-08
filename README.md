@@ -1,10 +1,13 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.9.1-yellow.svg)](https://github.com/RedReaper420/apoapsis/releases)
+[![Live Demo](https://img.shields.io/badge/demo-online-brightgreen.svg)](https://redreaper420.github.io/apoapsis/)
 
 # Apoapsis
 
-<img src="img/logo.webp">
+<p align="center">
+  <img src="img/logo.webp" alt="Apoapsis logo" width="33%">
+</p>
 
 Apoapsis is an interactive web-based star and planetary system generator inspired by Vector-Graphics' [Periapsis](https://github.com/Vector-Graphics/periapsis).
 
@@ -12,7 +15,7 @@ Live demo: https://redreaper420.github.io/apoapsis/
 
 ## Features
 
-- **Astrophysics-faithful** seeded procedural generation of main-sequence stars and planets (from tiny moons to brown dwarfs)
+- **Astrophysics-faithful** seeded procedural generation of main-sequence stars and planets (from tiny moons to brown dwarfs).
 - Configurable generation parameters (star properties, planetary migration simulation regimes, etc.)
 - Interactive 2D top-down visualization with time warp.
 - Detailed body properties inspector.
@@ -26,19 +29,41 @@ Live demo: https://redreaper420.github.io/apoapsis/
 Just open the [live demo](https://redreaper420.github.io/apoapsis/).
 
 ### Local / Self-hosting
-1. Clone or download the repository or one of the releases.
-2. Serve the files with any static server:
+1. Clone or download the repository (or a release).
+2. Serve the files with any static HTTP server. Examples:
+
+**Python 3**
 ```bash
-# Python local server | http://localhost:8000
 python -m http.server 8000
 ```
-3. In the browser, open URL leading to `index.html` at your server.
+
+**Node.js (npx)**
+```bash
+npx serve .
+```
+
+3. In a modern browser, open the URL leading to `index.html` at your server (i.e., `http://localhost:8000` with Python server).
 
 > [!TIP]
-> If you're hosting the app on your own server, you can change the link leading to a "homepage" to your own in the `home_url.txt` file.
+> When hosting on your own server you can change the "Home" button destination by editing `home_url.txt`.
+
+## Quick Usage
+
+|Action|How|
+|---|---|
+|Generate a new system|Click `♻️ Generate` at the top|
+|Change seed / settings|Click `⚙️` at the top and navigate the opened settings overlay|
+|Inspect a body|Click it in the view or use the navigation panel at the left|
+|Toggle details rendering|Click buttons at the bottom (`🌗` `💡` `🧲` `☁️` `🌐` `🌱` `🔆` `🔄` `🔍` `🏷️` `💫` `👁️`)|
+|Time warp|Click `▶️`/`⏸️` to toggle pause; drag the slider at the bottom to control simulation speed|
+|Save / load system|Click `💾` / `📂` at the top|
+|Export HTML report|Click `📄` at the top|
+|Activate generation filters|1. Open the settings (`⚙️`) <br> 2. Open the `Filter` tab <br> 3. Select, paste, or type a script in the text box(es) (⚠️ only paste code you trust) <br> 4. Click on `Enable filter`|
 
 ## License & Credits
 
+Inspired by [Periapsis](https://github.com/Vector-Graphics/periapsis) by VectorV Jay Walker ([@Vector-Graphics](https://github.com/Vector-Graphics)).
+
 This project is licensed under the [MIT License](LICENSE).  
 
-For third-party libraries, assets, and attributions, see [THIRD_PARTY_LICENCES.md](THIRD_PARTY_LICENCES.md).
+For third-party libraries, assets, and attributions, see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
