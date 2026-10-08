@@ -68,6 +68,7 @@ class Renderer {
 		this.uiElements = Array.from(document.getElementsByClassName('ui'));
 		this.idle = 0;
 		this.idleMax = 1.0;
+		this.settingsOpen = false;
 
 		//#endregion
 
@@ -117,6 +118,7 @@ class Renderer {
 
 		// Settings update after buttons pressing
 		eventBus.on(events.UI.SettingToggle, (cb) => { this[cb.setting] = cb.value; });
+		eventBus.on(events.UI.SettingsOverlayToggle, (cb) => { this.settingsOpen = cb.value; });
 
 		// Navigation interaction setup
 		this.bodyListElement = document.getElementById('bodyList');
@@ -625,7 +627,7 @@ class Renderer {
 		const simDt = realDt * this.timeMultiplier;
 		this.simTimeSeconds += simDt * (!this.pause);
 
-		this.idle = this.setting_keepUIVisibile ? 0 : Math.min(this.idleMax, this.idle + realDt);
+		this.idle = this.setting_keepUIVisibile || this.settingsOpen ? 0 : Math.min(this.idleMax, this.idle + realDt);
 		if (this.idle === this.idleMax)
 			this.uiElements.forEach(el => { el.classList.add('hidden'); });
 		else

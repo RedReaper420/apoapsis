@@ -57,6 +57,7 @@ const events = Object.freeze({
 	UI: Object.freeze({
 		ButtonClick:	'ui_button_click',
 		SettingToggle:	'ui_setting_toggle',
+		SettingsOverlayToggle: 'ui_settings_overlay_toggle',
 	}),
 });
 

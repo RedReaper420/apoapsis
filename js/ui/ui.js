@@ -178,6 +178,7 @@ function handleButtonClick(button) {
 		case 'settings': {
 			const settings = document.getElementById('generatorSettings');
 			settings.classList.toggle('open');
+			eventBus.emit(events.UI.SettingsOverlayToggle, { value: settings.classList.contains('open') });
 			break;
 		}
 
