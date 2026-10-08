@@ -1,4 +1,7 @@
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.9.1-yellow.svg)](https://github.com/RedReaper420/apoapsis/releases)
+
 # Apoapsis
 
 <img src="img/logo.webp">
@@ -9,23 +12,30 @@ Live demo: https://redreaper420.github.io/apoapsis/
 
 ## Features
 
-* Astrophysics-faithul, thorough seeded procedural generation of main-sequence stars and planets from smallest moons to brown dwarfs.
-* Configurable generation settings (i.e. stars properties, planetary migration).
-* Interactive 2D top-down system visualization (on Kelperial rails) with time warp.
-* Detailed body properties inspector.
-* Scriptable generation filter.
-* Saving & loading of systems and settings (JSON)
+- **Astrophysics-faithful** seeded procedural generation of main-sequence stars and planets (from tiny moons to brown dwarfs)
+- Configurable generation parameters (star properties, planetary migration simulation regimes, etc.)
+- Interactive 2D top-down visualization with time warp.
+- Detailed body properties inspector.
+- Scriptable generation filter.
+- Saving & loading of systems and settings in JSON files.
+- Saving total system report into a HTML document.
 
-## Hosting & Launch
+## Getting Started
 
-Just unpack the content of this repository into some directory on your server/hosting. When hosting the app on your server, you might want to edit the "To homepage" link in `home_url.txt`.
+### Online
+Just open the [live demo](https://redreaper420.github.io/apoapsis/).
 
-The app can also be run locally via any local server, i.e.:
-
+### Local / Self-hosting
+1. Clone or download the repository or one of the releases.
+2. Serve the files with any static server:
 ```bash
 # Python local server | http://localhost:8000
 python -m http.server 8000
 ```
+3. In the browser, open URL leading to `index.html` at your server.
+
+> [!TIP]
+> If you're hosting the app on your own server, you can change the link leading to a "homepage" to your own in the `home_url.txt` file.
 
 ## License & Credits
 
