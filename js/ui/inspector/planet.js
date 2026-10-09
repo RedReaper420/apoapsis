@@ -175,9 +175,9 @@ export default function generatePlanetProfile(body) {
 				body.envelope.mass,
 				T.units.Mass.kg,
 				[
-					T.units.Mass.M_Moon, 
+					//T.units.Mass.M_Moon, 
 					T.units.Mass.M_Earth, 
-					T.units.Mass.M_Jupiter, 
+					//T.units.Mass.M_Jupiter, 
 				],
 				0.1
 			);
@@ -224,9 +224,9 @@ export default function generatePlanetProfile(body) {
 			body.core.mass,
 			T.units.Mass.kg,
 			[
-				T.units.Mass.M_Moon, 
+				//T.units.Mass.M_Moon, 
 				T.units.Mass.M_Earth, 
-				T.units.Mass.M_Jupiter, 
+				//T.units.Mass.M_Jupiter, 
 			],
 			0.1
 		);

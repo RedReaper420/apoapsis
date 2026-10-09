@@ -374,11 +374,11 @@ function samplePlanetCoreMass(genData, profile) {
  * @returns {number} Iron fraction [0.01, 0.85]
  */
 function sampleCoreIronFraction(genData, coreMass) {
-	const randomBase = 0.1; const randomScatter = 0.25;
+	const randomBase = 0.1; const randomScatter = 0.3;
 	const randIronFraction = randomBase + utils.randomRangeGaussian(-randomScatter, randomScatter);
 	
 	const starMetallicity = genData.parentStar.metallicity;
-	const starMetallicityFactor = 0.15 * Math.exp(0.4 * starMetallicity);
+	const starMetallicityFactor = 0.15 * Math.exp(0.45 * starMetallicity);
 
 	const sma_norm = genData.sma_norm;
 	const distanceFactor = Math.exp(-0.1 * (sma_norm - consts.PHY_DIST_SNOW_LINE));
@@ -571,12 +571,21 @@ export function setEccentricity(planet) {
  */
 function setInitialRotation(planet) {
 	planet.isRotationRetrograde = false;
+	const mass = planet.mass.as(T.units.Mass.M_Earth);
 
-	// Setting an initial rotation period from an empirical formula.
-	let rotationPeriod_h = 24 * Math.pow(planet.mass.as(T.units.Mass.M_Earth), -utils.randomRangeGaussian(0.3, 0.5)) * (10 ** utils.clamp(utils.gaussianRandom(0, 0.2), -0.75, 0.75));
+	// Setting the initial rotation period from the empirical formula.
+	let rotationPeriod_h = 24 * Math.pow(mass, -utils.randomRangeGaussian(0.3, 0.5)) * (10 ** utils.clamp(utils.gaussianRandom(0, 0.2), -0.75, 0.75));
+
+	let rotationSpeedModifier = 1.0;
+
+	// Lighweight bodies boost
+	const i = planet.genData.impacts + (planet.genData.isMoon && (planet.genData.moonType !== T.moonTypes.Binary));
+	const boostChance = Math.pow(Math.exp(-mass / (1 + i)), 2);
+	if (prng() < boostChance) {
+		rotationSpeedModifier /= 1 + Math.pow(mass, -1/3);
+	}
 
 	// Cumulatively modifying rotation period from giant impacts.
-	let rotationSpeedModifier = 1.0;
 	for (let i = 0; i < planet.genData.impacts; i++) {
 		if (prng() < 0.25) {// 25% chance for a significant impact.
 			if (Math.pow(prng(), 2) < 0.5) {
@@ -1063,7 +1072,7 @@ function getPlanetCategory(planet) {
 			if (planet.core.composition.ice >= 0.1)
 				compProperties.push('oceanic');
 
-			if (planet.core.composition.iron >= 0.5)
+			if (planet.core.composition.iron >= 0.6)
 				compProperties.push('iron');
 			else if (planet.core.composition.iron < 0.01)
 				compProperties.push('coreless');
@@ -1099,7 +1108,7 @@ function getPlanetCategory(planet) {
 	let massCat = '';
 	switch (planet.type) {
 		case T.planetTypes.Terrestrial: {
-			if (mass < 0.001) massCat = 'asteroid';
+			if (mass < 0.0001) massCat = 'asteroid';
 			else if (mass < 0.02) massCat = 'micro-Earth';
 			else if (mass < 0.2) massCat = 'sub-Earth';
 			else if (mass < 2.0) massCat = 'Earth';
@@ -1131,8 +1140,8 @@ function getPlanetCategory(planet) {
 			// Saturn's mass is 95 M⊕
 			else if (mass < 90) massCat = 'sub-Saturn';
 
-			// Value a bit less than 2 M♃
-			else if (mass < 635)  massCat = 'Jupiter';
+			// Value a bit less than 2 M♃ (~636 M⊕)
+			else if (mass < 630)  massCat = 'Jupiter';
 
 			else massCat = 'super-Jupiter';
 			

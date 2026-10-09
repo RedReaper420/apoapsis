@@ -1,14 +1,110 @@
 [
 	{
 		"thumb": "",
+		"groupName": "Terrestrial planets",
+		"scripts": [
+			{
+				"thumb": "🔘",
+				"name": "Iron world",
+				"desc": "Finds a terrestrial planet having >= 60% of iron in its interior.",
+				"rarity": 6,
+				"script": "terrestrial/iron_world",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🌫️",
+				"name": "Venus analog",
+				"desc": "Finds a non-gas planet with atmosphere pressure >= 50 bar.",
+				"rarity": 6,
+				"script": "terrestrial/venus_analog",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🗿",
+				"name": "Asteroid",
+				"desc": "Finds an asteroid (a body with mass <= 10<sup>-4</sup> M⊕).",
+				"rarity": 8,
+				"script": "terrestrial/asteroid",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🟠",
+				"name": "Lava world",
+				"desc": "Finds a hot terrestrial planet having a lava ocean.",
+				"rarity": 10,
+				"script": "terrestrial/lava_world",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🌑<span style='font-size: 50%;'>🌏</span>",
+				"name": "Mega-Earth",
+				"desc": "Finds a terrestrial planet with mass >= 10 M⊕.",
+				"rarity": 40,
+				"script": "terrestrial/mega_earth",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🌑",
+				"name": "Chtonian planet",
+				"desc": "Finds a heavy hot terrestrial planet orbiting its star very closely.",
+				"rarity": 80,
+				"script": "terrestrial/chtonian",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "☀️☀️<span style='font-size: 50%;'>🌕</span>",
+				"name": "Tatooine",
+				"desc": "Finds a warm circumbinary terrestrial planet.",
+				"rarity": 110,
+				"script": "terrestrial/tatooine",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🔵",
+				"name": "Ocean world",
+				"desc": "Finds a planet having a deep global liquid water ocean.",
+				"rarity": 250,
+				"script": "terrestrial/ocean_world",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🌍",
+				"name": "Earth 2",
+				"desc": "Finds an Earth analog orbiting a G-class star.",
+				"rarity": 2700,
+				"script": "terrestrial/earth_2",
+				"pre": false,
+				"post": false
+			}
+		]
+	},
+	{
+		"thumb": "",
 		"groupName": "Giant planets",
 		"scripts": [
 			{
+				"thumb": "⚫",
+				"name": "Hot Jupiter/Neptune",
+				"desc": "Finds a sub-Neptune or a giant planet with temperature >= 900K.",
+				"rarity": 15,
+				"script": "giants/hot_jupiter",
+				"pre": false,
+				"post": false
+			},
+			{
 				"thumb": "🔴<span style='font-size: 75%;'>🪐</span>",
 				"name": "A giant around a red dwarf",
-				"desc": "Finds a red dwarf hosting a giant planet (>= 15 M⊕).",
-				"rarity": 40,
-				"script": "giant_around_red_dwarf",
+				"desc": "Finds a giant planet (>= 15 M⊕) around a red dwarf.",
+				"rarity": 20,
+				"script": "giants/giant_around_red_dwarf",
 				"pre": false,
 				"post": false
 			},
@@ -16,8 +112,8 @@
 				"thumb": "❄️/💨",
 				"name": "Hybrid giant",
 				"desc": "Finds a sub-Neptune or a giant planet with ~1:1 ice to gas ratio.",
-				"rarity": 310,
-				"script": "hybrid_giant",
+				"rarity": 1000,
+				"script": "giants/hybrid_giant",
 				"pre": false,
 				"post": false
 			},
@@ -25,8 +121,8 @@
 				"thumb": "🟤",
 				"name": "Brown dwarf",
 				"desc": "Finds a brown dwarf planet (mass >= 4100 M⊕ (12.9 M♃)).",
-				"rarity": 2400,
-				"script": "brown_dwarf",
+				"rarity": 1200,
+				"script": "giants/brown_dwarf",
 				"pre": false,
 				"post": false
 			},
@@ -34,8 +130,8 @@
 				"thumb": "🔵",
 				"name": "Mega-Neptune",
 				"desc": "Finds an ice giant with mass >= 90 M⊕.",
-				"rarity": 4400,
-				"script": "mega_neptune",
+				"rarity": 4800,
+				"script": "giants/mega_neptune",
 				"pre": false,
 				"post": false
 			}
@@ -46,11 +142,11 @@
 		"groupName": "Binary planets",
 		"scripts": [
 			{
-				"thumb": "🌎🌏",
-				"name": "Twin Earths",
-				"desc": "Finds a binary planetary system of habitable meso-Earths.",
-				"rarity": 3300,
-				"script": "twin_earths",
+				"thumb": "🪐🪐",
+				"name": "Binary giants",
+				"desc": "Finds a pair of co-orbiting gas giants or sub-Neptunes with a mass ratio >= 1:25.",
+				"rarity": 500,
+				"script": "binary_planets/binary_giants",
 				"pre": false,
 				"post": false
 			},
@@ -58,8 +154,17 @@
 				"thumb": "🪐<span style='font-size: 50%;'>🌑</span>",
 				"name": "Massive moon",
 				"desc": "Finds a massive moon that is technically a component of a binary with mass ratio lesser than 1:25.",
-				"rarity": 4800,
-				"script": "massive_moon",
+				"rarity": 1500,
+				"script": "binary_planets/massive_moon",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🌎🌏",
+				"name": "Twin Earths",
+				"desc": "Finds a binary planetary system of habitable meso-Earths.",
+				"rarity": 2100,
+				"script": "binary_planets/twin_earths",
 				"pre": false,
 				"post": false
 			}
@@ -70,11 +175,20 @@
 		"groupName": "Moons",
 		"scripts": [
 			{
-				"thumb": "🪐🪐<span style='font-size: 50%;'>🌑</span>",
+				"thumb": "🌑↩️",
+				"name": "Retrograde moon",
+				"desc": "Finds a moon on a retrograde orbit.",
+				"rarity": 40,
+				"script": "moons/retrograde_moon",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🌑🌕<span style='font-size: 50%;'>🌑</span>",
 				"name": "Circumbinary moon",
 				"desc": "Finds a circumbinary moon (a common moon of a binary planet).",
 				"rarity": 4800,
-				"script": "circumbinary_moon",
+				"script": "moons/circumbinary_moon",
 				"pre": false,
 				"post": false
 			},
@@ -82,8 +196,8 @@
 				"thumb": "🪐<span style='font-size: 50%;'>🌍</span>",
 				"name": "Pandora",
 				"desc": "Finds a habitable big moon orbiting a giant planet.",
-				"rarity": 7400,
-				"script": "pandora",
+				"rarity": 7900,
+				"script": "moons/pandora",
 				"pre": false,
 				"post": false
 			}
@@ -97,8 +211,8 @@
 				"thumb": "🦠<span style='font-size: 50%;'>🔵</span>",
 				"name": "Ammonia life",
 				"desc": "Finds a planet hosting life in ammonia water ocean.",
-				"rarity": 9,
-				"script": "ammonia_life",
+				"rarity": 5,
+				"script": "life/ammonia_life",
 				"pre": false,
 				"post": false
 			},
@@ -106,8 +220,17 @@
 				"thumb": "🦠<span style='font-size: 50%;'>🟠</span>",
 				"name": "Methane life",
 				"desc": "Finds a planet hosting life in methane ocean.",
-				"rarity": 12,
-				"script": "methane_life",
+				"rarity": 18,
+				"script": "life/methane_life",
+				"pre": false,
+				"post": false
+			},
+			{
+				"thumb": "🏙️",
+				"name": "Civilization",
+				"desc": "Finds a planet hosting sapient life.",
+				"rarity": 18,
+				"script": "life/civilization",
 				"pre": false,
 				"post": false
 			}
@@ -118,11 +241,11 @@
 		"groupName": "Other",
 		"scripts": [
 			{
-				"thumb": "☀️☀️<span style='font-size: 50%;'>🌕</span>",
-				"name": "Tatooine",
-				"desc": "Finds a warm circumbinary terrestrial planet.",
-				"rarity": 60,
-				"script": "tatooine",
+				"thumb": "🪐",
+				"name": "Ringed planet",
+				"desc": "Finds a planet having rings.",
+				"rarity": 8,
+				"script": "rings",
 				"pre": false,
 				"post": false
 			}

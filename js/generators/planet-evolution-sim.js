@@ -113,6 +113,9 @@ class RotationManager {
 		}
 
 		this.planet.tidalLockIn.value = this.tidalLockTime_s * (1 - ageToTLRatio);
+		
+		if (ageToTLRatio > 0.99)
+			this.planet.isTidallyLocked = true;
 	}
 }
 

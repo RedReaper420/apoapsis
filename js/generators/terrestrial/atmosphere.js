@@ -45,11 +45,12 @@ export function generateAtmosphere(planet) {
 
 	const f_ret = utils.clamp( (K_ret - 0.20) / 0.60 , 0.0, 10.0) ** 2;
 	const g_Earth = planetMass_MEarth / (planetRadius_REarth ** 2);
-	const tidalOutgassing = 1.0 + Math.min(F_tidal / 0.001, 50.0);
+	const tidalOutgassing = 1.0 + Math.min(F_tidal / 0.5, 50.0);
 	const randPress = Math.pow(10, utils.clamp( utils.gaussianRandom(0, 0.5) , -1, 1));
 	const distFactor = planet.genData.sma_norm > 1 ? 1 / Math.sqrt(planet.genData.sma_norm) : 1;
+	const tempFactor = 1 + ((T_eff / 1000) ** 3);
 
-	const P_surf_raw = P_base * f_ret * g_Earth * tidalOutgassing * randPress * distFactor;
+	const P_surf_raw = P_base * f_ret * g_Earth * tidalOutgassing * randPress * distFactor * tempFactor;
 
 	const dampeningThreshold = 200 * Math.exp(-5 * planetMass_MEarth);
 	const P_dampened = P_surf_raw >= dampeningThreshold
@@ -64,7 +65,7 @@ export function generateAtmosphere(planet) {
 	planet.temperature = new T.Value(T_surf, T.units.Temp.K);
 	
 	let compositionRaw = {};
-	if (T_surf > 1500) {
+	if (T_surf > 1200) {
 		compositionRaw = {
 			SiO2: prng.range(0.50, 0.70),
 			 SO2: prng.range(0.10, 0.30),
@@ -134,10 +135,11 @@ export function generateAtmosphere(planet) {
 		};
 	}
 	
-	if ((F_tidal > 0.05) && (f_ice < 0.05)) {
-		compositionRaw.SO2 = (compositionRaw.SO2 || 0) + prng.range(0.05, 0.15);
-		compositionRaw.CO2 = (compositionRaw.CO2 || 0) + prng.range(0.10, 0.30);
-		compositionRaw.H2O = (compositionRaw.H2O || 0) + prng.range(0.01, 0.05);
+	if ((F_tidal > 0.5) && (f_ice < 0.05)) {
+		const tidalMult = 1 + (F_tidal -1) / F_tidal;
+		compositionRaw.SO2 = (compositionRaw.SO2 || 0) + prng.range(0.05, 0.15) * tidalMult;
+		compositionRaw.CO2 = (compositionRaw.CO2 || 0) + prng.range(0.10, 0.30) * tidalMult;
+		compositionRaw.H2O = (compositionRaw.H2O || 0) + prng.range(0.01, 0.05) * tidalMult;
 	}
 
 	const envelopeChance = utils.clamp((K_ret - 2.5) / (6.5 - 2.5), 0.0, 1.0);

@@ -88,7 +88,7 @@ async function initSelector() {
 				option.appendChild(desc);
 
 				// Rarity
-				const rarity = document.createElement('i');
+				const rarity = document.createElement('sub');
 				rarity.classList.add('script-desc');
 				rarity.innerText = '1/' + item.rarity;
 				option.appendChild(rarity);

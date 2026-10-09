@@ -239,7 +239,8 @@ export function getColor(planet) {
 				CO: 0.20,
 				H2O: 0.10,
 			};
-			planet.atmosphere.scaleHeight.value *= 2;
+			planet.atmosphere.scaleHeight.value *= 3;
+			planet.atmosphere.pressure.value *= 0.5;
 		}
 		else if (temp >= 900) {
 			planet.atmosphere.composition = {
@@ -247,7 +248,8 @@ export function getColor(planet) {
 				CO: 0.10,
 				H2O: 0.10,
 			};
-			planet.atmosphere.scaleHeight.value *= 1.5;
+			planet.atmosphere.scaleHeight.value *= 2;
+			planet.atmosphere.pressure.value *= 0.5;
 		}
 		else if (temp >= 350) {
 			planet.atmosphere.composition = {
@@ -255,6 +257,7 @@ export function getColor(planet) {
 				H2O: 0.60,
 				CH4: 0.10,
 			};
+			planet.atmosphere.scaleHeight.value *= 1.5;
 		}
 		else if (temp >= 250) {
 			planet.atmosphere.composition = {
@@ -303,10 +306,10 @@ export function getColor(planet) {
 				return "#1A1A1A"; // Type IV: Hot Jupiters (alkali metals absorb light; the planet is blacker than coal)
 			}
 			if (temp >= 1200 && temp < 1300) {
-				return "#6A0000"; // // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
+				return "#ae9191"; // // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
 			}
 			// temp >= 1300
-			return "#6A0000"; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
+			return "#ae9191"; // Type V: Super-hot (clouds of liquid iron and silicates are deflecting light)
 		}
 
 		case T.planetTypes.IceGiant:
@@ -323,10 +326,10 @@ export function getColor(planet) {
 				return "#7ab0b2";
 			}
 			if (temp >= 900 && temp < 1300) {
-				return "#6B1010";
+				return "#4A0000";
 			}
 			// temp >= 1300
-			return "#6A0000";
+			return "#ae9191";
 		}
 	}
 }

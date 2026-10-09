@@ -42,7 +42,7 @@ export function simulateMigration(settings, starsArray) {
 
 		for (let step = 0; step < totalDiscreteSteps; step++) {
 			// Exponential gas dispersion over time
-			const currentDiskDensity = initialDiskDensity * Math.exp(-step / totalDiscreteSteps);
+			const currentDiskDensity = initialDiskDensity * Math.exp(-5 * step / totalDiscreteSteps);
 			activeGiantsCount = 0; 
 
 			for (let i = 0; i < star.bodies.length; i++) {
@@ -147,7 +147,7 @@ function applyMigration(settings, planet, diskDensity, timeStepYears, isGrandTac
 	// Scaled migration constants
 	const TYPE_1_COEFF = settings.planet_orbit_migration_type_1_coeff * 1e-7;
 	const TYPE_2_COEFF = settings.planet_orbit_migration_type_2_coeff * 1e-7;
-	const INNER_DISK_EDGE_AU = 0.05; // Inside boundary normalized to Solar units (AU☉)
+	const INNER_DISK_EDGE_AU = 0.04; // Inside boundary normalized to Solar units (AU☉)
 	
 	let migrationRate = 0;
 

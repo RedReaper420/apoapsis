@@ -261,7 +261,9 @@ class SystemGenerator {
 					filter(child);
 				});
 			}
-			this.system.bodies.forEach(body => { filter(body) });
+
+			if (isFilterOn)
+				this.system.bodies.forEach(body => { filter(body) });
 		}
 
 		if (isFilterOn) {
