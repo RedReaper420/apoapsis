@@ -6,7 +6,7 @@
 # Apoapsis
 
 <p align="center">
-  <img src="img/logo.webp" alt="Apoapsis logo" width="33%">
+  <img src="img/logo.webp" alt="Apoapsis logo" width="38%">
 </p>
 
 Apoapsis is an interactive web-based star and planetary system generator inspired by Vector-Graphics' [Periapsis](https://github.com/Vector-Graphics/periapsis).
