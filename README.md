@@ -27,7 +27,7 @@ Live demo: https://redreaper420.github.io/apoapsis/
 - Detailed body properties inspector.
 - Scriptable generation filter.
 - Saving & loading of systems and settings in JSON files.
-- Saving total system report into a HTML document.
+- Total system report generation in HTML format.
 
 ## Getting Started
 
