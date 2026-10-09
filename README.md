@@ -11,7 +11,7 @@
 
 Apoapsis is an interactive web-based star and planetary system generator inspired by Vector-Graphics' [Periapsis](https://github.com/Vector-Graphics/periapsis).
 
-Live demo: https://redreaper420.github.io/apoapsis/
+**Live demo:** https://redreaper420.github.io/apoapsis/
 
 ## Screenshots
 
