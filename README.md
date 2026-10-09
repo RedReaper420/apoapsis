@@ -29,7 +29,7 @@ Apoapsis is an interactive web-based star and planetary system generator inspire
 
 ## Features
 
-- **Astrophysics-faithful** seeded procedural generation of main-sequence stars and planets (from tiny moons to brown dwarfs).
+- Astrophysics-based seeded procedural generation of main-sequence stars and planets (from tiny moons to brown dwarfs).
 - Configurable generation parameters (star properties, planetary migration simulation regimes, etc.)
 - Interactive 2D top-down visualization with time warp.
 - Detailed body properties inspector.
