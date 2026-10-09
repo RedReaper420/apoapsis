@@ -15,9 +15,17 @@ Live demo: https://redreaper420.github.io/apoapsis/
 
 ## Screenshots
 
-|<img alt="Screenshot - UI" src="https://github.com/user-attachments/assets/6620398b-f32b-4d80-a96e-03c6c852d37e" />|<img alt="Screenshot - Saturn-like" src="https://github.com/user-attachments/assets/b625824b-0196-4b16-b98b-97da5c3b01df" />|<img alt="Screenshot - Binary Earths" src="https://github.com/user-attachments/assets/dee79590-1ad8-4512-ac00-dc2990115e25" />|
-|-|-|-|
-|<img alt="Screenshot - Rocky planet w/ magnetic field and its moon, illuminated from two sides" src="https://github.com/user-attachments/assets/4bc21ac6-1b96-4129-8392-78d4e842bd2b" />|<img alt="Screenshot - Lava world" src="https://github.com/user-attachments/assets/3972d43e-1053-49a6-b907-f74bd332e07a" />|<img alt="Screenshot - Close binary star system" src="https://github.com/user-attachments/assets/4a6d8029-a57d-4d0d-a9fd-fbec479a2672" />|
+<details open><summary>Open/Close</summary>
+<p>
+
+|<img alt="Screenshot - UI" src="https://github.com/user-attachments/assets/6620398b-f32b-4d80-a96e-03c6c852d37e" />|<img alt="Screenshot - Rocky planet w/ magnetic field and its moon, illuminated from two sides" src="https://github.com/user-attachments/assets/4bc21ac6-1b96-4129-8392-78d4e842bd2b" />|
+|-|-|
+|<img alt="Screenshot - Saturn-like view" src="https://github.com/user-attachments/assets/b625824b-0196-4b16-b98b-97da5c3b01df" />|<img alt="Screenshot - Lava world" src="https://github.com/user-attachments/assets/3972d43e-1053-49a6-b907-f74bd332e07a" />|
+|<img alt="Screenshot - Binary Earths" src="https://github.com/user-attachments/assets/dee79590-1ad8-4512-ac00-dc2990115e25" />|<img alt="Screenshot - Close binary star system" src="https://github.com/user-attachments/assets/4a6d8029-a57d-4d0d-a9fd-fbec479a2672" />|
+
+</p>
+</details>
+
 
 ## Features
 
@@ -68,7 +76,7 @@ npx serve .
 
 ## License & Credits
 
-Inspired by [Periapsis](https://github.com/Vector-Graphics/periapsis) by VectorV Jay Walker ([@Vector-Graphics](https://github.com/Vector-Graphics)).
+Special thanks to [@Vector-Graphics](https://github.com/Vector-Graphics) for inspiring this project through [Periapsis](https://github.com/Vector-Graphics/periapsis) and for allowing the use of original assets and concepts.
 
 This project is licensed under the [MIT License](LICENSE).  
 
