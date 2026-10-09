@@ -8,6 +8,7 @@ This project incorporates components from the following open-source projects and
   * **Author:** VectorV Jay Walker (GitHub: [@Vector-Graphics](https://github.com/Vector-Graphics))
   * **Assets:** K-type star icon - used under CC0 (Public Domain Dedication). Modified and used as favicon.
   * **Source:** https://github.com/Vector-Graphics/periapsis
+* **Metrophobic** font by Vernon Adams, [licensed](https://fonts.google.com/specimen/Metrophobic/license?preview.script=Latn) under the SIL Open Font License, Version 1.1.
 
 ### Code & Libraries
 
