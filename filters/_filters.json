@@ -198,7 +198,7 @@
 				"desc": "Finds a habitable big moon orbiting a giant planet.",
 				"rarity": 7900,
 				"script": "moons/pandora",
-				"pre": false,
+				"pre": true,
 				"post": false
 			}
 		]
