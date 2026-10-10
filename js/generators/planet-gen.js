@@ -1149,8 +1149,8 @@ function getPlanetCategory(planet) {
 		}
 
 		case T.planetTypes.BrownDwarf: {
-			// Separation around 63 M♃, defining if a brown dwarf can burn lithium or not (lithium test)
-			massCat = `${mass < 20000 ? 'low' : 'high'}-mass brown dwarf`;
+			// Separation around 65 M♃, defining if a brown dwarf can burn lithium or not (lithium test)
+			massCat = `${mass < 20650 ? 'low' : 'high'}-mass brown dwarf`;
 			
 			break;
 		}
