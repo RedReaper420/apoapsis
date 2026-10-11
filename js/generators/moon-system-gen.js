@@ -193,6 +193,10 @@ function getRocheLimit(planet, moon) {
 function generateBinary(settings, planet, binarySmaMin_REarth, binarySmaMax_REarth, availableMassRatio) {
 	// --- 1. Generating a companion planet ---
 
+	// Marking the planet as "binary moon"
+	planet.genData.isMoon = true;
+	planet.genData.moonType = T.moonTypes.Binary;
+
 	// Companion's SMA around the planet (later will be assigned to the planet too).
 	const companionSma_REarth = utils.clamp(
 		utils.randomRangeGaussian(binarySmaMin_REarth, binarySmaMin_REarth * 20), 
