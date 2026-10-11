@@ -163,7 +163,7 @@
 				"thumb": "🌎🌏",
 				"name": "Twin Earths",
 				"desc": "Finds a binary planetary system of habitable meso-Earths.",
-				"rarity": 2100,
+				"rarity": 2400,
 				"script": "binary_planets/twin_earths",
 				"pre": false,
 				"post": false
@@ -196,7 +196,7 @@
 				"thumb": "🪐<span style='font-size: 50%;'>🌍</span>",
 				"name": "Pandora",
 				"desc": "Finds a habitable big moon orbiting a giant planet.",
-				"rarity": 7900,
+				"rarity": 17500,
 				"script": "moons/pandora",
 				"pre": true,
 				"post": false
