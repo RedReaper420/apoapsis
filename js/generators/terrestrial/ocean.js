@@ -428,7 +428,7 @@ const EUTECTIC_SYSTEM_H2O_NH3 = {
 	 * Simplified boiling point of a compound (Raoult/Henry law deviation)
 	 */
 	getBoilingTemperature(w, pressurePa) {
-		// Base T_boil proportionate to molar fraction (at 1 атм)
+		// Base T_boil proportionate to molar fraction (at 1 atm)
 		const tBoil1atm = this.pureH2O.T_boil * (1 - w) + this.pureNH3.T_boil * w;
 		
 		// Atmospheric pressure correction (Clausius-Clapeyron)
@@ -475,7 +475,7 @@ const EUTECTIC_SYSTEM_H2O_NaCl = {
 	 * Simplified boiling point of a compound (Raoult/Henry law deviation)
 	 */
 	getBoilingTemperature(w, pressurePa) {
-		// Base T_boil proportionate to molar fraction (at 1 атм)
+		// Base T_boil proportionate to molar fraction (at 1 atm)
 		const tBoil1atm = this.pureH2O.T_boil * (1 - w) + this.pureNaCl.T_boil * w;
 		
 		// Atmospheric pressure correction (Clausius-Clapeyron)
@@ -489,10 +489,10 @@ const EUTECTIC_SYSTEM_H2O_NaCl = {
 };
 
 /**
- * Estimates the state of a water-ammonia ocean.
+ * Estimates the state of a water-mixture ocean.
  * @param {number} tempK - Surface temperature (K)
  * @param {number} pressurePa - Atmosphere pressure (Pa)
- * @param {number} ammoniaFraction - NH3 mass fraction in the ocean (от 0.0 до 1.0)
+ * @param {number} eutecticRatio - Mixture substance mass fraction in the ocean (0.0-1.0)
  */
 function getEutecticOceanState(tempK, pressurePa, eutecticRatio = 0.15, system = EUTECTIC_SYSTEM_H2O_NH3) {
 	const sys = system;
