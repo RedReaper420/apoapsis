@@ -77,10 +77,10 @@ export function calculateLife(planet, lifeChance) {
 	planet.lifeHistory.set('Prokaryotic life', timestamp);
 
 	// Assumed that ammonia- and methane-based life can't get more advanced than early prokaryotes
-	if (planet.ocean.includes('Water') === false)
+	if (planet.ocean.includes('Water') === false) // "Ammonia water" ≠ "Water", the difference is in capital W
 		return lifeLevel;
 
-	// Assumed that subglacial life won't develop photosynthesis, thus, no complicated life forms
+	// Assumed that subglacial life will not develop photosynthesis, thus, no complicated life forms
 	if (planet.ocean.includes('frozen'))
 		return lifeLevel;
 
@@ -152,26 +152,36 @@ function greatOxidationEvent(planet) {
 	if (!(isHabitableThermal && isHabitablePressure && (h2 < 0.05)))
 		return false;
 
+	// Photosynthesis simulation: conversion of CO2 & CH4 into O2
+
 	const currentComp = { ...planet.atmosphere.composition };
+	const massFactor = Math.sqrt(planet.atmosphere.mass.as(T.units.Mass.M_Earth));
 
-	// Convert CO2/CH4 pool into O2 via photosynthesis simulation
-	const o2Target = prng.range(0.18, 0.24);
-
-	// Nitrogenn re-balance
-	currentComp['N2'] = ((currentComp['N2'] || 0) + prng.range(0.73, 0.80)) / 2;
-
-	// Add Oxygen and re-balance
-	currentComp['O2'] = o2Target;
-	if (currentComp['CO2']) currentComp['CO2'] *= prng.range(0.002, 0.01); // CO2 drawdown
-	if (currentComp['CH4']) currentComp['CH4'] *= prng.range(0.001, 0.005); // Methane oxidation
+	currentComp['N2'] = (currentComp['N2'] || 0) * 0.25 + prng.range(0.73, 0.80) * 0.75;
+	currentComp['O2'] = (currentComp['O2'] || 0) * 0.25 + prng.range(0.18, 0.24) * 0.75;
+	if (currentComp['CO2']) currentComp['CO2'] *= prng.range(0.002, 0.010) * massFactor; // CO2 drawdown
+	if (currentComp['CH4']) currentComp['CH4'] *= prng.range(0.001, 0.005) * massFactor; // Methane oxidation
 
 	planet.atmosphere.composition = atmosphere.normalizeComposition(currentComp);
 
-	// Recalculate climate feedback
+	// Climate feedback recalculation
 	terrestrial.setSurfaceTemperature(planet);
 	terrestrial.setOcean(planet);
 	planet.albedo = terrestrial.calculateAlbedo(planet);
 	terrestrial.setSurfaceTemperature(planet);
+
+	if (planet.ocean.includes('frozen')) {
+		// "Second chance": greenhouse gases accumulation
+		planet.atmosphere.composition['O2'] = (planet.atmosphere.composition['O2'] || 0) * prng.range(0.75, 0.85);
+		planet.atmosphere.composition['CO2'] = ((planet.atmosphere.composition['CO2'] || 0) + prng.range(0.001, 0.002)) * 4;
+		planet.atmosphere.composition['CH4'] = ((planet.atmosphere.composition['CH4'] || 0) + prng.range(0.0001, 0.0005)) * 2;
+		planet.atmosphere.composition = atmosphere.normalizeComposition(planet.atmosphere.composition);
+
+		terrestrial.setSurfaceTemperature(planet);
+		terrestrial.setOcean(planet);
+		planet.albedo = terrestrial.calculateAlbedo(planet);
+		terrestrial.setSurfaceTemperature(planet);
+	}
 
 	return true;
 }

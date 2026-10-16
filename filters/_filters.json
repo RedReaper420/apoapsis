@@ -6,7 +6,7 @@
 			{
 				"thumb": "🔘",
 				"name": "Iron world",
-				"desc": "Finds a terrestrial planet having >= 60% of iron in its interior.",
+				"desc": "Finds a terrestrial planet having ≥60% of iron in its interior.",
 				"rarity": 6,
 				"script": "terrestrial/iron_world",
 				"pre": false,
@@ -15,7 +15,7 @@
 			{
 				"thumb": "🌫️",
 				"name": "Venus analog",
-				"desc": "Finds a non-gas planet with atmosphere pressure >= 50 bar.",
+				"desc": "Finds a non-gas planet with atmosphere pressure ≥50 bar.",
 				"rarity": 6,
 				"script": "terrestrial/venus_analog",
 				"pre": false,
@@ -24,7 +24,7 @@
 			{
 				"thumb": "🗿",
 				"name": "Asteroid",
-				"desc": "Finds an asteroid (a body with mass <= 10<sup>-4</sup> M⊕).",
+				"desc": "Finds an asteroid (a body with mass ≤10<sup>-4</sup> M⊕).",
 				"rarity": 8,
 				"script": "terrestrial/asteroid",
 				"pre": false,
@@ -40,9 +40,9 @@
 				"post": false
 			},
 			{
-				"thumb": "🌑<span style='font-size: 50%;'>🌏</span>",
+				"thumb": "🌕<span style='font-size: 50%;'>🌏</span>",
 				"name": "Mega-Earth",
-				"desc": "Finds a terrestrial planet with mass >= 10 M⊕.",
+				"desc": "Finds a terrestrial planet with mass ≥10 M⊕.",
 				"rarity": 40,
 				"script": "terrestrial/mega_earth",
 				"pre": false,
@@ -79,7 +79,7 @@
 				"thumb": "🌍",
 				"name": "Earth 2",
 				"desc": "Finds an Earth analog orbiting a G-class star.",
-				"rarity": 2700,
+				"rarity": 4200,
 				"script": "terrestrial/earth_2",
 				"pre": false,
 				"post": false
@@ -93,7 +93,7 @@
 			{
 				"thumb": "⚫",
 				"name": "Hot Jupiter/Neptune",
-				"desc": "Finds a sub-Neptune or a giant planet with temperature >= 900K.",
+				"desc": "Finds a sub-Neptune or a giant planet with temperature ≥900K.",
 				"rarity": 15,
 				"script": "giants/hot_jupiter",
 				"pre": false,
@@ -102,7 +102,7 @@
 			{
 				"thumb": "🔴<span style='font-size: 75%;'>🪐</span>",
 				"name": "A giant around a red dwarf",
-				"desc": "Finds a giant planet (>= 15 M⊕) around a red dwarf.",
+				"desc": "Finds a giant planet (≥15 M⊕) around a red dwarf.",
 				"rarity": 20,
 				"script": "giants/giant_around_red_dwarf",
 				"pre": false,
@@ -120,7 +120,7 @@
 			{
 				"thumb": "🟤",
 				"name": "Brown dwarf",
-				"desc": "Finds a brown dwarf planet (mass >= 4100 M⊕ (12.9 M♃)).",
+				"desc": "Finds a brown dwarf planet (mass ≥4100 M⊕ (12.9 M♃)).",
 				"rarity": 1200,
 				"script": "giants/brown_dwarf",
 				"pre": false,
@@ -129,7 +129,7 @@
 			{
 				"thumb": "🔵",
 				"name": "Mega-Neptune",
-				"desc": "Finds an ice giant with mass >= 90 M⊕.",
+				"desc": "Finds an ice giant with mass ≥90 M⊕.",
 				"rarity": 4800,
 				"script": "giants/mega_neptune",
 				"pre": false,
@@ -144,7 +144,7 @@
 			{
 				"thumb": "🪐🪐",
 				"name": "Binary giants",
-				"desc": "Finds a pair of co-orbiting gas giants or sub-Neptunes with a mass ratio >= 1:25.",
+				"desc": "Finds a pair of co-orbiting gas giants or sub-Neptunes with a mass ratio ≥1:25.",
 				"rarity": 500,
 				"script": "binary_planets/binary_giants",
 				"pre": false,

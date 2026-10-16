@@ -33,7 +33,7 @@ export default function drawRings() {
 
 		ctx.beginPath();
 			ctx.arc(coords.x, coords.y, outerRadius, 0, Math.PI * 2, false);
-			ctx.arc(coords.x, coords.y, innerRadius, 0, Math.PI * 2, true); // Drawing counter-clockwise is cutting a hole in the middle
+			ctx.arc(coords.x, coords.y, innerRadius, 0, Math.PI * 2, true); // Drawing counter-clockwise cuts a hole in the middle
 		ctx.closePath();
 		
 		ctx.save();

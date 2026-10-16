@@ -1,7 +1,7 @@
 
 if (body instanceof T.Planet) {
     if (body.type === T.planetTypes.Terrestrial) {
-        if (body.category.includes('asteroid')) {
+        if (body.classification.includes('asteroid')) {
             finish();
         }
     }

@@ -70,6 +70,19 @@ class Water extends OceanSubstance {
 		this.density = new T.Value(1.025, T.units.Dens.g_cm3);
 		this.bulk = new T.Value(2.2e9, T.units.Press.Pa);
 
+		this.calculateState = (planet) => {
+			const temp = planet.temperature.as(T.units.Temp.K);
+			const pressure = planet.atmosphere.pressure.as(T.units.Press.Pa);
+			const state = getPhaseState(this.substance, temp, pressure);
+
+			if (state.phase !== 'SOLID') {
+				this.state = state.phase;
+			}
+			else {
+				this.state = (getEutecticOceanState(temp, pressure, 0.035, EUTECTIC_SYSTEM_H2O_NaCl)).phase;
+			}
+		};
+
 		this.calculateBudget = (planet) => {
 			if (((this.state === 'SOLID') || (this.state === 'LIQUID')) === false) {
 				this.budget = 0;
@@ -77,12 +90,9 @@ class Water extends OceanSubstance {
 			}
 
 			// Ocean gets boiled and photoevaporated (H2 flies away, O reacts with Fe in land)
-			if (1 / Math.sqrt(planet.genData.sma_norm) > 1.15) {
-				this.budget = 0;
-				return;
-			}
+			const evapotationFactor = Math.min(1, planet.genData.sma_norm ** 2);
 
-			this.budget = planet.core.composition.ice * 0.99;
+			this.budget = planet.core.composition.ice * 0.99 * evapotationFactor;
 
 			if (this.state === 'SOLID')
 				this.budget *= -1;
@@ -102,7 +112,7 @@ class Methane extends OceanSubstance {
 		this.bulk = new T.Value(1.3e8, T.units.Press.Pa);
 
 		this.calculateBudget = (planet) => {
-			if (!(this.state === 'LIQUID')) {
+			if (this.state !== 'LIQUID') {
 				this.budget = 0;
 				return;
 			}
@@ -132,7 +142,7 @@ class AmmoniaWater extends OceanSubstance {
 			const distFactor = Math.min(1, Math.exp(2 * (planet.genData.sma_norm - consts.PHY_DIST_SNOW_LINE)));
 			this.NH3_f = 0.33 * iceFactor * distFactor;
 
-			this.state = (getEutecticOceanState(temp, pressure, this.NH3_f)).phase;
+			this.state = (getEutecticOceanState(temp, pressure, this.NH3_f, EUTECTIC_SYSTEM_H2O_NH3)).phase;
 		};
 
 		this.calculateBudget = (planet) => {
@@ -392,8 +402,9 @@ const EUTECTIC_SYSTEM_H2O_NH3 = {
 		w_NH3: 0.321,    // Ammonia mass fraction (32.1%)
 		T_melt: 176.15   // Eutectic freezing temperature (~ -97°C)
 	},
-	pureH2O: { T_melt: 273.15, T_boil: 373.15, pCrit: 22064000 },
-	pureNH3: { T_melt: 195.42, T_boil: 239.82, pCrit: 11280000 },
+	pureH2O: { T_melt: 273.15, T_boil: 373.15 },
+	pureNH3: { T_melt: 195.42, T_boil: 239.82 },
+	mixSubstance: 'NH3',
 
 	/**
 	 * Approximate liquidus temperature (freezing point) based on NH3 fraction
@@ -431,14 +442,61 @@ const EUTECTIC_SYSTEM_H2O_NH3 = {
 };
 
 /**
+ * Constants for eutectic system Water-Sodium chloride (~1 atm)
+ */
+const EUTECTIC_SYSTEM_H2O_NaCl = {
+	eutecticPoint: {
+		w_NaCl: 0.233,    // Sodium chloride mass fraction (32.1%)
+		T_melt: 251.95   // Eutectic freezing temperature (-21.2°C)
+	},
+	pureH2O: { T_melt: 273.15, T_boil: 373.15 },
+	pureNaCl: { T_melt: 195.42, T_boil: 239.82 },
+	mixSubstance: 'NaCl',
+
+	/**
+	 * Approximate liquidus temperature (freezing point) based on NaCl fraction
+	 * @param {number} w - NaCl mass fraction [0..1]
+	 */
+	getMeltTemperature(w) {
+		const wE = this.eutecticPoint.w_NaCl;
+		const TE = this.eutecticPoint.T_melt;
+
+		if (w <= wE) {
+			// Left branch: from pure H2O to the eutectic (H2O crystallizes as ice)
+			return this.pureH2O.T_melt - (this.pureH2O.T_melt - TE) * Math.pow(w / wE, 0.85);
+		} 
+		else {
+			// Right branch: from the eutectic to pure NaCl
+			return TE + (this.pureNaCl.T_melt - TE) * Math.pow((w - wE) / (1 - wE), 1.2);
+		}
+	},
+
+	/**
+	 * Simplified boiling point of a compound (Raoult/Henry law deviation)
+	 */
+	getBoilingTemperature(w, pressurePa) {
+		// Base T_boil proportionate to molar fraction (at 1 атм)
+		const tBoil1atm = this.pureH2O.T_boil * (1 - w) + this.pureNaCl.T_boil * w;
+		
+		// Atmospheric pressure correction (Clausius-Clapeyron)
+		const P0 = 101325;
+		const dH_vap = 35000; // J/mol (average heat of vaporization)
+		const R = 8.314;
+		
+		const invT = (1 / tBoil1atm) - (R * Math.log(pressurePa / P0) / dH_vap);
+		return 1 / invT;
+	}
+};
+
+/**
  * Estimates the state of a water-ammonia ocean.
  * @param {number} tempK - Surface temperature (K)
  * @param {number} pressurePa - Atmosphere pressure (Pa)
  * @param {number} ammoniaFraction - NH3 mass fraction in the ocean (от 0.0 до 1.0)
  */
-function getEutecticOceanState(tempK, pressurePa, ammoniaFraction = 0.15) {
-	const sys = EUTECTIC_SYSTEM_H2O_NH3;
-	const w = Math.max(0, Math.min(1, ammoniaFraction));
+function getEutecticOceanState(tempK, pressurePa, eutecticRatio = 0.15, system = EUTECTIC_SYSTEM_H2O_NH3) {
+	const sys = system;
+	const w = Math.max(0, Math.min(1, eutecticRatio));
 
 	const T_melt = sys.getMeltTemperature(w);
 	const T_boil = sys.getBoilingTemperature(w, pressurePa);
@@ -447,7 +505,6 @@ function getEutecticOceanState(tempK, pressurePa, ammoniaFraction = 0.15) {
 	if (tempK < T_melt) {
 		return {
 			phase: "SOLID",
-			composition: w > 0 ? "Water-ammonia ice / Hydrates" : "Water ice",
 			desc: `Frozen surface (T < ${T_melt.toFixed(1)} K)`
 		};
 	}
@@ -456,8 +513,7 @@ function getEutecticOceanState(tempK, pressurePa, ammoniaFraction = 0.15) {
 	if (tempK > T_boil) {
 		return {
 			phase: "GAS",
-			composition: "H2O + NH3 vapor",
-			desc: `Ocean has been evaporated (T > ${T_boil.toFixed(1)} K)`
+			desc: `Evaporated ocean (T > ${T_boil.toFixed(1)} K)`
 		};
 	}
 
@@ -466,6 +522,6 @@ function getEutecticOceanState(tempK, pressurePa, ammoniaFraction = 0.15) {
 		phase: "LIQUID",
 		meltTemp: Number(T_melt.toFixed(1)),
 		boilTemp: Number(T_boil.toFixed(1)),
-		desc: `Liquid ocean (${(w * 100).toFixed(1)}% NH3). Is liquid within the range: ${T_melt.toFixed(1)}K - ${T_boil.toFixed(1)}K`
+		desc: `Liquid ocean (${(w * 100).toFixed(1)}% ${sys.mixSubstance}). Is liquid within the range: ${T_melt.toFixed(1)}K - ${T_boil.toFixed(1)}K`
 	};
 }

@@ -63,7 +63,8 @@ class RotationManager {
 		}
 
 		this.tidalLockTime_s = getTidalLockTime(this.planet, parent).as(T.units.Time.s);
-		this.targetRotationPeriod_s = getTidalLockRotationPeriod(this.planet, parent).as(T.units.Time.s);
+		const sign = this.planet.genData.retrograde ? -1 : 1;
+		this.targetRotationPeriod_s = sign * getTidalLockRotationPeriod(this.planet, parent).as(T.units.Time.s);
 		this.targetOmega = 2 * Math.PI / this.targetRotationPeriod_s;
 
 		this.planet.tidalLockIn = new T.Value(0, T.units.Time.s);
@@ -81,34 +82,22 @@ class RotationManager {
 		
 		const currentRotationPeriod_s = this.planet.rotationPeriod.as(T.units.Time.s);
 		let currentOmega = 2 * Math.PI / currentRotationPeriod_s;
-		if (this.planet.isRotationRetrograde) currentOmega = -currentOmega;
 
 		const adjustedOmega = currentOmega * (1 - interpolationFactor) + this.targetOmega * interpolationFactor;
 
 		if (ageToTLRatio === 1.0) {
 			this.planet.isTidallyLocked = true;
-			this.planet.isRotationRetrograde = false;
 			this.planet.rotationPeriod = new T.Value(this.targetRotationPeriod_s, T.units.Time.s);
 		}
 		else {
 			this.planet.isTidallyLocked = false;
 
-			if (adjustedOmega < 0) {
-				this.planet.isRotationRetrograde = true;
-				const newPeriod_s = 2 * Math.PI / Math.abs(adjustedOmega);
-				this.planet.rotationPeriod = new T.Value(newPeriod_s, T.units.Time.s);
-			}
-			else if (adjustedOmega > 0) {
-				this.planet.isRotationRetrograde = false;
-				const newPeriod_s = 2 * Math.PI / adjustedOmega;
-				this.planet.rotationPeriod = new T.Value(newPeriod_s, T.units.Time.s);
+			if (adjustedOmega === 0) {
+				this.planet.rotationPeriod = new T.Value(Infinity, T.units.Time.s);
 			}
 			else {
-				this.planet.rotationPeriod = new T.Value(Infinity, T.units.Time.s);
-				/*
-				planet.isRotationRetrograde = false;
-				planet.rotationPeriod = new T.Value(100000, T.units.Time.h);
-				*/
+				const newPeriod_s = 2 * Math.PI / adjustedOmega;
+				this.planet.rotationPeriod = new T.Value(newPeriod_s, T.units.Time.s);
 			}
 		}
 
@@ -132,7 +121,7 @@ function getTidalLockTime(planet, parent) {
 	const m_p = parent.mass.as(T.units.Mass.kg); // Parent body's mass
 	const R = planet.radius.as(T.units.Dist.m); // Satellite's radius
 
-	const w = 2 * Math.PI / planet.rotationPeriod.as(T.units.Time.s); // Satellite's spin rate, rad/s
+	const w = 2 * Math.PI / Math.abs(planet.rotationPeriod.as(T.units.Time.s)); // Satellite's spin rate, rad/s
 	const a = planet.sma.as(T.units.Dist.m); // Satellite's SMA
 
 	const I_factor = calculateMomentOfInertiaFactor(planet);
@@ -258,7 +247,7 @@ function getTidalLockRotationPeriod(planet, parent) {
 	const a = planet.sma.as(T.units.Dist.m);
 
 	// Rotation period = Orbital period
-	const t = Math.sqrt( ((4 * (Math.PI**2)) / (consts.PHY_G * (m1 + m2))) * (a**3) );
+	const t = Math.sqrt( ((4 * (Math.PI ** 2)) / (consts.PHY_G * (m1 + m2))) * (a ** 3) );
 
 	return new T.Value(t, T.units.Time.s);
 }
@@ -430,7 +419,7 @@ class MagnetManager {
 		// Christensen formula for a magnetic field inside the core
 		let b_core = this.c * Math.sqrt(consts.PHY_MU_0) * Math.pow(this.rho_core, 1/6) * Math.pow(f_c / this.r_core, 1/3);
 		
-		const rotationPeriod_h = Math.min(1000, this.planet.rotationPeriod.as(T.units.Time.h));
+		const rotationPeriod_h = Math.min(1000, Math.abs(this.planet.rotationPeriod.as(T.units.Time.h)));
 		b_core *= 1 + 1 / (0.2 * rotationPeriod_h);
 
 		// Magnetic field scaled at planet's surface level

@@ -236,7 +236,7 @@ export function planetGeneration_Stage3(settings, planet) {
 
 
 	planet.esi = calculateESI(planet);
-	planet.category = getPlanetCategory(planet);
+	planet.classification = getPlanetClassification(planet);
 }
 
 /**
@@ -570,7 +570,6 @@ export function setEccentricity(planet) {
  * @param {T.Planet} planet - Current planet
  */
 function setInitialRotation(planet) {
-	planet.isRotationRetrograde = false;
 	const mass = planet.mass.as(T.units.Mass.M_Earth);
 
 	// Setting the initial rotation period from the empirical formula.
@@ -598,7 +597,7 @@ function setInitialRotation(planet) {
 
 				// Chance for turning the planet around.
 				if (prng() < 0.5)
-					planet.isRotationRetrograde = !planet.isRotationRetrograde;
+					rotationSpeedModifier *= -1;
 			}
 		}
 	}
@@ -620,7 +619,8 @@ function setInitialRotation(planet) {
  * @returns {number} Same rotation period value in hours if it's safe, a new rotation period value slightly above critical threshold otherwise.
  */
 function correctRotationPeriod(planet, currentRotationPeriod_h) {
-	const currentRotationPeriod_s = new T.Value(currentRotationPeriod_h, T.units.Time.h).as(T.units.Time.s);
+	const sign = Math.sign(currentRotationPeriod_h);
+	const currentRotationPeriod_s = new T.Value(Math.abs(currentRotationPeriod_h), T.units.Time.h).as(T.units.Time.s);
 
 	const R_m = planet.radius.as(T.units.Dist.m);
 	const M_kg = planet.mass.as(T.units.Mass.kg);
@@ -634,7 +634,7 @@ function correctRotationPeriod(planet, currentRotationPeriod_h) {
 	else {
 		// Current rotation speed passed the limit, setting the slightly slowed down limit value.
 		const surfOrbitPeriod_h = new T.Value(surfOrbitPeriod_s, T.units.Time.s).as(T.units.Time.h);
-		return surfOrbitPeriod_h * 1.25 * prng.range(1.0, 3.0);
+		return sign * surfOrbitPeriod_h * 1.25 * prng.range(1.0, 3.0);
 	}
 }
 
@@ -846,9 +846,9 @@ function setSurfaceTemperature(planet) {
 export function calculateSynodicDay(planet) {
 	const isNotMoon = (!planet.genData.isMoon) && (planet.companion === undefined);
 
-	const T_rot = planet.rotationPeriod.as(T.units.Time.s);
+	const T_rot = Math.abs(planet.rotationPeriod.as(T.units.Time.s));
 	const sign = isNotMoon 
-		? planet.isRotationRetrograde ? 1 : -1 // Accounting for retrograde rotation for planets
+		? planet.rotationPeriod.value < 0 ? 1 : -1 // Accounting for retrograde rotation for planets
 		: planet.genData.retrograde ? 1 : -1; // Accounting for retrograde orbital motion for moons
 	const P_orb = isNotMoon // (Host) planet orbital period
 		? planet.orbitalPeriod.as(T.units.Time.s)
@@ -1022,7 +1022,7 @@ function calculateESI(planet) {
  * 
  * @param {T.Planet} planet 
  */
-function getPlanetCategory(planet) {
+function getPlanetClassification(planet) {
 	const capitalizeFirstLetter = (str) => { return str.charAt(0).toUpperCase() + str.slice(1) };
 
 	const temp = planet.temperature.as(T.units.Temp.K);
@@ -1032,29 +1032,27 @@ function getPlanetCategory(planet) {
 	let tempCatStyle = '';
 
 	if (temp < 110) { 
-		// < -163°C, below methane's boiling point (-161.58°C)
+		// < -163°C, below the methane's boiling point (-161.58°C)
 		tempCat = 'super-cold'; 
 		tempCatStyle = 'cornflowerblue';
 	}
-	else if (temp < 260) {
-		// < -13°C, below 18%-salty water's freezing point
-		// Common sea water is ~3.5% salty and freezes at -1.9°C
-		// Dead Sea's salinity is up to 35%, freezing point is -20°C
+	else if (temp < 250) {
+		// < -23°C, below the eutectic mixture of NaCl and H2O (23.3%, -21.2°C)
 		tempCat = 'cold';
 		tempCatStyle = 'lightblue';
 	}
-	else if (temp < 360) {
-		// < 87°C
+	else if (temp < 370) {
+		// < 97°C, below the water's boiling point (100°C)
 		tempCat = 'temperate';
 		tempCatStyle = 'lightgreen';
 	}
 	else if (temp < 800) {
-		// < 527°C
+		// < 527°C, below the Draper point (~525°C)
 		tempCat = 'hot';
 		tempCatStyle = 'goldenrod';
 	}
 	else {
-		// Above ~525°C things start to glow in visible light (Draper point)
+		// Above ~525°C solid materials start to glow in visible light (Draper point)
 		tempCat = 'super-hot';
 		tempCatStyle = 'crimson';
 	}

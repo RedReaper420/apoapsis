@@ -44,8 +44,8 @@ export default function generatePlanetProfile(body) {
 		//#endregion
 
 		//#region | Classification
-		const category = planet.querySelector('#classification');
-		category.innerHTML = body.category;
+		const classification = planet.querySelector('#classification');
+		classification.innerHTML = body.classification;
 		//#endregion
 
 		//#region | ESI
@@ -271,7 +271,7 @@ export default function generatePlanetProfile(body) {
 		const rotationPeriodValue = planet.querySelector('#rotationPeriodValue');
 		const rotationPeriodUnit = planet.querySelector('#rotationPeriodUnit');
 		const rotationPeriodFit = utils.getFittingValue(
-			body.rotationPeriod,
+			new T.Value(Math.abs(body.rotationPeriod.value), body.rotationPeriod.unit),
 			T.units.Time.s,
 			[
 				T.units.Time.h, 
@@ -280,13 +280,13 @@ export default function generatePlanetProfile(body) {
 			],
 			0.9
 		);
-		rotationPeriodValue.innerText = rotationPeriodFit.value.toFixed(2);
+		rotationPeriodValue.innerText = Math.abs(rotationPeriodFit.value).toFixed(2);
 		rotationPeriodUnit.innerText = rotationPeriodFit.unit;
 		//#endregion
 
 		//#region | Retrograde rotation
 		const rotationRetrograde = planet.querySelector('#rotationRetrograde');
-		rotationRetrograde.innerText = body.isRotationRetrograde ? 'Yes' : 'No';
+		rotationRetrograde.innerText = body.rotationPeriod.value < 0 ? 'Yes' : 'No';
 		//#endregion
 
 		//#region | Synodic day
