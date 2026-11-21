@@ -368,7 +368,7 @@ const defaultUrl = `https://github.com/RedReaper420/apoapsis`;
 const outboundUrlPrompt = document.getElementById('outboundPage');
 const outboundButton = document.getElementById('outboundButton');
 
-fetch('home_url.txt')
+fetch(`home_url.txt?t=${Date.now()}`, { cache: 'no-store' })
 .then(response => {
 	if (response.ok) {
 		return response.text();
