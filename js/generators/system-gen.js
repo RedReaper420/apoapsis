@@ -35,14 +35,14 @@ class SystemGenerator {
 		this.#subscribe();
 	}
 
-	generate() {
+	generate(seedOverride = undefined) {
 		const generateSeed = () => { 
 			return !this.fallbackSeed 
 				? window.crypto.randomUUID() 
 				: utils.generateFallbackSeed();
 		}
 
-		this.settings.seed = this.settings.seed_user ? this.settings.seed_user : generateSeed();
+		this.settings.seed = seedOverride ?? (this.settings.seed_user ? this.settings.seed_user : generateSeed());
 		prng.seed(this.settings.seed);
 		this.system = new T.System(this.settings);
 
@@ -226,64 +226,101 @@ class SystemGenerator {
 		this.system.bodies.forEach(body => { calculateSynodicDaysAndMinMaxTemps(body) });
 	}
 
-	startGeneration() {
-		const isFilterOn = document.getElementById('enable_filter').checked;
+	async startGeneration() {
+		if (this._generating)
+			return;
+		this._generating = true;
+
 		const genStatus = document.getElementById('genStatus');
-		const pregen = document.getElementById('pregen').value;
-		const predicate = document.getElementById('predicate').value;
-		const postgen = document.getElementById('postgen').value;
 
-		let attemptsLimit = 1000;
-		let gen = true;
-		let attempts = isFilterOn ? 0 : attemptsLimit - 1;
-		let status = false;
-	
-		// Used in filtration scripts
-		let finish = () => { gen = false; status = true; }
+		try {
+			const isFilterOn = document.getElementById('enable_filter').checked;
+			const pregen = document.getElementById('pregen').value;
+			const predicate = document.getElementById('predicate').value;
+			const postgen = document.getElementById('postgen').value;
 
-		if (isFilterOn)
-			eval(pregen);
+			let attemptsLimit = 1000;
+			let gen = true;
+			let attempts = isFilterOn ? 0 : attemptsLimit - 1;
+			let status = false;
 
-		while (gen && (attempts < attemptsLimit)) {
-			this.generate();
-			attempts++;
+			// A fixed user seed would produce the same system on every filtered attempt,
+			// so treat it as a base seed and derive a new seed for each retry.
+			const baseSeed = this.settings.seed_user;
+			const varySeed = isFilterOn && !!baseSeed;
+			const attemptNote = varySeed ? ', seed varied' : '';
 
-			const filter = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
-				eval(predicate);
-
-				// ---
-
-				if (body instanceof T.Binary) {
-					filter(body.primary);
-					filter(body.secondary);
-				}
-				body.bodies.forEach(child => { 
-					filter(child);
-				});
-			}
+			// Used in filtration scripts
+			let finish = () => { gen = false; status = true; }
 
 			if (isFilterOn)
-				this.system.bodies.forEach(body => { filter(body) });
+				eval(pregen);
+
+			while (gen && (attempts < attemptsLimit)) {
+				const seedOverride = varySeed
+					? (attempts === 0 ? baseSeed : `${baseSeed}#attempt${attempts}`)
+					: undefined;
+
+				this.generate(seedOverride);
+				attempts++;
+
+				const filter = (/** @type {T.BinaryPlanet|T.BinaryStar|T.Planet|T.Star} */ body) => {
+					if (!gen)
+						return;
+
+					eval(predicate);
+
+					// ---
+
+					if (body instanceof T.Binary) {
+						filter(body.primary);
+						filter(body.secondary);
+					}
+					body.bodies.forEach(child => {
+						filter(child);
+					});
+				}
+
+				if (isFilterOn) {
+					this.system.bodies.forEach(body => { filter(body) });
+
+					// Let the browser repaint and process input during long filter runs.
+					if (gen && attempts % 10 === 0) {
+						genStatus.innerText = `⏳ (${attempts}/${attemptsLimit} attempts${attemptNote})`;
+						await new Promise(requestAnimationFrame);
+					}
+				}
+			}
+
+			if (isFilterOn) {
+				genStatus.innerText = `${status ? '✅' : '❌'} (${attempts}/${attemptsLimit} attempts${attemptNote})`;
+
+				eval(postgen);
+			}
+			else {
+				genStatus.innerText = '✓ (no filter)';
+			}
+
+			this.feedbackId++;
+			genStatus.innerText += ` | ${this.feedback[this.feedbackId % this.feedback.length]} | ${(new Date()).toISOString()}`;
+
+			seedInput.placeholder = this.system.settings.seed;
+
+			eventBus.emit(events.Generator.Generation.Completed, {
+				data: this.system,
+				status: isFilterOn ? (status ? 'found' : 'not_found') : null
+			});
 		}
-
-		if (isFilterOn) {
-			genStatus.innerText = `${status ? '✅' : '❌'} (${attempts}/${attemptsLimit} attempts)`;
-
-			eval(postgen);
+		catch (error) {
+			console.error('Generation failed:', error);
+			genStatus.innerText = `❌ Generation failed: ${error.message}`;
+			const generateButton = document.querySelector('button[name=generate]');
+			if (generateButton)
+				generateButton.disabled = false;
 		}
-		else {
-			genStatus.innerText = '✓ (no filter)';
+		finally {
+			this._generating = false;
 		}
-
-		this.feedbackId++;
-		genStatus.innerText += ` | ${this.feedback[this.feedbackId % this.feedback.length]} | ${(new Date()).toISOString()}`;
-
-		seedInput.placeholder = this.system.settings.seed;
-
-		eventBus.emit(events.Generator.Generation.Completed, { 
-			data: this.system, 
-			status: isFilterOn ? (status ? 'found' : 'not_found') : null 
-		});
 	}
 
 	// -------------------------------------------------

@@ -8,6 +8,8 @@ const consts = Object.freeze({
 	PHY_R_GAS: 8.31446261815324,
 	/** Stefan-Boltzmann constant */
 	PHY_SIGMA: 5.670374419e-8,
+	/** Solar luminosity, unit: W */
+	PHY_SUN_LUMINOSITY: 3.828e26,
 
 	/** Unit: M☉ */
 	PHY_STAR_MASS_MIN: 0.08,

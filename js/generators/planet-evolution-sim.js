@@ -281,9 +281,11 @@ class SolarManager {
 
 		this.saturation = starAge_Gy <= this.saturationTime_Gy;
 
-		this.L_XUV = this.saturation === true
-			? this.star.luminosity * 1e-3
-			: this.star.luminosity * 1e-3 * Math.pow(starAge_Gy / this.saturationTime_Gy, -1.1);
+		// Star luminosity is stored in solar units; energy-limited escape needs watts.
+		const L_XUV_sun = this.star.luminosity * 1e-3;
+		this.L_XUV = L_XUV_sun * consts.PHY_SUN_LUMINOSITY * (this.saturation === true
+			? 1
+			: Math.pow(starAge_Gy / this.saturationTime_Gy, -1.1));
 
 		const base_density = 8.4e-21; // Base stellar wind density at 1 AU
 		const v_sw = 400e3; // Stellar wind velocity
@@ -486,11 +488,11 @@ class DissipationManager {
 		if (this.atmosphereMass_init_kg === 0)
 			return;
 
-		// Hydrostatic escape
+		// Energy-limited (hydrostatic) escape: dM/dt = eps * L_XUV * R_p^3 / (4 * G * M_p * a^2)
 		const eps = 0.10;
 		const R_p = this.planetRadius_m;
 		const M_p = this.planetMass_kg;
-		const M_thermal = (eps * this.evo.solarManager.L_XUV * (R_p ** 3)) / (4 * consts.PHY_G * M_p * this.distance_m);
+		const M_thermal = (eps * this.evo.solarManager.L_XUV * (R_p ** 3)) / (4 * consts.PHY_G * M_p * (this.distance_m ** 2));
 
 		// Solar wind stripping
 		const eta = 0.005;

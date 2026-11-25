@@ -414,11 +414,14 @@ class Renderer {
 	handleWheel(e) {
 		e.preventDefault(); // Prevent standard browser page scrolling
 
-		// Determine zoom factor multiplier (scrolling up zooms in, down zooms out)
-		const zoomFactor = e.deltaY < 0 ? 0.97 : 1.03;
-		
-		// Scale the target metric
-		let nextZoom = Math.pow(this.targetMetersPerPixel, zoomFactor);
+		// Zoom by a constant factor per input delta instead of raising the current
+		// scale to a power (which made zoom speed depend on the current depth).
+		let delta = e.deltaY;
+		if (e.deltaMode === 1) delta *= 16; // lines -> pixels
+		else if (e.deltaMode === 2) delta *= this.canvas.clientHeight; // pages -> pixels
+		delta = utils.clamp(delta, -100, 100);
+
+		const nextZoom = this.targetMetersPerPixel * Math.exp(delta * 0.002);
 
 		// Boundary constraints
 		const maxZoomIn = 10 * 1000; 
@@ -619,6 +622,9 @@ class Renderer {
 	}
 
 	loop(timestamp) {
+		// Schedule first so a single drawing error cannot kill the animation loop.
+		requestAnimationFrame((t) => this.loop(t));
+
 		if (!this.lastRealTime) this.lastRealTime = timestamp;
 		let realDt = (timestamp - this.lastRealTime) / 1000;
 		this.lastRealTime = timestamp;
@@ -658,12 +664,12 @@ class Renderer {
 
 		if (hoveredBody !== null) hoveredBody.sim.hover = true;
 
-		if (this.currentSystem !== null)
-			this.bodyList.forEach(body => {
-			body.drawBody();
-		});
-		
-		requestAnimationFrame((timestamp) => this.loop(timestamp));
+		if (this.currentSystem !== null) {
+			this.bodyList.forEach(body => { body.updateVisualState(); });
+			// Draw all overlays first so later bodies' orbits/fields never cover earlier bodies.
+			this.bodyList.forEach(body => { body.drawOverlays(); });
+			this.bodyList.forEach(body => { body.drawBody(); });
+		}
 	}
 }
 

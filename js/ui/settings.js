@@ -65,7 +65,22 @@ function generateSetting(tab, labelText, id, type, values, options, tooltip = un
 	}
 	else {
 		inputElement.addEventListener('input', (e) => {
-			eventBus.emit(id, { data: Number(e.currentTarget.value) });
+			const input = e.currentTarget;
+			const raw = input.value.trim();
+			if (raw === '')
+				return; // Keep the last valid value instead of feeding 0 to the generator.
+
+			const value = Number(raw);
+			if (!Number.isFinite(value))
+				return;
+
+			const min = input.min === '' ? -Infinity : Number(input.min);
+			const max = input.max === '' ? Infinity : Number(input.max);
+			const clamped = Math.min(max, Math.max(min, value));
+			if (clamped !== value)
+				input.value = clamped;
+
+			eventBus.emit(id, { data: clamped });
 		});
 		if (values.min !== undefined) inputElement.min = values.min;
 		if (values.max !== undefined) inputElement.max = values.max;

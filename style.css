@@ -128,6 +128,8 @@ body::before {
 
 	&.hidden {
 		opacity: 0;
+		/* Invisible UI must not swallow canvas clicks/taps. */
+		pointer-events: none;
 	}
 }
 
@@ -394,7 +396,7 @@ summary {
 	transition: var(--transition-speed-medium);
 }
 summary:hover {
-	color: var(--col-highlight);
+	color: var(--col-alt);
 	cursor: pointer;
 }
 
@@ -525,7 +527,8 @@ tr:nth-of-type(2n) {
 	
 	visibility: hidden;
 }
-.tooltip:hover .tooltiptext {
+.tooltip:hover .tooltiptext,
+.tooltip:focus-within .tooltiptext {
 	visibility: visible;
 }
 .tooltiptext::after {
@@ -739,12 +742,17 @@ textarea {
 select {
 	transition: var(--transition-speed-fast);
 }
-select,
-::picker(select) {
+select {
 	appearance: base-select;
 
 	color: var(--col-main);
 	background-color: var(--col-background);
+}
+@supports selector(::picker(select)) {
+	::picker(select) {
+		color: var(--col-main);
+		background-color: var(--col-background);
+	}
 }
 
 select::picker-icon {

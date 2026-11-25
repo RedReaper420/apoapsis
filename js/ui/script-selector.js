@@ -10,39 +10,44 @@ const scriptTextarea = document.getElementById('predicate');
 const preTextarea = document.getElementById('pregen');
 const postTextarea = document.getElementById('postgen');
 
+let scriptRequestId = 0;
+
 async function handleScriptChange(id) {
+	const requestId = ++scriptRequestId;
 	const options = Array.from(document.getElementsByTagName('option'));
 	const selected = options.find(opt => { return opt.value === id });
 
-	if (selected && id) {
-		// Load and set search script
-		const response_predicate = await fetch(`./filters/${id}.js?t=${Date.now()}`, { cache: 'no-store' });
-		scriptTextarea.value = await response_predicate.text();
-
-		// Load and set pre-gen script
-		if (selected.dataset.pre === 'true') {
-			const response_pre = await fetch(`./filters/${id}.pre.js?t=${Date.now()}`, { cache: 'no-store' });
-			preTextarea.value = await response_pre.text();
-		}
-		else {
-			preTextarea.value = '';
-		}
-
-		// Load and set post-gen script
-		if (selected.dataset.post === 'true') {
-			const response_post = await fetch(`./filters/${id}.post.js?t=${Date.now()}`, { cache: 'no-store' });
-			postTextarea.value = await response_post.text();
-		}
-		else {
-			postTextarea.value = '';
-		}
-	}
-	else {
+	if (!selected || !id) {
 		// Flush scripts
 		scriptTextarea.value = '';
 		preTextarea.value = '';
 		postTextarea.value = '';
+		return;
 	}
+
+	const load = async (name) => {
+		const response = await fetch(`./filters/${name}?t=${Date.now()}`, { cache: 'no-store' });
+		if (!response.ok) {
+			console.error(`Script loading error: ${response.status}`);
+			return '';
+		}
+		return response.text();
+	};
+
+	// Load and set search script
+	const predicatePromise = load(`${id}.js`);
+	const prePromise = selected.dataset.pre === 'true' ? load(`${id}.pre.js`) : Promise.resolve('');
+	const postPromise = selected.dataset.post === 'true' ? load(`${id}.post.js`) : Promise.resolve('');
+
+	const [predicate, pre, post] = await Promise.all([predicatePromise, prePromise, postPromise]);
+
+	// A newer selection may have finished while these requests were in flight.
+	if (requestId !== scriptRequestId)
+		return;
+
+	scriptTextarea.value = predicate;
+	preTextarea.value = pre;
+	postTextarea.value = post;
 }
 
 async function initSelector() {

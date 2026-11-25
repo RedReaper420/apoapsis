@@ -41,7 +41,7 @@ const events = Object.freeze({
 
 			Planet: Object.freeze({
 				amountMultiplier:		'settings_planet_amount_multiplier',
-				bonusGiantImpactChance:	'settings_planet_giant_impact_chance',
+				bonusGiantImpactChance:	'settings_planet_bonus_giant_impact_chance',
 				maxBonusGiantImpacts:	'settings_planet_max_bonus_giant_impacts',
 				binaryChance: 			'settings_planet_binary_chance',
 				lifeChance:				'settings_planet_life_chance',
