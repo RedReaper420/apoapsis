@@ -695,7 +695,7 @@ export class RingSystem {
  * @property {boolean} isMoon - Is the planet a moon of other planet. Affects interior generation.
  * @property {string} moonType - Moon type (`T.moonTypes`)
  * @property {boolean} retrograde - Retrograde orbit flag, assigned for some regular moons.
- * @property {number} mass - Moon mass (M⊕).
+ * @property {Value} mass - Moon mass (unit: `Mass`).
  * 
  * @property {BinaryStar|Star} parentStar - A star that hosts the planet.
  * @property {string} status - Planet's status that is assigned and used during the migration.
