@@ -1,6 +1,6 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.1.0-crimson.svg)](https://github.com/RedReaper420/apoapsis/releases)
+[![Version](https://img.shields.io/badge/Version-1.2.0-crimson.svg)](https://github.com/RedReaper420/apoapsis/releases)
 [![Live Demo](https://img.shields.io/badge/Demo-Online-brightgreen.svg)](https://redreaper420.github.io/apoapsis/)
 [![GitHub Wiki](https://img.shields.io/badge/Wiki-Documentation-181717)](https://github.com/RedReaper420/apoapsis/wiki)
 
