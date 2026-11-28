@@ -750,6 +750,8 @@ select {
 }
 @supports selector(::picker(select)) {
 	::picker(select) {
+		appearance: base-select;
+		
 		color: var(--col-main);
 		background-color: var(--col-background);
 	}
@@ -816,19 +818,19 @@ optgroup {
 	}
 }
 
-.script-thumb {
+.script-item.thumb {
 	text-shadow: 0 0 0.25em white;
 }
 
-.script-name {
+.script-item.name {
 	font-weight: bold;
 }
 
-.script-desc {
+.script-item.desc {
 	text-wrap: pretty;
 }
 
-selectedcontent .script-desc {
+selectedcontent .script-item.desc {
 	display: none;
 }
 

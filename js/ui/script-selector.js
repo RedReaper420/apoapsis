@@ -76,25 +76,25 @@ async function initSelector() {
 
 				// "Thumbnail"
 				const thumb = document.createElement('span');
-				thumb.classList.add('script-thumb');
+				thumb.classList.add('script-item', 'thumb');
 				thumb.innerHTML = item.thumb;
 				option.appendChild(thumb);
 
 				// Script name
 				const name = document.createElement('q');
-				name.classList.add('script-name');
+				name.classList.add('script-item', 'name');
 				name.innerHTML = item.name;
 				option.appendChild(name);
 
 				// Script description
 				const desc = document.createElement('i');
-				desc.classList.add('script-desc');
+				desc.classList.add('script-item', 'desc');
 				desc.innerHTML = item.desc;
 				option.appendChild(desc);
 
 				// Rarity
 				const rarity = document.createElement('sub');
-				rarity.classList.add('script-desc');
+				rarity.classList.add('script-item', 'desc');
 				rarity.innerText = '1/' + item.rarity;
 				option.appendChild(rarity);
 
