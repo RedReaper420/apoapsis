@@ -12,8 +12,9 @@ export default function drawRings() {
 	const rend = this.renderer;
 	const ctx = rend.bodyCtx;
 
-	const hdr = rend.setting_applyHDR;
-	const lighting = Math.min(1.0, hdr ? Math.pow(this.sim.lum_avg, 1/5) : this.sim.lum_avg); // HDR
+	// drawLighting() already applies HDR to sim.lum_avg; applying it again here
+	// made rings much brighter than the planet they belong to.
+	const lighting = Math.min(1.0, this.sim.lum_avg);
 	
 	for (const ring of this.rings) {
 		const innerRadius = ring.innerRadius.as(T.units.Dist.m) / rend.metersPerPixel;

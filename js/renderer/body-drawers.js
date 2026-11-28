@@ -23,6 +23,8 @@ import drawLighting from "./body-drawers/lighting.js";
 export function setDrawFunctions(body, renderer) {
 	body.renderer = renderer;
 
+	body.updateVisualState = updateVisualState;
+	body.drawOverlays = drawOverlays;
 	body.drawBody = drawBody;
 
 	body.drawTrail = drawTrail;
@@ -42,11 +44,8 @@ export function setDrawFunctions(body, renderer) {
 	body.drawHint = drawHint;
 }
 
-function drawBody() {
-	const coords = this.position.screen;
+function updateVisualState() {
 	const rend = this.renderer;
-	const ctx = rend.ctx;
-	const bodyCtx = rend.bodyCtx;
 
 	this.sim.radius_vis = this.sim.radius / rend.metersPerPixel;
 	this.sim.radius_atm_vis = this.sim.radius_atm / rend.metersPerPixel;
@@ -58,6 +57,20 @@ function drawBody() {
 
 	if (!rend.setting_applyScaling)
 		this.sim.radius_vis_scaled = this.sim.radius_vis;
+}
+
+function isOffscreen() {
+	const coords = this.position.screen;
+	const rend = this.renderer;
+	return Math.hypot(coords.x, coords.y) > Math.max(rend.canvas.width, rend.canvas.height) * 50;
+}
+
+/** Draws everything that belongs behind the bodies: orbits, trails, habitable zones and fields. */
+function drawOverlays() {
+	const rend = this.renderer;
+
+	if (isOffscreen.call(this))
+		return;
 
 	switch (rend.setting_drawTrails) {
 		case 0:
@@ -73,10 +86,6 @@ function drawBody() {
 			break;
 	}
 
-	// Culling
-	if (Math.hypot(coords.x, coords.y) > Math.max(rend.canvas.width, rend.canvas.height) * 50)
-		return;
-
 	// Habitable zone
 	if (rend.setting_showHabitableZone)
 		this.drawHabitableZone();
@@ -84,9 +93,17 @@ function drawBody() {
 	// Magnetosphere
 	if (rend.setting_showMagnetospheres)
 		this.drawMagneticField();
-	
-	// Drawing body parts on a body canvas
+}
 
+function drawBody() {
+	const rend = this.renderer;
+	const ctx = rend.ctx;
+	const bodyCtx = rend.bodyCtx;
+
+	if (isOffscreen.call(this))
+		return;
+
+	// Drawing body parts on a body canvas
 	bodyCtx.clearRect(0, 0, bodyCtx.canvas.width, bodyCtx.canvas.height);
 
 	// Barycenter

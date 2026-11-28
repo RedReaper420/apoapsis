@@ -320,13 +320,14 @@ function mergePlanets(recipient, donor) {
 	const donorCoreMass = donor.core.mass.value;
 
 	const coreCoeff = 0.9; // 90% of core mass will remain
+	const combinedCoreMass = recipientCoreMass + donorCoreMass;
 
-	recipient.core.mass.value += donorCoreMass;
-	recipient.core.mass.value *= coreCoeff;
-	
-	recipient.core.composition.iron = (recipient.core.composition.iron * recipientCoreMass + donor.core.composition.iron * donorCoreMass) / recipient.core.mass.value;
-	recipient.core.composition.rock = (recipient.core.composition.rock * recipientCoreMass + donor.core.composition.rock * donorCoreMass) / recipient.core.mass.value;
-	recipient.core.composition.ice = (recipient.core.composition.ice * recipientCoreMass + donor.core.composition.ice * donorCoreMass) / recipient.core.mass.value;
+	// Composition fractions are mass-weighted using the pre-loss mass so that they still sum to 1.
+	recipient.core.composition.iron = (recipient.core.composition.iron * recipientCoreMass + donor.core.composition.iron * donorCoreMass) / combinedCoreMass;
+	recipient.core.composition.rock = (recipient.core.composition.rock * recipientCoreMass + donor.core.composition.rock * donorCoreMass) / combinedCoreMass;
+	recipient.core.composition.ice = (recipient.core.composition.ice * recipientCoreMass + donor.core.composition.ice * donorCoreMass) / combinedCoreMass;
+
+	recipient.core.mass.value = combinedCoreMass * coreCoeff;
 
 	// --- Volatile Envelope Merge ---
 	recipient.envelope.mass.convertTo(T.units.Mass.M_Earth);
@@ -335,21 +336,18 @@ function mergePlanets(recipient, donor) {
 	const recipientEnvMass = recipient.envelope.mass.value;
 	const donorEnvMass = donor.envelope.mass.value;
 	
-	recipient.envelope.mass.value += donorEnvMass;
+	const combinedEnvMass = recipientEnvMass + donorEnvMass;
+	recipient.envelope.mass.value = combinedEnvMass;
 
-	if (recipient.envelope.mass.value > 0) { // Envelope was there initially or was acquired just now
+	if (combinedEnvMass > 0) { // Envelope was there initially or was acquired just now
 		const gasCoeff = prng.range(0.65, 0.85); // 65%-85% of gas will remain
 
-		// Calculating new composition fractions
-		recipient.envelope.composition.gas = (recipient.envelope.composition.gas * recipientEnvMass + donor.envelope.composition.gas * donorEnvMass) / recipient.envelope.mass.value;
-		recipient.envelope.composition.ice = (recipient.envelope.composition.ice * recipientEnvMass + donor.envelope.composition.ice * donorEnvMass) / recipient.envelope.mass.value;
+		// Calculating new composition fractions before losing any gas
+		const gasMass = recipient.envelope.composition.gas * recipientEnvMass + donor.envelope.composition.gas * donorEnvMass;
+		const lostGas = gasMass * (1 - gasCoeff);
 
-		// Losing some portion of the gas
-		recipient.envelope.mass.value -= recipient.envelope.mass.value * (recipient.envelope.composition.gas - (1 - gasCoeff));
-		recipient.envelope.composition.gas *= gasCoeff;
-
-		// Normalizing composition
-		recipient.envelope.composition.gas = recipient.envelope.composition.gas / (recipient.envelope.composition.gas + recipient.envelope.composition.ice);
+		recipient.envelope.mass.value = combinedEnvMass - lostGas;
+		recipient.envelope.composition.gas = (gasMass - lostGas) / recipient.envelope.mass.value;
 		recipient.envelope.composition.ice = 1 - recipient.envelope.composition.gas;
 	}
 	else { // Both bodies had no envelope

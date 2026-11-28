@@ -57,6 +57,10 @@ function showSystemNotFoundToast() {
 }
 
 eventBus.on(events.Generator.Generation.Completed, (cb) => {
+	const generateButton = document.querySelector('button[name=generate]');
+	if (generateButton)
+		generateButton.disabled = false;
+
 	if (cb.status === 'found')
 		showSystemFoundToast();
 	else if (cb.status === 'not_found')
@@ -85,7 +89,7 @@ function closeTab() {
 
 // Tabs initiation
 for (let i = 0; i < tabButtons.length; i++) {
-	tabButtons[i].addEventListener('click', () => { openTab(event, tabButtons[i].name); });
+	tabButtons[i].addEventListener('click', (e) => { openTab(e, tabButtons[i].name); });
 
 	if (i === 0)
 		tabButtons[i].click();
@@ -93,34 +97,80 @@ for (let i = 0; i < tabButtons.length; i++) {
 
 //#endregion
 
+// Keep collapsed overlays out of the tab order and accessibility tree.
+const settingsOverlay = document.getElementById('generatorSettings');
+settingsOverlay.inert = !settingsOverlay.classList.contains('open');
+settingsOverlay.setAttribute('aria-hidden', String(settingsOverlay.inert));
+
 const systemLoader = document.getElementById('systemLoader');
 const settingsLoader = document.getElementById('settingsLoader');
 
+function showErrorToast(message) {
+	Toastify({
+		text: message,
+		duration: 4000,
+		position: 'center',
+		gravity: 'top',
+		style: {
+			color: 'var(--col-main)',
+			background: 'var(--col-background)',
+			border: '1px solid crimson',
+			borderRadius: 'var(--corner-radius)'
+		}
+	}).showToast();
+}
+
+/** Applies a value from a saved settings file, clamping numeric values to the input's bounds. */
+function applySettingValue(input, rawValue) {
+	if (input.type === 'checkbox') {
+		input.checked = Boolean(rawValue);
+		return true;
+	}
+
+	const value = Number(rawValue);
+	if (!Number.isFinite(value))
+		return false;
+
+	const min = input.min === '' ? -Infinity : Number(input.min);
+	const max = input.max === '' ? Infinity : Number(input.max);
+	input.value = Math.min(max, Math.max(min, value));
+	return true;
+}
+
 // System load upon file select handle
 systemLoader.addEventListener('change', async () => {
-	if (!systemLoader.files.length) {
+	if (!systemLoader.files.length)
 		return;
-	}
 
-	const data = await systemLoader.files[0].text();
+	try {
+		const data = await systemLoader.files[0].text();
 
-	const classMap = {
-		'Star': T.Star,
-		'Planet': T.Planet,
-		'BinaryStar': T.BinaryStar,
-		'BinaryPlanet': T.BinaryPlanet,
-		'Value': T.Value,
-	};
+		const classMap = {
+			'Star': T.Star,
+			'Planet': T.Planet,
+			'BinaryStar': T.BinaryStar,
+			'BinaryPlanet': T.BinaryPlanet,
+			'Value': T.Value,
+		};
 
-	function reviver(key, value) {
-		if (value && typeof value === 'object' && value.$type && classMap[value.$type]) {
-			Object.setPrototypeOf(value, classMap[value.$type].prototype);
+		function reviver(key, value) {
+			if (value && typeof value === 'object' && value.$type && classMap[value.$type]) {
+				Object.setPrototypeOf(value, classMap[value.$type].prototype);
+			}
+			return value;
 		}
-		return value;
-	}
 
-	const loadedSystem = JSON.retrocycle(JSON.parse(data, reviver));
-	eventBus.emit(events.Generator.Generation.Completed, { data: loadedSystem });
+		const loadedSystem = JSON.retrocycle(JSON.parse(data, reviver));
+		eventBus.emit(events.Generator.Generation.Completed, { data: loadedSystem });
+	}
+	catch (error) {
+		console.error('Failed to load system:', error);
+		showErrorToast('Failed to load system: invalid file.');
+	}
+	finally {
+		// Clearing the input allows selecting the same file again.
+		systemLoader.value = '';
+	}
 });
 
 // Settings load upon file select handle
@@ -128,33 +178,40 @@ settingsLoader.addEventListener('change', async () => {
 	if (!settingsLoader.files.length)
 		return;
 
-	const data = await settingsLoader.files[0].text();
-	const settings = JSON.parse(data);
+	try {
+		const data = await settingsLoader.files[0].text();
+		const settings = JSON.parse(data);
 
-	const inputs = Array.from(document.getElementsByTagName('input'));
-	inputs.forEach(input => {
-		const setting = input.name.replace('settings_', '');
+		const inputs = Array.from(document.getElementsByTagName('input'));
+		inputs.forEach(input => {
+			const setting = input.name.replace('settings_', '');
 
-		if (settings[setting] !== undefined) {
-			switch (input.type) {
-				case 'checkbox': input.checked = settings[setting];
+			if (settings[setting] !== undefined && applySettingValue(input, settings[setting]))
+				input.dispatchEvent(new Event('input'));
+		});
 
-				default: input.value = settings[setting];
-			}
-			input.dispatchEvent(new Event('input'));
-		}
-	});
-
-	const seed = document.getElementById('gen_seed');
-	seed.value = settings.seed_user ? settings.seed_user : settings.seed;
-	seed.dispatchEvent(new Event('input'));
+		// An empty user seed must stay empty; otherwise a previously generated random
+		// seed gets pinned and all subsequent generations would repeat it.
+		const seed = document.getElementById('gen_seed');
+		seed.value = settings.seed_user ?? '';
+		seed.placeholder = settings.seed ?? '';
+		seed.dispatchEvent(new Event('input'));
+	}
+	catch (error) {
+		console.error('Failed to load settings:', error);
+		showErrorToast('Failed to load settings: invalid file.');
+	}
+	finally {
+		settingsLoader.value = '';
+	}
 });
 
 // Click event emitting for buttons
 const buttons = Array.from(document.getElementsByTagName('button'));
 buttons.forEach(button => {
 	button.addEventListener('click', (e) => {
-		eventBus.emit(events.UI.ButtonClick, { data: e.target });
+		// Buttons can contain nested elements (e.g. the ⚙️ glyph), so use currentTarget.
+		eventBus.emit(events.UI.ButtonClick, { data: e.currentTarget });
 	});
 });
 
@@ -164,6 +221,9 @@ eventBus.on(events.UI.ButtonClick, (cb) => handleButtonClick(cb.data));
  * @param {HTMLButtonElement} button 
  */
 function handleButtonClick(button) {
+	if (!(button instanceof HTMLButtonElement))
+		return;
+
 	if (button.classList.contains('toggle'))
 		button.classList.toggle('on');
 	else if (button.classList.contains('multitoggle'))
@@ -171,6 +231,8 @@ function handleButtonClick(button) {
 
 	switch (button.name) {
 		case 'generate': {
+			// Generation (especially with filters) can take a while; prevent overlapping runs.
+			button.disabled = true;
 			eventBus.emit(events.Generator.Generation.Start);
 			break;
 		}
@@ -178,7 +240,10 @@ function handleButtonClick(button) {
 		case 'settings': {
 			const settings = document.getElementById('generatorSettings');
 			settings.classList.toggle('open');
-			eventBus.emit(events.UI.SettingsOverlayToggle, { value: settings.classList.contains('open') });
+			const open = settings.classList.contains('open');
+			settings.inert = !open;
+			settings.setAttribute('aria-hidden', String(!open));
+			eventBus.emit(events.UI.SettingsOverlayToggle, { value: open });
 			break;
 		}
 
@@ -233,6 +298,7 @@ function handleButtonClick(button) {
 				: button.innerText.slice(0, 2);
 			const targetPanel = document.getElementById(button.name);
 			targetPanel.classList.toggle('closed');
+			targetPanel.inert = targetPanel.classList.contains('closed');
 			break;
 		}
 
@@ -303,11 +369,12 @@ function saveSystem() {
 	
 	const timestamp = (new Date()).toISOString();
 	
+	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
-	link.href = URL.createObjectURL(blob);
+	link.href = url;
 	link.download = `Apoapsis System ${timestamp}.json`;
 	link.click();
-	URL.revokeObjectURL(link.href);
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function saveSettings() {
@@ -316,11 +383,12 @@ function saveSettings() {
 	
 	const timestamp = (new Date()).toISOString();
 	
+	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
-	link.href = URL.createObjectURL(blob);
+	link.href = url;
 	link.download = `Apoapsis Settings ${timestamp}.json`;
 	link.click();
-	URL.revokeObjectURL(link.href);
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function copySeed() {
@@ -381,6 +449,10 @@ fetch(`home_url.txt?t=${Date.now()}`, { cache: 'no-store' })
 .then(response => {
 	outboundUrlPrompt.innerText = response;
 	outboundButton.href = response;
+})
+.catch(() => {
+	outboundUrlPrompt.innerText = defaultUrl;
+	outboundButton.href = defaultUrl;
 });
 
 //#endregion

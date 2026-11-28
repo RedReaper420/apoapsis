@@ -110,18 +110,11 @@ export function generateStar(settings, constraint = null, constraintMassMult = 1
  * @see {@link sampleKroupaIMF}
  */
 function sampleIMF(minMass, maxMass) {
-	let mass = 0;
-
-	const MAX_ATTEMPTS = 100;
-	let attempts = 0;
-	do {
-		mass = sampleKroupaIMF();
-		attempts++;
-	} while ( ((mass < minMass) || (mass > maxMass)) && (attempts < MAX_ATTEMPTS) );
-
-	const finalMass = utils.clamp(mass, minMass, maxMass);
-
-	return new T.Value(finalMass, T.units.Mass.M_Sun);
+	// Sample from the requested interval directly: rejection sampling with a final
+	// clamp piles up stars at the boundaries whenever the interval is narrow.
+	const lower = Math.min(minMass, maxMass);
+	const upper = Math.max(minMass, maxMass);
+	return new T.Value(sampleKroupaIMF(lower, upper), T.units.Mass.M_Sun);
 }
 
 /**
@@ -144,43 +137,39 @@ function sampleKroupaIMF(minMass = consts.PHY_STAR_MASS_MIN, maxMass = consts.PH
 	const alpha2 = 1.3;   // Low mass stars segment (0.08 - 0.5 M☉)
 	const alpha3 = 2.3;   // Intermediate and high mass segment (> 0.5 M☉)
 
-	const massThreshold1 = 0.01;
-	const massThreshold2 = 0.08;
-	const massThreshold3 = 0.5;
-	const massThreshold4 = maxMass;
+	const boundaries = [0.01, 0.08, 0.5];
+	const lower = Math.max(minMass, boundaries[0]);
+	const upper = Math.max(lower, maxMass);
 
-	const lowLimit = Math.max(minMass, 0.01);
+	// Truncate each power-law segment to the requested range before building the CDF.
+	const segments = [
+		{ lower, upper: Math.min(upper, boundaries[1]), alpha: alpha1 },
+		{ lower: Math.max(lower, boundaries[1]), upper: Math.min(upper, boundaries[2]), alpha: alpha2 },
+		{ lower: Math.max(lower, boundaries[2]), upper, alpha: alpha3 },
+	].filter(segment => segment.upper > segment.lower);
 
-	// Cumulative distribution function (CDF) segments
-	let cdfSegment1 = 0;
-	let cdfSegment2 = 0;
+	if (segments.length === 0)
+		return lower;
 
-	// Segment 1: Substellar objects / ultra-low mass
-	if (lowLimit < massThreshold2) {
-		const norm1 = (Math.pow(massThreshold2, 1 - alpha1) - Math.pow(massThreshold1, 1 - alpha1)) / (1 - alpha1);
-		cdfSegment1 = norm1;
+	const weights = segments.map(({ lower: a, upper: b, alpha }) =>
+		alpha === 1
+			? Math.log(b / a)
+			: (Math.pow(b, 1 - alpha) - Math.pow(a, 1 - alpha)) / (1 - alpha)
+	);
+
+	let randomWeight = prng() * weights.reduce((sum, weight) => sum + weight, 0);
+
+	for (let i = 0; i < segments.length; i++) {
+		const { lower: a, alpha } = segments[i];
+		if (randomWeight <= weights[i] || i === segments.length - 1) {
+			if (alpha === 1)
+				return a * Math.exp(randomWeight / weights[i]); // log-space interpolation
+			return Math.pow(Math.pow(a, 1 - alpha) + randomWeight * (1 - alpha), 1 / (1 - alpha));
+		}
+		randomWeight -= weights[i];
 	}
 
-	// Segment 2: 0.08 - 0.5 M☉
-	const norm2 = (Math.pow(massThreshold3, 1 - alpha2) - Math.pow(massThreshold2, 1 - alpha2)) / (1 - alpha2);
-	cdfSegment2 = cdfSegment1 + norm2;
-
-	// Segment 3: 0.5 M☉ - maxMass
-	const norm3 = (Math.pow(massThreshold4, 1 - alpha3) - Math.pow(massThreshold3, 1 - alpha3)) / (1 - alpha3);
-	const totalCdfWeight = cdfSegment2 + norm3;
-
-	const randomWeight = prng() * totalCdfWeight;
-
-	// Inverse Transform Sampling Execution
-	if (randomWeight < cdfSegment1) {
-		return Math.pow(Math.pow(massThreshold1, 1 - alpha1) + randomWeight * (1 - alpha1), 1 / (1 - alpha1));
-	} else if (randomWeight < cdfSegment2) {
-		const relativeWeight = randomWeight - cdfSegment1;
-		return Math.pow(Math.pow(massThreshold2, 1 - alpha2) + relativeWeight * (1 - alpha2), 1 / (1 - alpha2));
-	} else {
-		const relativeWeight = randomWeight - cdfSegment2;
-		return Math.pow(Math.pow(massThreshold3, 1 - alpha3) + relativeWeight * (1 - alpha3), 1 / (1 - alpha3));
-	}
+	return lower;
 }
 
 /**
@@ -241,11 +230,14 @@ function getLuminosity(starMass) {
 function getRadius(starMass) {
 	const mass = starMass.as(T.units.Mass.M_Sun);
 
-	if (mass <= 1.5)
-		return new T.Value(0.438 * (mass**2) + 0.479 * mass + 0.075, T.units.Dist.R_Sun);
-	else
-		return new T.Value(Math.pow(10, 0.003 + 0.724 * Math.log10(mass)), T.units.Dist.R_Sun);
-		//return new T.Value(Math.pow(mass, 0.8), T.units.Dist.R_Sun);
+	const lowMassRadius = 0.438 * (mass**2) + 0.479 * mass + 0.075;
+	const highMassRadius = Math.pow(10, 0.003 + 0.724 * Math.log10(Math.max(mass, 1e-6)));
+
+	// The two relations differ noticeably at 1.5 M☉; blend over a narrow range
+	// around their actual intersection (~1 M☉) to avoid a jump in radius,
+	// luminosity-derived temperature and density.
+	const blend = utils.clamp((mass - 1.0) / 0.1, 0, 1);
+	return new T.Value(lowMassRadius * (1 - blend) + highMassRadius * blend, T.units.Dist.R_Sun);
 }
 
 /**
@@ -455,11 +447,12 @@ function getRotation(starRadius, starMass, starAge) {
 	// Random deviation
 	const randomFactor = Math.exp( utils.clamp(utils.gaussianRandom(), -1.5, 1.5) );
 
-	// Calculating critical rotational velocity (Roche model)
-	const v_crit = 0.816 * Math.sqrt((consts.PHY_G * M_kg) / R_m); 
+	// Calculating critical rotational velocity (Roche model), converted to km/s
+	// to match v_base before applying the cap.
+	const v_crit_kms = (0.816 * Math.sqrt((consts.PHY_G * M_kg) / R_m)) / 1000;
 
 	// Calculating final rotational velocity
-	const v_e = Math.min(v_base * brakeFactor * randomFactor, v_crit * 0.9); 
+	const v_e = Math.min(v_base * brakeFactor * randomFactor, v_crit_kms * 0.9);
 
 	// Calculating rotation period.
 	// v = W * R = 2piR / P  -->  P = 2piR / v

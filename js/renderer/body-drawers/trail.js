@@ -6,9 +6,15 @@ export default function drawTrail() {
 	if (this instanceof T.Binary)
 		return;
 	
-	this.sim.trail.push({x: this.position.absolute.x, y: this.position.absolute.y});
+	// Sample once per simulation timestamp. Sampling per animation frame fills the
+	// trail with duplicate points while paused and collapses the drawn path.
+	const simTime = this.renderer.simTimeSeconds;
+	if (this.sim.lastTrailTime !== simTime) {
+		this.sim.lastTrailTime = simTime;
+		this.sim.trail.push({x: this.position.absolute.x, y: this.position.absolute.y});
 
-	if (this.sim.trail.length > 300) this.sim.trail.shift();
+		if (this.sim.trail.length > 300) this.sim.trail.shift();
+	}
 
 	if (this.sim.trail.length < 2) return;
 	

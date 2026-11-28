@@ -338,8 +338,8 @@ export function getColor(planet) {
  * @param {T.Planet} planet 
  */
 export function setSurfaceTemperature(planet) {
+	// temperature_eq already includes the albedo correction (see planet-gen.js).
 	planet.temperature_eq.convertTo(T.units.Temp.K);
-	planet.temperature_eq.value *= Math.pow(1 - planet.albedo, 1/4);
 
 	let T_eff_fusion = 0;
 	if (planet.type === T.planetTypes.BrownDwarf) {

@@ -45,7 +45,19 @@ export default function generatePlanetProfile(body) {
 
 		//#region | Classification
 		const classification = planet.querySelector('#classification');
-		classification.innerHTML = body.classification;
+		// Classifications of systems loaded from JSON are untrusted, so never parse them as HTML.
+		const classificationText = String(body.classification ?? '').replace(/<[^>]*>/g, '');
+		const [tempLabel, ...rest] = classificationText.split(' ');
+		const tempColor = body.classificationColor;
+		if (/^([a-z]+|#[0-9a-f]{3,8})$/i.test(tempColor || '')) {
+			const coloredLabel = document.createElement('span');
+			coloredLabel.style.color = tempColor;
+			coloredLabel.textContent = tempLabel;
+			classification.replaceChildren(coloredLabel, document.createTextNode(rest.length ? ' ' + rest.join(' ') : ''));
+		}
+		else {
+			classification.textContent = classificationText;
+		}
 		//#endregion
 
 		//#region | ESI

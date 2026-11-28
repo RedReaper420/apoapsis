@@ -7,11 +7,13 @@ export function saveDocument() {
 	
 	const timestamp = (new Date()).toISOString();
 	
+	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
-	link.href = URL.createObjectURL(blob);
+	link.href = url;
 	link.download = `Apoapsis System Report ${timestamp}.html`;
 	link.click();
-	URL.revokeObjectURL(link.href);
+	// Revoking in the same tick can cancel the download in some browsers.
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function generateDocument() {
@@ -293,15 +295,23 @@ function generateDocument() {
 <body>
 <main>`;
 
+	// Text taken from user-editable seeds and loaded system files must not be parsed as HTML.
+	const escapeHtml = (value) => String(value)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+
 	const navigation = document.getElementById('navigation').cloneNode(true);
 	const bodyList = Array.from(navigation.getElementsByClassName('body'));
 	bodyList.forEach(el => {
-		el.innerHTML = `<a href='#${el.dataset.id}'>${el.innerText}</a>`
+		el.innerHTML = `<a href='#${escapeHtml(el.dataset.id)}'>${escapeHtml(el.innerText)}</a>`
 	});
 	
 	let bodies = '';
 	const scan = (body) => {
-		bodies += `<br><h1 id='${body.sim.navMark.dataset.id}'>${body.name}</h1>${body.sim.profile.outerHTML}<br><hr>`;
+		bodies += `<br><h1 id='${escapeHtml(body.sim.navMark.dataset.id)}'>${escapeHtml(body.name)}</h1>${body.sim.profile.outerHTML}<br><hr>`;
 		
 		// ---
 
@@ -318,7 +328,7 @@ function generateDocument() {
 
 	const debug = `<details><summary>Generation Info</summary>
 <textarea cols="120" rows="40">
-${JSON.stringify(window.apoapsis_system.settings, null, '\t')}
+${escapeHtml(JSON.stringify(window.apoapsis_system.settings, null, '\t'))}
 </textarea>
 </details>
 	`;

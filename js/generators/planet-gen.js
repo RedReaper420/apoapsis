@@ -85,6 +85,7 @@ export function generatePlanet(settings, parentBody, sma, genData, profile = und
 
 		planet.genData = {
 			isMoon: true,
+			impacts: 0,
 			mass: genData.mass,
 			retrograde: genData.retrograde,
 			moonType: genData.moonType,
@@ -160,13 +161,17 @@ export function planetGeneration_Stage2(planet) {
  * @param {T.Planet} planet 
  */
 export function planetGeneration_Stage3(settings, planet) {
-	// Simplified tidal braking caused by the planet's nearest moon
+	// Simplified tidal braking caused by the planet's nearest moon.
+	// Moon arrays are not guaranteed to be sorted by semi-major axis.
 	if (planet.bodies.length > 0) {
+		const nearestMoon = planet.bodies.reduce((a, b) =>
+			a.sma.as(T.units.Dist.m) <= b.sma.as(T.units.Dist.m) ? a : b
+		);
 		const m_p = planet.mass.as(T.units.Mass.kg);
-		const m_m = planet.bodies[0].mass.as(T.units.Mass.kg);
+		const m_m = nearestMoon.mass.as(T.units.Mass.kg);
 		const massComponent = (m_m / m_p) * Math.min(m_p, m_m);
 
-		const a = planet.bodies[0].sma.as(T.units.Dist.m);
+		const a = nearestMoon.sma.as(T.units.Dist.m);
 		const t = Math.log(planet.age.as(T.units.Time.s));
 		
 		const tidalForceFactor = Math.pow(massComponent / (a ** 3) * t, 1/3);
@@ -205,8 +210,8 @@ export function planetGeneration_Stage3(settings, planet) {
 		terrestrial.setSurfaceTemperature(planet);
 
 		// Simplified simulation of the atmosphere's freezing at T < -223°C
-		if (planet.temperature.as(T.units.K) <= 50) {
-			planet.atmosphere.pressure.value *= 0.01 * (1 - Math.exp(-0.075 * planet.temperature.as(T.units.K)));
+		if (planet.temperature.as(T.units.Temp.K) <= 50) {
+			planet.atmosphere.pressure.value *= 0.01 * (1 - Math.exp(-0.075 * planet.temperature.as(T.units.Temp.K)));
 
 			const A = 4 * Math.PI * (planet.radius.as(T.units.Dist.m) ** 2);
 			planet.atmosphere.mass.set(planet.atmosphere.pressure.as(T.units.Press.Pa) * A / planet.g.as(T.units.Acc.m_s2), T.units.Mass.kg);
@@ -383,7 +388,7 @@ function sampleCoreIronFraction(genData, coreMass) {
 	const sma_norm = genData.sma_norm;
 	const distanceFactor = Math.exp(-0.1 * (sma_norm - consts.PHY_DIST_SNOW_LINE));
 
-	const coreMass_MEarth = genData.isMoon ? genData.mass : coreMass.as(T.units.Mass.M_Earth);
+	const coreMass_MEarth = genData.isMoon ? genData.mass.as(T.units.Mass.M_Earth) : coreMass.as(T.units.Mass.M_Earth);
 	const massFactor = coreMass_MEarth > 1 ? 1.0 + 0.25 * Math.log10(coreMass_MEarth) : 1.0;
 
 	return utils.clamp((randIronFraction + starMetallicityFactor) * distanceFactor * massFactor, 0.001, 0.85);
@@ -800,7 +805,8 @@ function getGlowColor(temperature) {
 	else {
 		const toHex = (colorVal) => colorVal.toString(16).padStart(2, '0');
 		
-		const a = Math.min(255, Math.floor(Math.pow((1400, temp - 700) / (1400 - 700), 2) * 255));
+		const heat = (temp - 700) / (1400 - 700);
+		const a = Math.min(255, Math.floor(heat * heat * 255));
 
 		if (temp < 1000) {
 			// Calculating color from #170000 at 700K to #ff4400 at 1000K.
@@ -1057,8 +1063,10 @@ function getPlanetClassification(planet) {
 		tempCatStyle = 'crimson';
 	}
 
+	// Keep the classification as plain text and store the color separately, so that
+	// inspectors and exported reports never have to inject generator-produced HTML.
+	planet.classificationColor = tempCatStyle;
 	tempCat = capitalizeFirstLetter(tempCat);
-	tempCat = `<span style="color: ${tempCatStyle};">${tempCat}</span>`;
 
 	let compCat = '';
 	switch (planet.type) {
